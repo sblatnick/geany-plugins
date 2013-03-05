@@ -1,0 +1,4 @@
+
+gcc -c src/quick-opener.c -fPIC `pkg-config --cflags geany`
+gcc quick-opener.o -o quick-opener.so -shared `pkg-config --libs geany`
+sudo cp quick-opener.so /usr/local/lib/geany/
