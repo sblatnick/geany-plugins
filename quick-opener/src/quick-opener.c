@@ -5,6 +5,7 @@ GeanyData       *geany_data;
 GeanyFunctions  *geany_functions;
 
 GtkWidget *dialog;
+GtkTreeStore *list;
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Opener", "Search filenames while typing", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
@@ -20,12 +21,20 @@ static GtkWidget *main_menu_item = NULL;
 static void onkeypress(GtkEntry *entry)
 {
 	printf("keypress\n");
-	gtk_dialog_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
+	//gtk_tree_store_clear(list);
+	
+	GtkTreeIter row;
+	gtk_tree_store_append(list, &row, NULL);
+	gtk_tree_store_set(list, &row, 0, "hello", 1, "world", -1);
+	
+	//gtk_dialog_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
 }
 
 static void quick_open()
 {
-	GtkWidget *entry, *label, *hbox;
+	GtkWidget *entry, *label, *hbox, *tree, *scrollable;
+	GtkTreeViewColumn *path_column, *name_column;
+	GtkCellRenderer *renderer;
 
 	gchar *dir;
   GeanyProject 	*project 	= geany->app->project;
@@ -43,8 +52,8 @@ static void quick_open()
   gtk_dialog_add_button(GTK_DIALOG(dialog),_("_Open"), GTK_RESPONSE_OK);
 	gtk_dialog_add_button(GTK_DIALOG(dialog),_("_Cancel"), GTK_RESPONSE_CANCEL);
 	
-	hbox=gtk_hbox_new(FALSE,0);
-	gtk_container_add(GTK_CONTAINER(GTK_DIALOG(dialog)->vbox),hbox);
+	hbox=gtk_hbox_new(FALSE, 0);
+	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox),hbox, FALSE, FALSE, 0);
 	gtk_widget_show(hbox);
 
 	label=gtk_label_new(_("File:"));
@@ -54,8 +63,38 @@ static void quick_open()
 	entry = gtk_entry_new();
 	g_signal_connect(entry, "changed", G_CALLBACK(onkeypress), NULL);
 
-	gtk_box_pack_start(GTK_BOX(hbox), entry, FALSE, FALSE, 2);
+	gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 2);
 	gtk_widget_show(entry);
+	
+	//Table:
+	
+	list = gtk_tree_store_new(2, G_TYPE_STRING, G_TYPE_STRING);
+	onkeypress(NULL);
+	tree=gtk_tree_view_new_with_model(GTK_TREE_MODEL(list));
+
+	path_column = gtk_tree_view_column_new();
+	gtk_tree_view_column_set_alignment(path_column, 1.0);
+	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), path_column);
+	name_column = gtk_tree_view_column_new();
+	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), name_column);
+	
+	renderer = gtk_cell_renderer_text_new();
+	
+	gtk_tree_view_column_pack_start(path_column, renderer, TRUE);
+	gtk_tree_view_column_add_attribute(path_column, renderer, "text", 0);
+	gtk_tree_view_column_pack_start(name_column, renderer, TRUE);
+	gtk_tree_view_column_add_attribute(name_column, renderer, "text", 1);
+		
+	g_object_unref(GTK_TREE_MODEL(list));
+	gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(tree), FALSE);
+
+  //Scrollable:
+  scrollable = gtk_scrolled_window_new(NULL, NULL);
+	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrollable), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+	gtk_container_add(GTK_CONTAINER(scrollable), tree);
+
+	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), scrollable, TRUE, TRUE, 10);
+	gtk_widget_show_all(dialog);
 
 	gint response = gtk_dialog_run(GTK_DIALOG(dialog));
 	
