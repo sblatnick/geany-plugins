@@ -6,6 +6,7 @@ GeanyFunctions  *geany_functions;
 
 GtkWidget *dialog;
 GtkTreeStore *list;
+gchar *base_directory;
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Opener", "Search filenames while typing", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
@@ -24,8 +25,28 @@ static void onkeypress(GtkEntry *entry)
 	//gtk_tree_store_clear(list);
 	
 	GtkTreeIter row;
-	gtk_tree_store_append(list, &row, NULL);
-	gtk_tree_store_set(list, &row, 0, "hello", 1, "world", -1);
+	
+	GSList *found, *file;
+	found = utils_get_file_list_full(base_directory, TRUE, TRUE, NULL);
+  for(file = found; file; file = file->next) {
+    gchar *path = file->data;
+    if(g_file_test(path, G_FILE_TEST_IS_DIR)) {
+    
+    }
+    else {
+      gchar *last;
+      last = g_strrstr(path,"/");
+      gchar *name, *directory;
+      GString *dir = g_string_new(path);
+      
+      name = last + 1;
+      utils_string_replace_first(dir, name, "");
+      directory = g_string_free(dir, FALSE);
+
+      gtk_tree_store_append(list, &row, NULL);
+	    gtk_tree_store_set(list, &row, 0, directory, 1, name, -1);
+    }
+  }
 	
 	//gtk_dialog_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
 }
@@ -34,16 +55,17 @@ static void quick_open()
 {
 	GtkWidget *entry, *label, *hbox, *tree, *scrollable;
 	GtkTreeViewColumn *path_column, *name_column;
-	GtkCellRenderer *renderer;
+	GtkCellRenderer *renderLeft, *renderRight;
 
-	gchar *dir;
   GeanyProject 	*project 	= geany->app->project;
 	if(project) {
-		dir = project->base_path;
+		base_directory = project->base_path;
 	}
 	else {
-		dir = geany->prefs->default_open_path;
+		base_directory = geany->prefs->default_open_path;
 	}
+	
+	printf("base directory: %s\n", base_directory);
 
   dialog = gtk_dialog_new_with_buttons(_("Quick Open:"),
   	GTK_WINDOW(geany->main_widgets->window),
@@ -78,12 +100,15 @@ static void quick_open()
 	name_column = gtk_tree_view_column_new();
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), name_column);
 	
-	renderer = gtk_cell_renderer_text_new();
+	renderRight = gtk_cell_renderer_text_new();
+	gtk_cell_renderer_set_alignment(renderRight, 1.0, 0.0);
 	
-	gtk_tree_view_column_pack_start(path_column, renderer, TRUE);
-	gtk_tree_view_column_add_attribute(path_column, renderer, "text", 0);
-	gtk_tree_view_column_pack_start(name_column, renderer, TRUE);
-	gtk_tree_view_column_add_attribute(name_column, renderer, "text", 1);
+	renderLeft = gtk_cell_renderer_text_new();
+	
+	gtk_tree_view_column_pack_start(path_column, renderRight, TRUE);
+	gtk_tree_view_column_add_attribute(path_column, renderRight, "text", 0);
+	gtk_tree_view_column_pack_start(name_column, renderLeft, TRUE);
+	gtk_tree_view_column_add_attribute(name_column, renderLeft, "text", 1);
 		
 	g_object_unref(GTK_TREE_MODEL(list));
 	gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(tree), FALSE);
