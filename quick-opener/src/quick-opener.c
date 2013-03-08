@@ -20,11 +20,23 @@ enum
 	COUNT_KB
 };
 
+static void render_text(
+  GtkTreeViewColumn *col,
+  GtkCellRenderer *renderer,
+  GtkTreeModel *model,
+  GtkTreeIter *iter,
+  gpointer user_data
+)
+{
+  g_object_set(renderer, "weight", PANGO_WEIGHT_BOLD, NULL);
+}
+
 static GtkWidget *main_menu_item = NULL;
 
 static void list_files(gchar *base)
 {
 	GSList *found, *file;
+
 	found = utils_get_file_list_full(base, TRUE, TRUE, NULL);
   for(file = found; file && row_pos < MAX_LIST; file = file->next) {
     gchar *path = file->data;
@@ -130,6 +142,8 @@ static void quick_open()
 
 	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), scrollable, TRUE, TRUE, 10);
 	gtk_widget_show_all(dialog);
+
+  gtk_tree_view_column_set_cell_data_func(name_column, renderLeft, render_text, NULL, NULL);
 
 	gint response = gtk_dialog_run(GTK_DIALOG(dialog));
 	
