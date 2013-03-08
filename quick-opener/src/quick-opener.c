@@ -9,7 +9,7 @@ GtkTreeStore *list;
 GtkTreeIter row;
 gint row_pos;
 gchar *base_directory;
-gint MAX_LIST = 20;
+gint MAX_LIST = 50;
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Opener", "Search filenames while typing", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
@@ -51,6 +51,7 @@ static void list_files(gchar *base)
 
 static void onkeypress(GtkEntry *entry)
 {
+  printf("%s\n", gtk_entry_get_text(entry));
   row_pos = 0;
 	gtk_tree_store_clear(list);
 	list_files(base_directory);
@@ -102,15 +103,17 @@ static void quick_open()
 	tree = gtk_tree_view_new_with_model(GTK_TREE_MODEL(list));
 
 	path_column = gtk_tree_view_column_new();
-	gtk_tree_view_column_set_alignment(path_column, 1.0);
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), path_column);
 	name_column = gtk_tree_view_column_new();
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), name_column);
 	
 	renderRight = gtk_cell_renderer_text_new();
 	gtk_cell_renderer_set_alignment(renderRight, 1.0, 0.0);
+	gtk_cell_renderer_set_padding(renderRight, 0, 1);
+	g_object_set(renderRight, "foreground", "#777", "foreground-set", TRUE, NULL);
 	
 	renderLeft = gtk_cell_renderer_text_new();
+	gtk_cell_renderer_set_padding(renderLeft, 0, 1);
 	
 	gtk_tree_view_column_pack_start(path_column, renderRight, TRUE);
 	gtk_tree_view_column_add_attribute(path_column, renderRight, "text", 0);
