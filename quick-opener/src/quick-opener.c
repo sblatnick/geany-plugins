@@ -9,7 +9,7 @@ GtkTreeStore *list;
 GtkTreeIter row;
 gint row_pos;
 gchar *base_directory;
-gint MAX_LIST = 50;
+gint MAX_LIST = 20;
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Opener", "Search filenames while typing", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
@@ -24,31 +24,32 @@ static GtkWidget *main_menu_item = NULL;
 
 static void list_files(gchar *base, const gchar *filter)
 {
-  GSList *found, *file;
-  found = utils_get_file_list_full(base, TRUE, TRUE, NULL);
-  for(file = found; file && row_pos < MAX_LIST; file = file->next) {
-    gchar *path = file->data;
+  //GSList *found, *file;
+  //found = utils_get_file_list_full(base, TRUE, TRUE, NULL);
+  
+  GDir *dir;
+  gchar const *file_name;
+  gchar *path;
+  dir = g_dir_open(base, 0, NULL);
+  foreach_dir(file_name, dir)
+	{
+	  if(row_pos > MAX_LIST) {
+	    return;
+	  }
+	  path = g_build_path(G_DIR_SEPARATOR_S, base, file_name, NULL);
     if(g_file_test(path, G_FILE_TEST_IS_DIR)) {
       list_files(path, filter);
     }
     else {
-      gchar *last;
-      last = g_strrstr(path,"/");
-      gchar *name, *directory;
-      GString *dir = g_string_new(path);
-      
-      name = last + 1;
-      utils_string_replace_first(dir, name, "");
-      utils_string_replace_first(dir, base_directory, ""); //Hide common directory
-      directory = g_string_free(dir, FALSE);
-
       if(g_strrstr(path, filter) > 0) {
+        //utils_string_replace_first(dir, base_directory, ""); //Hide common directory
         gtk_tree_store_append(list, &row, NULL);
-        gtk_tree_store_set(list, &row, 0, directory, 1, name, -1);
+        gtk_tree_store_set(list, &row, 0, base, 1, file_name, -1);
         row_pos++;
       }
     }
   }
+  g_dir_close(dir);
 }
 
 static void onkeypress(GtkEntry *entry)
