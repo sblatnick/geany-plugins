@@ -4,7 +4,7 @@ GeanyPlugin		 *geany_plugin;
 GeanyData			 *geany_data;
 GeanyFunctions	*geany_functions;
 
-GtkWidget *dialog, *scrollable;
+GtkWidget *dialog, *scrollable, *tree;
 GtkTreeStore *list;
 GtkTreeIter row;
 gint row_pos;
@@ -38,11 +38,7 @@ static void list_files(gchar *base, const gchar *filter)
 
 		if(g_file_test(path, G_FILE_TEST_IS_DIR)) {
 			if(g_regex_match(path_regex, file_name, 0, NULL)) {
-				printf("match: %s\n", file_name);
 				continue;
-			}
-			else {
-				printf("no match: %s\n", file_name);
 			}
 			list_files(path, filter);
 		}
@@ -67,11 +63,13 @@ static void onkeypress(GtkEntry *entry)
 	list_files(base_directory, gtk_entry_get_text(entry));
 	GtkAdjustment *adjustment = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scrollable));
 	gtk_adjustment_set_value(adjustment, gtk_adjustment_get_upper(adjustment));
+
+	gtk_tree_view_set_cursor(GTK_TREE_VIEW(tree), gtk_tree_path_new_from_string("0"), NULL, FALSE);
 }
 
 static void quick_open()
 {
-	GtkWidget *entry, *label, *hbox, *tree;
+	GtkWidget *entry, *label, *hbox;
 	GtkTreeViewColumn *path_column, *name_column;
 	GtkCellRenderer *renderLeft, *renderRight;
 
