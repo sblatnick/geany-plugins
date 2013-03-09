@@ -40,12 +40,10 @@ static void submit(
     gtk_tree_model_get(model, &iter, 0, &path, 1, &name, -1);
     file = g_build_path(G_DIR_SEPARATOR_S, path, name, NULL);
 		document_open_file(file, FALSE, NULL, NULL);
+		gtk_dialog_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
     g_free(path);
     g_free(name);
   }
-	
-	
-	printf("submit\n");
 }
 
 static void list_files(gchar *base, const gchar *filter)
@@ -81,7 +79,15 @@ static void list_files(gchar *base, const gchar *filter)
 	g_dir_close(dir);
 }
 
-static void onkeypress(GtkEntry *entry, GdkEventKey *event, gpointer user_data)
+static gboolean onkeypress(GtkEntry *entry, GdkEventKey *event, gpointer user_data)
+{
+	if(event->keyval == 65364) {
+		gtk_tree_view_set_cursor(GTK_TREE_VIEW(tree), gtk_tree_path_new_from_string("1"), NULL, FALSE);
+	}
+	return FALSE;
+}
+
+static void onkeyrelease(GtkEntry *entry, GdkEventKey *event, gpointer user_data)
 {
 	if(event->keyval == GDK_Return) {
 		submit(GTK_TREE_VIEW(tree), NULL, NULL, NULL);
@@ -128,7 +134,8 @@ static void quick_open()
 	gtk_widget_show(label);
 
 	entry = gtk_entry_new();
-	g_signal_connect(entry, "key-release-event", G_CALLBACK(onkeypress), NULL);
+	g_signal_connect(entry, "key-press-event", G_CALLBACK(onkeypress), NULL);
+	g_signal_connect(entry, "key-release-event", G_CALLBACK(onkeyrelease), NULL);
 
 	gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 2);
 	gtk_widget_show(entry);
@@ -169,10 +176,6 @@ static void quick_open()
 	gtk_widget_show_all(dialog);
 
 	gint response = gtk_dialog_run(GTK_DIALOG(dialog));
-	
-	if(response == GTK_RESPONSE_OK) {
-		document_open_file("/home/steve/geany-plugins/quicksearch/make", FALSE, NULL, NULL);
-	}
 	gtk_widget_destroy(dialog);
 }
 
