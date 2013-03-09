@@ -1,4 +1,5 @@
 #include <geanyplugin.h>
+#include <gdk/gdkkeysyms.h>
 
 GeanyPlugin		 *geany_plugin;
 GeanyData			 *geany_data;
@@ -22,6 +23,30 @@ enum
 };
 
 static GtkWidget *main_menu_item = NULL;
+
+static void submit(
+	GtkTreeView *treeview,
+	GtkTreePath *path,
+	GtkTreeViewColumn *col,
+	gpointer user_data
+)
+{
+	GtkTreeSelection *selected = gtk_tree_view_get_selection(treeview);
+	GtkTreeIter 		iter;
+	GtkTreeModel 		*model;	
+	if(gtk_tree_selection_get_selected(selected, &model, &iter))
+  {
+    gchar *path, *name, *file;
+    gtk_tree_model_get(model, &iter, 0, &path, 1, &name, -1);
+    file = g_build_path(G_DIR_SEPARATOR_S, path, name, NULL);
+		document_open_file(file, FALSE, NULL, NULL);
+    g_free(path);
+    g_free(name);
+  }
+	
+	
+	printf("submit\n");
+}
 
 static void list_files(gchar *base, const gchar *filter)
 {	
@@ -56,15 +81,20 @@ static void list_files(gchar *base, const gchar *filter)
 	g_dir_close(dir);
 }
 
-static void onkeypress(GtkEntry *entry)
+static void onkeypress(GtkEntry *entry, GdkEventKey *event, gpointer user_data)
 {
-	row_pos = 0;
-	gtk_tree_store_clear(list);
-	list_files(base_directory, gtk_entry_get_text(entry));
-	GtkAdjustment *adjustment = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scrollable));
-	gtk_adjustment_set_value(adjustment, gtk_adjustment_get_upper(adjustment));
+	if(event->keyval == GDK_Return) {
+		submit(GTK_TREE_VIEW(tree), NULL, NULL, NULL);
+	}
+	else {
+		row_pos = 0;
+		gtk_tree_store_clear(list);
+		list_files(base_directory, gtk_entry_get_text(entry));
+		GtkAdjustment *adjustment = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scrollable));
+		gtk_adjustment_set_value(adjustment, gtk_adjustment_get_upper(adjustment));
 
-	gtk_tree_view_set_cursor(GTK_TREE_VIEW(tree), gtk_tree_path_new_from_string("0"), NULL, FALSE);
+		gtk_tree_view_set_cursor(GTK_TREE_VIEW(tree), gtk_tree_path_new_from_string("0"), NULL, FALSE);
+	}
 }
 
 static void quick_open()
@@ -98,7 +128,7 @@ static void quick_open()
 	gtk_widget_show(label);
 
 	entry = gtk_entry_new();
-	g_signal_connect(entry, "changed", G_CALLBACK(onkeypress), NULL);
+	g_signal_connect(entry, "key-release-event", G_CALLBACK(onkeypress), NULL);
 
 	gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 2);
 	gtk_widget_show(entry);
@@ -133,6 +163,7 @@ static void quick_open()
 	scrollable = gtk_scrolled_window_new(NULL, NULL);
 	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrollable), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 	gtk_container_add(GTK_CONTAINER(scrollable), tree);
+	g_signal_connect(tree, "row-activated", G_CALLBACK(submit), NULL);
 
 	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), scrollable, TRUE, TRUE, 10);
 	gtk_widget_show_all(dialog);
