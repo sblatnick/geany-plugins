@@ -11,7 +11,7 @@ GtkTreeIter row;
 gint row_pos;
 gchar *base_directory;
 gint MAX_LIST = 20;
-GRegex *name_regex, *path_regex;
+GRegex *name_regex, *path_regex, *trim_path;
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Opener", "Search filenames while typing", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
@@ -69,9 +69,11 @@ static void list_files(gchar *base, const gchar *filter)
 			if(g_regex_match(name_regex, file_name, 0, NULL)) {
 				continue;
 			}
-			if(g_strrstr(file_name, filter) > 0) {
+			GRegex *regex = g_regex_new(filter, G_REGEX_CASELESS, 0, NULL);
+			if(regex != NULL && g_regex_match(regex, file_name, 0, NULL)) {
 				gtk_tree_store_append(list, &row, NULL);
-				gtk_tree_store_set(list, &row, 0, base, 1, file_name, -1);
+				base = g_regex_replace(trim_path, base, -1, 0, "", 0, NULL);
+				gtk_tree_store_set(list, &row, 0, g_strconcat(base, "/", NULL), 1, file_name, -1);
 				row_pos++;
 			}
 		}
@@ -194,6 +196,7 @@ void plugin_init(GeanyData *data)
 	GeanyKeyGroup *key_group;
 	path_regex = g_regex_new("^\\.|^build$", G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
 	name_regex = g_regex_new("^\\.|\\.(o|so|exe|class|pyc)$", G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
+	trim_path = g_regex_new("/$", G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
 	key_group = plugin_set_key_group(geany_plugin, "quick_open_keyboard_shortcut", COUNT_KB, NULL);
 	keybindings_set_item( key_group, KB_QUICK_OPEN, quick_open_keyboard_shortcut, 0, 0,
 		"quick_open_keyboard_shortcut", _("Quick Open..."), NULL);
