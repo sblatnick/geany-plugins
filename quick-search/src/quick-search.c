@@ -43,12 +43,14 @@ void plugin_init(GeanyData *data)
 {
 	dialog = gtk_window_new(GTK_WINDOW_POPUP);
 	gtk_window_set_transient_for(GTK_WINDOW(dialog), GTK_WINDOW(geany->main_widgets->window));
+	//gtk_window_set_attached_to(GTK_WINDOW(dialog), geany->main_widgets->notebook);
 
 	gtk_window_set_title(GTK_WINDOW(dialog), _("Quick Search"));
 	gtk_window_set_type_hint(GTK_WINDOW(dialog), GDK_WINDOW_TYPE_HINT_DIALOG);
 	gtk_window_set_position(GTK_WINDOW(dialog), GTK_WIN_POS_CENTER_ON_PARENT);
-	gtk_window_set_decorated(GTK_WINDOW(dialog), FALSE);
-	gtk_window_set_default_size(GTK_WINDOW(dialog), 200, -1);
+	//gtk_window_set_decorated(GTK_WINDOW(dialog), FALSE);
+	//gtk_window_set_default_size(GTK_WINDOW(dialog), 200, -1);
+	gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
 
   entry = gtk_entry_new();
   gtk_entry_set_icon_from_stock(GTK_ENTRY(entry), GTK_ENTRY_ICON_SECONDARY, GTK_STOCK_FIND);
@@ -60,11 +62,11 @@ void plugin_init(GeanyData *data)
 	
 	key_group = plugin_set_key_group(geany_plugin, "quick_search_keyboard_shortcut", KB_GROUP, NULL);
 	keybindings_set_item(key_group, KB_QUICK_SEARCH, quick_search, 0, 0,
-		"quick_search_keyboard_shortcut", _("Quick Search..."), NULL);
+		"quick_search", _("Quick Search..."), NULL);
 	keybindings_set_item(key_group, KB_QUICK_SEARCH_NEXT, quick_next, 0, 0,
-		"quick_search_keyboard_shortcut", _("Go Next"), NULL);
+		"quick_search_next", _("Go Next"), NULL);
 	keybindings_set_item(key_group, KB_QUICK_SEARCH_PREV, quick_prev, 0, 0,
-		"quick_search_keyboard_shortcut", _("Go Previous"), NULL);
+		"quick_search_prev", _("Go Previous"), NULL);
 }
 
 void plugin_cleanup(void)
