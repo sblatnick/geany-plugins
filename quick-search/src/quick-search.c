@@ -41,11 +41,6 @@ static void quick_prev(G_GNUC_UNUSED guint key_id)
 
 }
 
-static gboolean on_key(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
-{
-
-}
-
 static gboolean on_out(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 {
 	g_signal_handler_disconnect(entry, handler);
@@ -55,8 +50,13 @@ static gboolean on_out(GtkWidget *widget, GdkEventKey *event, gpointer user_data
 
 static void on_in(GtkWidget *widget, gpointer user_data) {
 	handler = g_signal_connect(entry, "grab-notify", G_CALLBACK(on_out), NULL);
-	while(gdk_keyboard_grab(widget->window, TRUE, GDK_CURRENT_TIME) != GDK_GRAB_SUCCESS) {
-		sleep(0.1);
+	gdk_keyboard_grab(widget->window, TRUE, GDK_CURRENT_TIME);
+}
+
+static gboolean on_key(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
+{
+	if(event->keyval == GDK_Escape) {
+		on_out(NULL, NULL, NULL);
 	}
 }
 
