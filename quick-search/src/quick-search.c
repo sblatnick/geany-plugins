@@ -1,5 +1,6 @@
 #include <geanyplugin.h>
 #include <gdk/gdkkeysyms.h>
+#include <string.h>
 
 GeanyPlugin		 *geany_plugin;
 GeanyData			 *geany_data;
@@ -8,6 +9,7 @@ GeanyFunctions	*geany_functions;
 static GtkWidget *main_menu_item = NULL;
 static GtkWidget *dialog, *entry;
 static gulong handler;
+static gint old = 0;
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Search", "Do a case-insensitive search on the current document while highlighting all results", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
@@ -28,7 +30,7 @@ static void quick_search(G_GNUC_UNUSED guint key_id)
 	gtk_window_move(GTK_WINDOW(dialog), ox + x, oy + y);
 
 	gtk_widget_show_all(dialog);
-	gtk_widget_grab_focus(GTK_WIDGET(entry));
+	gtk_editable_select_region(GTK_EDITABLE(entry), 0, -1);
 }
 
 static void quick_next(G_GNUC_UNUSED guint key_id)
@@ -58,6 +60,14 @@ static gboolean on_key(GtkWidget *widget, GdkEventKey *event, gpointer user_data
 	if(event->keyval == GDK_Escape) {
 		on_out(NULL, NULL, NULL);
 	}
+	else {
+		const gchar *text = gtk_entry_get_text(GTK_ENTRY(entry));
+		if(strlen(text) != old) {
+			old = strlen(text);
+			GeanyDocument *doc = document_get_current();
+			printf("search and highlight: %s %d (%d)\n", text, search_find_next(doc->editor->sci, text, 0), event->state);
+		}
+	}
 }
 
 void plugin_init(GeanyData *data)
@@ -68,9 +78,11 @@ void plugin_init(GeanyData *data)
 
 	entry = gtk_entry_new();
 	gtk_entry_set_icon_from_stock(GTK_ENTRY(entry), GTK_ENTRY_ICON_SECONDARY, GTK_STOCK_FIND);
+	gtk_widget_grab_focus(GTK_WIDGET(entry));
 
 	gtk_container_add(GTK_CONTAINER(dialog), entry);
 	g_signal_connect(entry, "key-release-event", G_CALLBACK(on_key), NULL);
+	g_signal_connect(entry, "activate", G_CALLBACK(on_out), NULL);
 
 	GeanyKeyGroup *key_group;
 	
