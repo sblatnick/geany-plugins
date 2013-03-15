@@ -31,6 +31,21 @@ static void quick_search(G_GNUC_UNUSED guint key_id)
 	gtk_window_move(GTK_WINDOW(dialog), ox + x, oy + y);
 
 	gtk_widget_show_all(dialog);
+	
+	GeanyDocument *doc = document_get_current();
+	
+	if(sci_has_selection(doc->editor->sci)) {
+		gchar *selected;
+		selected = g_malloc(sci_get_selected_text_length(doc->editor->sci) + 1);
+		sci_get_selected_text(doc->editor->sci, selected);
+		
+		sci_goto_pos(doc->editor->sci, sci_get_selection_start(doc->editor->sci), TRUE);
+		sci_set_search_anchor(doc->editor->sci);
+		
+		old = strlen(selected);
+		gtk_entry_set_text(GTK_ENTRY(entry), selected);
+		g_free(selected);
+	}
 	gtk_editable_select_region(GTK_EDITABLE(entry), 0, -1);
 }
 
