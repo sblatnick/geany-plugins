@@ -10,6 +10,7 @@ static GtkWidget *main_menu_item = NULL;
 static GtkWidget *dialog, *entry;
 static gulong handler;
 static gint old = 0;
+static const gchar *text;
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Search", "Do a case-insensitive search on the current document while highlighting all results", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
@@ -35,18 +36,33 @@ static void quick_search(G_GNUC_UNUSED guint key_id)
 
 static void quick_next(G_GNUC_UNUSED guint key_id)
 {
-
+	GeanyDocument *doc = document_get_current();
+	sci_goto_pos(doc->editor->sci, sci_get_selection_end(doc->editor->sci), TRUE);
+	sci_set_search_anchor(doc->editor->sci);
+	search_find_next(doc->editor->sci, text, 0);
+	editor_display_current_line(doc->editor, 0.3F);
 }
 
 static void quick_prev(G_GNUC_UNUSED guint key_id)
 {
-
+	GeanyDocument *doc = document_get_current();
+	sci_goto_pos(doc->editor->sci, sci_get_selection_start(doc->editor->sci), TRUE);
+	sci_set_search_anchor(doc->editor->sci);
+	sci_search_prev(doc->editor->sci, 0, text);
+	editor_display_current_line(doc->editor, 0.3F);
 }
 
 static gboolean on_out(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 {
 	g_signal_handler_disconnect(entry, handler);
 	gtk_widget_hide(dialog);
+	return FALSE;
+}
+
+static gboolean on_activate(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
+{
+	text = gtk_entry_get_text(GTK_ENTRY(entry));
+	on_out(NULL, NULL, NULL);
 	return FALSE;
 }
 
@@ -61,11 +77,12 @@ static gboolean on_key(GtkWidget *widget, GdkEventKey *event, gpointer user_data
 		on_out(NULL, NULL, NULL);
 	}
 	else {
-		const gchar *text = gtk_entry_get_text(GTK_ENTRY(entry));
+		text = gtk_entry_get_text(GTK_ENTRY(entry));
 		if(strlen(text) != old) {
 			old = strlen(text);
 			GeanyDocument *doc = document_get_current();
 			printf("search and highlight: %s %d (%d)\n", text, search_find_next(doc->editor->sci, text, 0), event->state);
+			editor_display_current_line(doc->editor, 0.3F);
 		}
 	}
 }
@@ -82,7 +99,7 @@ void plugin_init(GeanyData *data)
 
 	gtk_container_add(GTK_CONTAINER(dialog), entry);
 	g_signal_connect(entry, "key-release-event", G_CALLBACK(on_key), NULL);
-	g_signal_connect(entry, "activate", G_CALLBACK(on_out), NULL);
+	g_signal_connect(entry, "activate", G_CALLBACK(on_activate), NULL);
 
 	GeanyKeyGroup *key_group;
 	
