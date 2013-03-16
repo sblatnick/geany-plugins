@@ -23,6 +23,16 @@ enum
 	KB_GROUP
 };
 
+static gchar* replace_all(gchar *haystack, gchar *needle, gchar *replace)
+{
+	gchar *result;
+	GString *str = g_string_new(haystack);
+	utils_string_replace_all(str, needle, replace);
+	strcpy(result, str->str);
+	g_string_free(str, TRUE);
+	return result;
+}
+
 static void quick_search(G_GNUC_UNUSED guint key_id)
 {
 	gint ox, oy, x, y;
@@ -43,6 +53,7 @@ static void quick_search(G_GNUC_UNUSED guint key_id)
 		sci_set_search_anchor(doc->editor->sci);
 		
 		old = strlen(selected);
+		search_mark_all(doc, selected, 0);
 		gtk_entry_set_text(GTK_ENTRY(entry), selected);
 		g_free(selected);
 	}
