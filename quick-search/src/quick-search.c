@@ -93,6 +93,7 @@ static gboolean on_activate(GtkWidget *widget, GdkEventKey *event, gpointer user
 static void on_in(GtkWidget *widget, gpointer user_data) {
 	handler = g_signal_connect(entry, "grab-notify", G_CALLBACK(on_out), NULL);
 	gdk_keyboard_grab(widget->window, TRUE, GDK_CURRENT_TIME);
+	gtk_editable_select_region(GTK_EDITABLE(entry), 0, -1);
 }
 
 static gboolean on_key(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
@@ -105,6 +106,7 @@ static gboolean on_key(GtkWidget *widget, GdkEventKey *event, gpointer user_data
 		if(strlen(text) != old) {
 			old = strlen(text);
 			GeanyDocument *doc = document_get_current();
+			search_mark_all(doc, text, 0);
 			search_find_next(doc->editor->sci, text, 0);
 			editor_display_current_line(doc->editor, 0.3F);
 		}
