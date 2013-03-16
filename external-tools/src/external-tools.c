@@ -1,6 +1,7 @@
 #include <geanyplugin.h>
 #include <gdk/gdkkeysyms.h>
 #include <string.h>
+#include "tool.c"
 
 GeanyPlugin		 *geany_plugin;
 GeanyData			 *geany_data;
@@ -20,12 +21,6 @@ enum
 void dialog()
 {
 	//show the dialog created in plugin_init
-}
-
-void load_tool(gchar *name)
-{
-	//load the file of the script into geany
-	//and hide the dialog?
 }
 
 void execute_tool(gchar *name)
@@ -50,7 +45,8 @@ void plugin_init(GeanyData *data)
 	{
 		printf("loading data for group/tool %s", groups[i]);
 		//get values
-		gint type = g_key_file_get_integer(config, groups[i], "type", NULL);
+		Tool *tool = load_tool(groups[i], config);
+
 
 		//populate actions in BOTH dialog and setup the shortcuts
 		//callbacks will use: g_key_file_set_integer(config, "external-tools", "type", type);
