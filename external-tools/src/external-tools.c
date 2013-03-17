@@ -12,6 +12,7 @@ PLUGIN_SET_INFO("External Tools", "Allow external tools to be integrated into ma
 
 static gchar *file;
 static GKeyFile *config;
+static GtkWidget *tool_menu_item = NULL;
 
 enum
 {
@@ -29,6 +30,18 @@ void execute_tool(gchar *name)
 	//and handling the output
 }
 
+static void menu_callback(GtkMenuItem *menuitem, gpointer gdata)
+{
+	//plugin_configure();
+}
+
+GtkWidget *plugin_configure(GtkDialog *dialog)
+{
+	GtkWidget *vbox;
+	vbox = gtk_vbox_new(FALSE, 6);
+	return vbox;
+}
+
 void plugin_init(GeanyData *data)
 {
 	config = g_key_file_new();
@@ -36,11 +49,11 @@ void plugin_init(GeanyData *data)
 		"external-tools", G_DIR_SEPARATOR_S, "external-tools.conf", NULL);
 	g_key_file_load_from_file(config, file, G_KEY_FILE_NONE, NULL);
 
-	//Load existing tools (in groups) 
+	//Load existing tools (in groups)
 	gsize len;
 	gchar **groups = g_key_file_get_groups(config, &len);
 	gsize i;
-	
+
 	for(i = 0; i < len; i++)
 	{
 		printf("loading data for group/tool %s", groups[i]);
@@ -51,6 +64,11 @@ void plugin_init(GeanyData *data)
 		//populate actions in BOTH dialog and setup the shortcuts
 		//callbacks will use: g_key_file_set_integer(config, "external-tools", "type", type);
 	}
+
+	tool_menu_item = gtk_menu_item_new_with_mnemonic("External Tools...");
+	gtk_widget_show(tool_menu_item);
+	gtk_container_add(GTK_CONTAINER(geany->main_widgets->tools_menu), tool_menu_item);
+	g_signal_connect(tool_menu_item, "activate", G_CALLBACK(menu_callback), NULL);
 }
 
 void plugin_cleanup(void)
