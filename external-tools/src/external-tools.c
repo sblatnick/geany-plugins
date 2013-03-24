@@ -2,6 +2,7 @@
 #include <gdk/gdkkeysyms.h>
 #include <string.h>
 #include "tool.c"
+#include "dialog.c"
 
 GeanyPlugin *geany_plugin;
 GeanyData *geany_data;
@@ -19,21 +20,9 @@ enum
 	KB_GROUP
 };
 
-void dialog()
-{
-	//show the dialog created in plugin_init
-}
-
 static void menu_callback(GtkMenuItem *menuitem, gpointer gdata)
 {
-	//plugin_configure();
-}
-
-GtkWidget *plugin_configure(GtkDialog *dialog)
-{
-	GtkWidget *vbox;
-	vbox = gtk_vbox_new(FALSE, 6);
-	return vbox;
+	plugin_show_configure(geany_plugin);
 }
 
 void plugin_init(GeanyData *data)
@@ -53,9 +42,7 @@ void plugin_init(GeanyData *data)
 	for(i = 0; i < len; i++)
 	{
 		printf("loading data for group/tool %s", groups[i]);
-		//get values
 		Tool *tool = load_tool(groups[i], config);
-
 
 		//populate actions in BOTH dialog and setup the shortcuts
 		//callbacks will use: g_key_file_set_integer(config, "external-tools", "type", type);
