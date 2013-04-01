@@ -10,7 +10,8 @@ extern gchar *path, *file;
 
 enum OUTPUT
 {
-	MESSAGE_PANEL = 0,
+  NOTHING = 0,
+	MESSAGE_PANEL,
 	TABLE_PANEL,
 	REPLACE_SELECTED,
 	REPLACE_LINE,
@@ -23,10 +24,20 @@ typedef struct
 {
 	gchar *name;
 	gint output;
+
+	gboolean save;
 	gboolean context;
 	gboolean menu;
-	gboolean save;
+	gboolean shortcut;
 } Tool;
+
+enum
+{
+  SAVE = 0,
+	CONTEXT,
+	MENU,
+	SHORTCUT
+};
 
 Tool* new_tool()
 {
