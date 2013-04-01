@@ -1,6 +1,7 @@
 #include <geanyplugin.h>
 #include <gdk/gdkkeysyms.h>
 #include <string.h>
+#include <stdlib.h>
 #include "tool.c"
 #include "dialog.c"
 
