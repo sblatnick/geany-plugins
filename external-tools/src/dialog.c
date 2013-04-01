@@ -12,9 +12,17 @@ GtkWidget *scrollable, *tree;
 GtkTreeStore *list;
 GtkTreeIter row;
 
-void selected(GtkTreeView *view, gpointer data)
+void selected_changed(GtkTreeView *view, gpointer data)
 {
-
+	GtkTreeSelection *selected = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
+	GtkTreeIter iter;
+	GtkTreeModel *model;
+	if(gtk_tree_selection_get_selected(selected, &model, &iter))
+  {
+    Tool *tool;
+    gtk_tree_model_get(model, &iter, 0, &tool, -1);
+    printf("Tool name: %s\n", tool->name);
+  }
 }
 
 void add_tool(Tool *tool)
@@ -26,8 +34,8 @@ void add_tool(Tool *tool)
 void delete_tool(GtkButton *button, gpointer data)
 {
 	GtkTreeSelection *selected = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
-	GtkTreeIter 		iter;
-	GtkTreeModel 		*model;	
+	GtkTreeIter iter;
+	GtkTreeModel *model;
 	if(gtk_tree_selection_get_selected(selected, &model, &iter))
   {
     Tool *tool;
@@ -48,7 +56,7 @@ void cell_data(GtkTreeViewColumn *tree_column, GtkCellRenderer *render,
 {
   Tool *tool;
   gtk_tree_model_get(model, iter, 0, &tool, -1);
-  g_object_set(render, "text", (gchar *)tool->name, NULL);
+  g_object_set(render, "text", tool->name, NULL);
 }
 
 GtkWidget *plugin_configure(GtkDialog *dialog)
@@ -72,9 +80,14 @@ GtkWidget *plugin_configure(GtkDialog *dialog)
     (GtkTreeCellDataFunc)cell_data, NULL, NULL);
 
 	scrollable = gtk_scrolled_window_new(NULL, NULL);
-	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrollable), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrollable),
+	  GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 	gtk_container_add(GTK_CONTAINER(scrollable), tree);
-	g_signal_connect(tree, "changed", G_CALLBACK(selected), NULL);
+	
+	GtkTreeSelection *select = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
+  gtk_tree_selection_set_mode(select, GTK_SELECTION_SINGLE);
+  g_signal_connect(G_OBJECT(select), "changed",
+    G_CALLBACK(selected_changed), NULL);
 
 	GtkWidget *delete = gtk_button_new_with_label("Delete");
 	GtkWidget *new = gtk_button_new_with_label("New");
