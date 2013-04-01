@@ -20,7 +20,7 @@ void selected(GtkTreeView *view, gpointer data)
 void add_tool(Tool *tool)
 {
 	gtk_tree_store_append(list, &row, NULL);
-	gtk_tree_store_set(list, &row, 0, tool->name, -1);
+	gtk_tree_store_set(list, &row, 0, tool, -1);
 }
 
 void delete_tool(GtkButton *button, gpointer data)
@@ -36,22 +36,19 @@ void delete_tool(GtkButton *button, gpointer data)
   }
 }
 
-void new_tool(GtkButton *button, gpointer data)
+void new_tool_entry(GtkButton *button, gpointer data)
 {
-	Tool *tool = (Tool*) malloc(sizeof(Tool));
+	Tool *tool = new_tool();
 	tool->name = "New Tool";
 	add_tool(tool);
 }
 
-gchar* get_tool_name(
-  GtkTreeViewColumn *tree_column,
-  GtkCellRenderer *cell,
-  GtkTreeModel *tree_model,
-  GtkTreeIter *iter,
-  gpointer data
-)
+void cell_data(GtkTreeViewColumn *tree_column, GtkCellRenderer *render,
+  GtkTreeModel *model, GtkTreeIter *iter, gpointer data)
 {
-  return "ok";
+  Tool *tool;
+  gtk_tree_model_get(model, iter, 0, &tool, -1);
+  g_object_set(render, "text", (gchar *)tool->name, NULL);
 }
 
 GtkWidget *plugin_configure(GtkDialog *dialog)
@@ -71,8 +68,8 @@ GtkWidget *plugin_configure(GtkDialog *dialog)
 	gtk_tree_view_column_add_attribute(column, render, "text", 0);
 	gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(tree), TRUE);
 
-/*  gtk_tree_view_column_set_cell_data_func(column, render,*/
-/*    (GtkTreeCellDataFunc)get_tool_name, NULL, NULL);*/
+  gtk_tree_view_column_set_cell_data_func(column, render,
+    (GtkTreeCellDataFunc)cell_data, NULL, NULL);
 
 	scrollable = gtk_scrolled_window_new(NULL, NULL);
 	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrollable), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
@@ -82,7 +79,7 @@ GtkWidget *plugin_configure(GtkDialog *dialog)
 	GtkWidget *delete = gtk_button_new_with_label("Delete");
 	GtkWidget *new = gtk_button_new_with_label("New");
 	g_signal_connect(delete, "clicked", G_CALLBACK(delete_tool), NULL);
-	g_signal_connect(new, "clicked", G_CALLBACK(new_tool), NULL);
+	g_signal_connect(new, "clicked", G_CALLBACK(new_tool_entry), NULL);
 
 	gtk_box_pack_start(GTK_BOX(buttonBox), delete, FALSE, FALSE, 10);
 	gtk_box_pack_end(GTK_BOX(buttonBox), new, FALSE, FALSE, 10);

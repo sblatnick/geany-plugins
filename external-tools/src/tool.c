@@ -28,6 +28,12 @@ typedef struct
 	gboolean save;
 } Tool;
 
+Tool* new_tool()
+{
+  Tool *tool = (Tool*) malloc(sizeof(Tool));
+  return tool;
+}
+
 void execute(Tool *tool)
 {
 	GError *error = NULL;
@@ -60,7 +66,7 @@ void execute(Tool *tool)
 
 Tool* load_tool(gchar *name, GKeyFile *config)
 {
-	Tool *tool;
+	Tool *tool = new_tool();
 	tool->name = name;
 	tool->output = g_key_file_get_integer(config, name, "output", NULL);
 	tool->context = g_key_file_get_boolean(config, name, "context", NULL);
