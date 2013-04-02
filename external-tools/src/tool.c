@@ -41,7 +41,9 @@ enum
 
 Tool* new_tool()
 {
-  Tool *tool = (Tool*) malloc(sizeof(Tool));
+  Tool init = {_("New Tool"), -1, FALSE, FALSE, FALSE, FALSE};
+  Tool *tool = g_slice_new(Tool);
+  *tool = init;
   return tool;
 }
 

@@ -60,8 +60,6 @@ void delete_tool(GtkButton *button, gpointer data)
 void new_tool_entry(GtkButton *button, gpointer data)
 {
 	Tool *tool = new_tool();
-	tool->name = _("New Tool");
-	tool->save = FALSE;
 	add_tool(tool);
 }
 
@@ -101,7 +99,7 @@ GtkWidget* checkbox(gchar *label, gchar *tooltip, gchar *key)
 {
 	GtkWidget *save_check = gtk_check_button_new_with_label(_(label));
 	ui_widget_set_tooltip_text(save_check, _(tooltip));
-	g_signal_connect(G_OBJECT(save_check), "toggled", G_CALLBACK(toggle_checkbox), key);
+	//g_signal_connect(G_OBJECT(save_check), "toggled", G_CALLBACK(toggle_checkbox), key);
 	return save_check;
 }
 
@@ -181,7 +179,7 @@ GtkWidget* plugin_configure(GtkDialog *dialog)
 	gtk_box_pack_start(GTK_BOX(hbox), settingsBox, TRUE, TRUE, 10);
 	gtk_widget_show_all(hbox);
 	
-	//g_signal_connect(dialog, "response", G_CALLBACK(dialog_response), NULL);
+	g_signal_connect(dialog, "response", G_CALLBACK(dialog_response), NULL);
 
 	return hbox;
 }
