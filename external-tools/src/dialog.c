@@ -8,7 +8,7 @@ extern GeanyFunctions *geany_functions;
 
 extern gchar *path, *file;
 
-GtkWidget *scrollable, *tree;
+static GtkWidget *scrollable, *tree, *saveCheckbox, *contextCheckbox, *menuCheckbox, *shortcutCheckbox, *title;
 GtkTreeStore *list;
 GtkTreeIter row;
 
@@ -29,7 +29,13 @@ Tool* get_active_tool()
 
 void selected_changed(GtkTreeView *view, gpointer data)
 {
-  printf("Tool name: %s\n", get_active_tool()->name);
+  Tool* tool = get_active_tool();
+  printf("Tool name: %s save: %s\n", tool->name, tool->save ? "true" : "false");
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(saveCheckbox), tool->save);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(contextCheckbox), tool->context);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(menuCheckbox), tool->menu);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(shortcutCheckbox), tool->shortcut);
+  gtk_entry_set_text(GTK_ENTRY(title), tool->name);
 }
 
 void add_tool(Tool *tool)
@@ -54,7 +60,8 @@ void delete_tool(GtkButton *button, gpointer data)
 void new_tool_entry(GtkButton *button, gpointer data)
 {
 	Tool *tool = new_tool();
-	tool->name = "New Tool";
+	tool->name = _("New Tool");
+	tool->save = FALSE;
 	add_tool(tool);
 }
 
@@ -105,6 +112,14 @@ void dialog_response(GtkDialog *dialog, gint response, gpointer user_data)
 	}
 }
 
+static gboolean on_change(GtkWidget *entry, GdkEventKey *event, gpointer user_data)
+{
+  Tool* tool = get_active_tool();
+  if(tool != NULL) {
+    tool->name = g_strdup(gtk_entry_get_text(GTK_ENTRY(entry)));
+  }
+}
+
 GtkWidget* plugin_configure(GtkDialog *dialog)
 {
 	GtkCellRenderer *render;
@@ -149,10 +164,19 @@ GtkWidget* plugin_configure(GtkDialog *dialog)
 
 	gtk_box_pack_start(GTK_BOX(hbox), vbox, TRUE, TRUE, 10);
 
-  gtk_box_pack_start(GTK_BOX(settingsBox), checkbox("Save", "Should the active document be saved when this tool is run?", GINT_TO_POINTER(SAVE)), FALSE, FALSE, 10);
-  gtk_box_pack_start(GTK_BOX(settingsBox), checkbox("Context Menu", "Should there be a context menu entry for this tool?", GINT_TO_POINTER(CONTEXT)), FALSE, FALSE, 10);
-  gtk_box_pack_start(GTK_BOX(settingsBox), checkbox("Menu", "Should there be a menu for this tool?", GINT_TO_POINTER(MENU)), FALSE, FALSE, 10);
-  gtk_box_pack_start(GTK_BOX(settingsBox), checkbox("Shortcut", "Should there be a keyboard shortcut for this tool?", GINT_TO_POINTER(SHORTCUT)), FALSE, FALSE, 10);
+  saveCheckbox = checkbox("Save", "Should the active document be saved when this tool is run?", GINT_TO_POINTER(SAVE));
+  contextCheckbox = checkbox("Context Menu", "Should there be a context menu entry for this tool?", GINT_TO_POINTER(CONTEXT));
+  menuCheckbox = checkbox("Menu", "Should there be a menu for this tool?", GINT_TO_POINTER(MENU));
+  shortcutCheckbox = checkbox("Shortcut", "Should there be a keyboard shortcut for this tool?", GINT_TO_POINTER(SHORTCUT));
+  
+  gtk_box_pack_start(GTK_BOX(settingsBox), saveCheckbox, FALSE, FALSE, 10);
+  gtk_box_pack_start(GTK_BOX(settingsBox), contextCheckbox, FALSE, FALSE, 10);
+  gtk_box_pack_start(GTK_BOX(settingsBox), menuCheckbox, FALSE, FALSE, 10);
+  gtk_box_pack_start(GTK_BOX(settingsBox), shortcutCheckbox, FALSE, FALSE, 10);
+
+  title = gtk_entry_new();
+	g_signal_connect(title, "changed", G_CALLBACK(on_change), NULL);
+	gtk_box_pack_start(GTK_BOX(settingsBox), title, TRUE, TRUE, 2);
 
 	gtk_box_pack_start(GTK_BOX(hbox), settingsBox, TRUE, TRUE, 10);
 	gtk_widget_show_all(hbox);
