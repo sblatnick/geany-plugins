@@ -7,6 +7,7 @@ extern GeanyData *geany_data;
 extern GeanyFunctions *geany_functions;
 
 extern gchar *tools;
+extern GKeyFile *config;
 
 enum OUTPUT
 {
@@ -42,9 +43,9 @@ enum
 Tool* new_tool()
 {
   gchar* orig = g_strdup(_("New Tool"));
-  gchar* name;
+  gchar* name = g_strdup(_("New Tool"));
   gint count = 2;
-  gchar* new = g_build_path(G_DIR_SEPARATOR_S, tools, name, NULL);
+  gchar* new = g_build_path(G_DIR_SEPARATOR_S, tools, orig, NULL);
   while(g_file_test(new, G_FILE_TEST_EXISTS)) {
 		printf("new: %s\n", new);
 		char counter[32];
@@ -100,16 +101,44 @@ void execute(Tool *tool)
 	}
 }
 
-
-Tool* load_tool(gchar *name, GKeyFile *config)
+Tool* load_tool(gchar *name)
 {
-	Tool *tool = new_tool();
-	tool->name = name;
-	tool->output = g_key_file_get_integer(config, name, "output", NULL);
-	tool->context = g_key_file_get_boolean(config, name, "context", NULL);
-	tool->menu = g_key_file_get_boolean(config, name, "menu", NULL);
-	tool->save = g_key_file_get_boolean(config, name, "save", NULL);
+  Tool init = {
+    name,
+    g_key_file_get_integer(config, name, "output", NULL),
+    g_key_file_get_boolean(config, name, "save", NULL),
+    g_key_file_get_boolean(config, name, "context", NULL),
+    g_key_file_get_boolean(config, name, "menu", NULL),
+    g_key_file_get_boolean(config, name, "shortcut", NULL)
+  };
+  Tool *tool = g_slice_new(Tool);
+  *tool = init;
 	return tool;
+}
+
+void load_tools()
+{
+  //Cleanup tools
+
+	//Load existing tools (in groups)
+	gsize len;
+	gchar **groups = g_key_file_get_groups(config, &len);
+	gsize i;
+
+	for(i = 0; i < len; i++)
+	{
+		printf("loading data for group/tool %s\n", groups[i]);
+		Tool *tool = load_tool(groups[i]);
+	}
+}
+
+void save_tool(Tool* tool)
+{
+	g_key_file_set_integer(config, tool->name, "output", tool->output);
+	g_key_file_set_boolean(config, tool->name, "save", tool->save);
+	g_key_file_set_boolean(config, tool->name, "context", tool->context);
+	g_key_file_set_boolean(config, tool->name, "menu", tool->menu);
+	g_key_file_set_boolean(config, tool->name, "shortcut", tool->shortcut);
 }
 
 void load_script(Tool *tool)

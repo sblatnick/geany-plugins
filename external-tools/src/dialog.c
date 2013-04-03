@@ -107,9 +107,19 @@ static GtkWidget* checkbox(gchar *label, gchar *tooltip, gchar *key)
 
 static void dialog_response(GtkDialog *dialog, gint response, gpointer user_data)
 {
-  if(! (response == GTK_RESPONSE_OK || response == GTK_RESPONSE_APPLY)) {
-		return;
-	}
+  GtkTreeIter iter;
+  gboolean valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(list), &iter);
+
+  while(valid)
+  {
+    Tool *tool;
+    gtk_tree_model_get(GTK_TREE_MODEL(list), &iter, 0, &tool, -1);
+    save_tool(tool);
+    valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(list), &iter);
+  }
+
+  //We need to re-establish all of the tools in the UI:
+  load_tools();
 }
 
 static gboolean on_change(GtkWidget *entry, GdkEventKey *event, gpointer user_data)
@@ -117,15 +127,20 @@ static gboolean on_change(GtkWidget *entry, GdkEventKey *event, gpointer user_da
   Tool* tool = get_active_tool();
   if(tool != NULL) {
     gchar *name = g_strdup(gtk_entry_get_text(GTK_ENTRY(entry)));
-    gchar *old = g_build_path(G_DIR_SEPARATOR_S, tools, tool->name, NULL);
-    gchar *new = g_build_path(G_DIR_SEPARATOR_S, tools, name, NULL);
-    if(g_rename(old, new) != 0) {
-      g_warning(_("external-tools: Unable to rename '%s' to '%s'"), old, new);
+    if(strlen(name) > 0) {
+      gchar *old = g_build_path(G_DIR_SEPARATOR_S, tools, tool->name, NULL);
+      gchar *new = g_build_path(G_DIR_SEPARATOR_S, tools, name, NULL);
+      if(g_rename(old, new) != 0) {
+        g_warning(_("external-tools: Unable to rename '%s' to '%s'"), old, new);
+      }
+      g_free(tool->name);
+      g_free(old);
+      g_free(new);
+      tool->name = name;
     }
-    g_free(tool->name);
-    g_free(old);
-    g_free(new);
-    tool->name = name;
+    else {
+      g_free(name);
+    }
   }
 }
 
