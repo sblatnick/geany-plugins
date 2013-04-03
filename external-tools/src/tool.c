@@ -6,7 +6,7 @@ extern GeanyPlugin *geany_plugin;
 extern GeanyData *geany_data;
 extern GeanyFunctions *geany_functions;
 
-extern gchar *path, *file;
+extern gchar *tools;
 
 enum OUTPUT
 {
@@ -41,7 +41,25 @@ enum
 
 Tool* new_tool()
 {
-  Tool init = {g_strdup(_("New Tool")), -1, FALSE, FALSE, FALSE, FALSE};
+  gchar* orig = g_strdup(_("New Tool"));
+  gchar* name;
+  gint count = 2;
+  gchar* new = g_build_path(G_DIR_SEPARATOR_S, tools, name, NULL);
+  while(g_file_test(new, G_FILE_TEST_EXISTS)) {
+		printf("new: %s\n", new);
+		char counter[32];
+    snprintf(counter, 32, "%d", count);
+    setptr(name, g_strconcat(orig, " ", counter, NULL));
+    printf("try: %d\n", count);
+		setptr(new, g_build_path(G_DIR_SEPARATOR_S, tools, name, NULL));
+    printf("iterate\n");
+    count++;
+	}
+	g_creat(new, 0744);
+	g_free(orig);
+	g_free(new);
+
+  Tool init = {name, -1, FALSE, FALSE, FALSE, FALSE};
   Tool *tool = g_slice_new(Tool);
   *tool = init;
   return tool;
@@ -61,7 +79,7 @@ void execute(Tool *tool)
 
 	GString *cmd_str = g_string_new("echo $script");
 	utils_string_replace_all(cmd_str, "$script",
-		g_strconcat(path, G_DIR_SEPARATOR, tool->name, NULL));
+		g_build_path(G_DIR_SEPARATOR_S, tools, tool->name, NULL));
 	gchar *cmd = g_string_free(cmd_str, FALSE);
 	cmd = utils_get_locale_from_utf8(cmd);
 

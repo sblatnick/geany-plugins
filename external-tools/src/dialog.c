@@ -6,7 +6,7 @@ extern GeanyPlugin *geany_plugin;
 extern GeanyData *geany_data;
 extern GeanyFunctions *geany_functions;
 
-extern gchar *path, *file;
+extern gchar *tools;
 
 static GtkWidget *scrollable, *tree, *title, *saveCheckbox, *contextCheckbox, *menuCheckbox, *shortcutCheckbox;
 static GtkTreeStore *list;
@@ -116,8 +116,16 @@ static gboolean on_change(GtkWidget *entry, GdkEventKey *event, gpointer user_da
 {
   Tool* tool = get_active_tool();
   if(tool != NULL) {
+    gchar *name = g_strdup(gtk_entry_get_text(GTK_ENTRY(entry)));
+    gchar *old = g_build_path(G_DIR_SEPARATOR_S, tools, tool->name, NULL);
+    gchar *new = g_build_path(G_DIR_SEPARATOR_S, tools, name, NULL);
+    if(g_rename(old, new) != 0) {
+      g_warning(_("external-tools: Unable to rename '%s' to '%s'"), old, new);
+    }
     g_free(tool->name);
-    tool->name = g_strdup(gtk_entry_get_text(GTK_ENTRY(entry)));
+    g_free(old);
+    g_free(new);
+    tool->name = name;
   }
 }
 
@@ -125,7 +133,7 @@ static void on_edit(GtkButton* button, gpointer data)
 {
   Tool* tool = get_active_tool();
   gtk_dialog_response(configDialog, GTK_RESPONSE_OK);
-  gchar* file = g_strconcat(path, G_DIR_SEPARATOR_S, "tools", G_DIR_SEPARATOR_S, tool->name, NULL);
+  gchar* file = g_build_path(G_DIR_SEPARATOR_S, tools, tool->name, NULL);
   document_open_file(file, FALSE, NULL, NULL);
 }
 

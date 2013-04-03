@@ -62,5 +62,8 @@ void plugin_cleanup(void)
 	gchar *data = g_key_file_to_data(config, NULL, NULL);
 	utils_write_file(conf, data);
 	g_free(data);
+	g_free(path);
+	g_free(conf);
+	g_free(tools);
 	g_key_file_free(config);
 }
