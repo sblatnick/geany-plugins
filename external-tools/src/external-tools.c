@@ -22,6 +22,11 @@ enum
 	KB_GROUP
 };
 
+static void key_callback(G_GNUC_UNUSED guint key_id)
+{
+  plugin_show_configure(geany_plugin);
+}
+
 static void menu_callback(GtkMenuItem *menuitem, gpointer gdata)
 {
 	plugin_show_configure(geany_plugin);
@@ -29,6 +34,9 @@ static void menu_callback(GtkMenuItem *menuitem, gpointer gdata)
 
 void plugin_init(GeanyData *data)
 {
+  GeanyKeyGroup *key_group = plugin_set_key_group(geany_plugin, "external_tools_keyboard_shortcut", 1, NULL);
+	keybindings_set_item(key_group, 0, key_callback, 0, 0, "external_tools_keyboard_shortcut", _("External Tools..."), NULL);
+
 	config = g_key_file_new();
 	
 	path = g_build_path(G_DIR_SEPARATOR_S, geany_data->app->configdir, "plugins", "external-tools", NULL);
@@ -37,7 +45,8 @@ void plugin_init(GeanyData *data)
 	g_key_file_load_from_file(config, conf, G_KEY_FILE_NONE, NULL);
   g_mkdir_with_parents(tools, S_IRUSR | S_IWUSR | S_IXUSR);
 
-  load_tools(NULL);
+  clean_tools();
+  load_tools(setup_tool);
 
 	tool_menu_item = gtk_menu_item_new_with_mnemonic("External Tools...");
 	gtk_widget_show(tool_menu_item);

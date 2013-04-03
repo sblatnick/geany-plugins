@@ -101,6 +101,20 @@ void execute(Tool *tool)
 	}
 }
 
+int setup_tool(Tool* tool)
+{
+  /*
+	gboolean context;
+	gboolean menu;
+	gboolean shortcut;
+  */
+}
+
+void clean_tools()
+{
+
+}
+
 Tool* load_tool(gchar *name)
 {
   Tool init = {
@@ -118,7 +132,9 @@ Tool* load_tool(gchar *name)
 
 void load_tools(int (*callback)(Tool*))
 {
-  //Cleanup tools
+  if(callback == NULL) {
+    return;
+  }
 
 	//Load existing tools (in groups)
 	gsize len;
@@ -129,9 +145,7 @@ void load_tools(int (*callback)(Tool*))
 	{
 		printf("loading data for group/tool %s\n", groups[i]);
 		Tool *tool = load_tool(groups[i]);
-		if(callback != NULL) {
-		  callback(tool);
-		}
+		callback(tool);
 	}
 }
 

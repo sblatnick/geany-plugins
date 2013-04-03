@@ -118,8 +118,10 @@ static void dialog_response(GtkDialog *dialog, gint response, gpointer user_data
     valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(list), &iter);
   }
 
+  //Remove all shortcuts to tools from the UI for a refresh:
+  clean_tools();
   //We need to re-establish all of the tools in the UI:
-  load_tools(NULL);
+  load_tools(setup_tool);
 }
 
 static gboolean on_change(GtkWidget *entry, GdkEventKey *event, gpointer user_data)
