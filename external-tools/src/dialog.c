@@ -8,11 +8,12 @@ extern GeanyFunctions *geany_functions;
 
 extern gchar *path, *file;
 
-static GtkWidget *scrollable, *tree, *saveCheckbox, *contextCheckbox, *menuCheckbox, *shortcutCheckbox, *title;
-GtkTreeStore *list;
-GtkTreeIter row;
+static GtkWidget *scrollable, *tree, *title, *saveCheckbox, *contextCheckbox, *menuCheckbox, *shortcutCheckbox;
+static GtkTreeStore *list;
+static GtkTreeIter row;
+static GtkDialog *configDialog;
 
-Tool* get_active_tool()
+static Tool* get_active_tool()
 {
 	GtkTreeSelection *selected = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
 	GtkTreeIter iter;
@@ -27,7 +28,7 @@ Tool* get_active_tool()
   }
 }
 
-void selected_changed(GtkTreeView *view, gpointer data)
+static void selected_changed(GtkTreeView *view, gpointer data)
 {
   Tool* tool = get_active_tool();
   printf("Tool name: %s save: %s\n", tool->name, tool->save ? "true" : "false");
@@ -38,13 +39,13 @@ void selected_changed(GtkTreeView *view, gpointer data)
   gtk_entry_set_text(GTK_ENTRY(title), tool->name);
 }
 
-void add_tool(Tool *tool)
+static void add_tool(Tool *tool)
 {
 	gtk_tree_store_append(list, &row, NULL);
 	gtk_tree_store_set(list, &row, 0, tool, -1);
 }
 
-void delete_tool(GtkButton *button, gpointer data)
+static void delete_tool(GtkButton *button, gpointer data)
 {
 	GtkTreeSelection *selected = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
 	GtkTreeIter iter;
@@ -58,13 +59,13 @@ void delete_tool(GtkButton *button, gpointer data)
   }
 }
 
-void new_tool_entry(GtkButton *button, gpointer data)
+static void new_tool_entry(GtkButton *button, gpointer data)
 {
 	Tool *tool = new_tool();
 	add_tool(tool);
 }
 
-void cell_data(GtkTreeViewColumn *tree_column, GtkCellRenderer *render,
+static void cell_data(GtkTreeViewColumn *tree_column, GtkCellRenderer *render,
   GtkTreeModel *model, GtkTreeIter *iter, gpointer data)
 {
   Tool *tool;
@@ -72,7 +73,7 @@ void cell_data(GtkTreeViewColumn *tree_column, GtkCellRenderer *render,
   g_object_set(render, "text", tool->name, NULL);
 }
 
-void toggle_checkbox(GtkToggleButton *checkbox, gpointer data)
+static void toggle_checkbox(GtkToggleButton *checkbox, gpointer data)
 {
   Tool* tool = get_active_tool();
   if(tool != NULL) {
@@ -96,15 +97,15 @@ void toggle_checkbox(GtkToggleButton *checkbox, gpointer data)
   }
 }
 
-GtkWidget* checkbox(gchar *label, gchar *tooltip, gchar *key)
+static GtkWidget* checkbox(gchar *label, gchar *tooltip, gchar *key)
 {
 	GtkWidget *save_check = gtk_check_button_new_with_label(_(label));
 	ui_widget_set_tooltip_text(save_check, _(tooltip));
-	//g_signal_connect(G_OBJECT(save_check), "toggled", G_CALLBACK(toggle_checkbox), key);
+	g_signal_connect(G_OBJECT(save_check), "toggled", G_CALLBACK(toggle_checkbox), key);
 	return save_check;
 }
 
-void dialog_response(GtkDialog *dialog, gint response, gpointer user_data)
+static void dialog_response(GtkDialog *dialog, gint response, gpointer user_data)
 {
   if(! (response == GTK_RESPONSE_OK || response == GTK_RESPONSE_APPLY)) {
 		return;
@@ -120,8 +121,15 @@ static gboolean on_change(GtkWidget *entry, GdkEventKey *event, gpointer user_da
   }
 }
 
+static void on_edit(GtkButton* button, gpointer data)
+{
+  Tool* tool = get_active_tool();
+  gtk_dialog_response(configDialog, GTK_RESPONSE_OK);
+}
+
 GtkWidget* plugin_configure(GtkDialog *dialog)
 {
+  configDialog = dialog;
 	GtkCellRenderer *render;
 	GtkWidget* vbox = gtk_vbox_new(FALSE, 6);
 	GtkWidget* hbox = gtk_hbox_new(FALSE, 6);
@@ -168,14 +176,18 @@ GtkWidget* plugin_configure(GtkDialog *dialog)
   menuCheckbox = checkbox("Menu", "Should there be a menu for this tool?", GINT_TO_POINTER(MENU));
   shortcutCheckbox = checkbox("Shortcut", "Should there be a keyboard shortcut for this tool?", GINT_TO_POINTER(SHORTCUT));
   
+  title = gtk_entry_new();
+	g_signal_connect(title, "changed", G_CALLBACK(on_change), NULL);
+	gtk_box_pack_start(GTK_BOX(settingsBox), title, FALSE, FALSE, 2);
+
   gtk_box_pack_start(GTK_BOX(settingsBox), saveCheckbox, FALSE, FALSE, 10);
   gtk_box_pack_start(GTK_BOX(settingsBox), contextCheckbox, FALSE, FALSE, 10);
   gtk_box_pack_start(GTK_BOX(settingsBox), menuCheckbox, FALSE, FALSE, 10);
   gtk_box_pack_start(GTK_BOX(settingsBox), shortcutCheckbox, FALSE, FALSE, 10);
 
-  title = gtk_entry_new();
-	g_signal_connect(title, "changed", G_CALLBACK(on_change), NULL);
-	gtk_box_pack_start(GTK_BOX(settingsBox), title, TRUE, TRUE, 2);
+  GtkWidget* editButton = gtk_button_new_with_label(_("Edit"));
+  g_signal_connect(editButton, "clicked", G_CALLBACK(on_edit), NULL);
+  gtk_box_pack_start(GTK_BOX(settingsBox), editButton, FALSE, FALSE, 2);
 
 	gtk_box_pack_start(GTK_BOX(hbox), settingsBox, TRUE, TRUE, 10);
 	gtk_widget_show_all(hbox);
