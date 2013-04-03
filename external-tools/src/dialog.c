@@ -125,6 +125,8 @@ static void on_edit(GtkButton* button, gpointer data)
 {
   Tool* tool = get_active_tool();
   gtk_dialog_response(configDialog, GTK_RESPONSE_OK);
+  gchar* file = g_strconcat(path, G_DIR_SEPARATOR_S, "tools", G_DIR_SEPARATOR_S, tool->name, NULL);
+  document_open_file(file, FALSE, NULL, NULL);
 }
 
 GtkWidget* plugin_configure(GtkDialog *dialog)

@@ -1,5 +1,6 @@
 #include <geanyplugin.h>
 #include <gdk/gdkkeysyms.h>
+#include <sys/stat.h>
 #include <string.h>
 #include <stdlib.h>
 #include "tool.c"
@@ -12,7 +13,7 @@ GeanyFunctions *geany_functions;
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("External Tools", "Allow external tools to be integrated into many common actions.", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
 
-gchar *path, *file;
+gchar *path, *conf, *tools;
 static GKeyFile *config;
 static GtkWidget *tool_menu_item = NULL;
 
@@ -30,10 +31,11 @@ void plugin_init(GeanyData *data)
 {
 	config = g_key_file_new();
 	
-	path = g_strconcat(geany->app->configdir, G_DIR_SEPARATOR_S,
-		"plugins", G_DIR_SEPARATOR_S, "external-tools", G_DIR_SEPARATOR_S, NULL);
-	file = g_strconcat(path, "external-tools.conf", NULL);
-	g_key_file_load_from_file(config, file, G_KEY_FILE_NONE, NULL);
+	path = g_build_path(G_DIR_SEPARATOR_S, geany_data->app->configdir, "plugins", "external-tools", NULL);
+	conf = g_build_path(G_DIR_SEPARATOR_S, path, "external-tools.conf", NULL);
+	tools = g_build_path(G_DIR_SEPARATOR_S, path, "tools", NULL);
+	g_key_file_load_from_file(config, conf, G_KEY_FILE_NONE, NULL);
+  g_mkdir_with_parents(tools, S_IRUSR | S_IWUSR | S_IXUSR);
 
 	//Load existing tools (in groups)
 	gsize len;
@@ -58,7 +60,7 @@ void plugin_init(GeanyData *data)
 void plugin_cleanup(void)
 {
 	gchar *data = g_key_file_to_data(config, NULL, NULL);
-	utils_write_file(file, data);
+	utils_write_file(conf, data);
 	g_free(data);
 	g_key_file_free(config);
 }
