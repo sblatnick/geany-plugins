@@ -8,6 +8,8 @@ extern GeanyFunctions *geany_functions;
 
 extern gchar *tools;
 extern GKeyFile *config;
+extern gint shortcutCount;
+extern GeanyKeyGroup *key_group;
 
 enum OUTPUT
 {
@@ -74,11 +76,12 @@ void free_tool(Tool* tool)
 
 void execute(Tool *tool)
 {
+  printf("TOOL EXECUTED: %s\n", tool->name);
 	GError *error = NULL;
 	gint status;
 	gchar *std_out, *std_err;
 
-	GString *cmd_str = g_string_new("echo $script");
+	GString *cmd_str = g_string_new("$script");
 	utils_string_replace_all(cmd_str, "$script",
 		g_build_path(G_DIR_SEPARATOR_S, tools, tool->name, NULL));
 	gchar *cmd = g_string_free(cmd_str, FALSE);
@@ -95,19 +98,32 @@ void execute(Tool *tool)
 		printf("std_out: %s", std_out);
 	}
 	else {
-		printf("std_err: %s", std_err);
+		printf("std_err:\n%s\n%s\n%s\n", cmd, std_err, error->message);
 		ui_set_statusbar(TRUE, _("ERROR %s: %s (%s)"), cmd, std_err, error->message);
 		g_error_free(error);
 	}
 }
 
+static void tool_menu_callback(GtkToggleButton *cb, gpointer data)
+{
+  execute(data);
+}
+
 int setup_tool(Tool* tool)
 {
-  /*
-	gboolean context;
-	gboolean menu;
-	gboolean shortcut;
-  */
+  if(tool->shortcut) {
+    //Store tool in an array
+    shortcutCount++;
+  }
+  if(tool->context) {
+    //TODO
+  }
+  if(tool->menu) {
+    GtkWidget *tool_menu_item = gtk_menu_item_new_with_mnemonic(tool->name);
+    gtk_widget_show(tool_menu_item);
+    gtk_container_add(GTK_CONTAINER(geany->main_widgets->tools_menu), tool_menu_item);
+    g_signal_connect(tool_menu_item, "activate", G_CALLBACK(tool_menu_callback), tool);
+  }
 }
 
 void clean_tools()
