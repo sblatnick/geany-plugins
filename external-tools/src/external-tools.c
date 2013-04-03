@@ -37,7 +37,7 @@ void plugin_init(GeanyData *data)
 	g_key_file_load_from_file(config, conf, G_KEY_FILE_NONE, NULL);
   g_mkdir_with_parents(tools, S_IRUSR | S_IWUSR | S_IXUSR);
 
-  load_tools();
+  load_tools(NULL);
 
 	tool_menu_item = gtk_menu_item_new_with_mnemonic("External Tools...");
 	gtk_widget_show(tool_menu_item);

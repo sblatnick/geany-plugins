@@ -116,7 +116,7 @@ Tool* load_tool(gchar *name)
 	return tool;
 }
 
-void load_tools()
+void load_tools(int (*callback)(Tool*))
 {
   //Cleanup tools
 
@@ -129,6 +129,9 @@ void load_tools()
 	{
 		printf("loading data for group/tool %s\n", groups[i]);
 		Tool *tool = load_tool(groups[i]);
+		if(callback != NULL) {
+		  callback(tool);
+		}
 	}
 }
 

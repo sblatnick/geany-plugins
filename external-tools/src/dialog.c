@@ -39,7 +39,7 @@ static void selected_changed(GtkTreeView *view, gpointer data)
   gtk_entry_set_text(GTK_ENTRY(title), tool->name);
 }
 
-static void add_tool(Tool *tool)
+static int add_tool(Tool *tool)
 {
 	gtk_tree_store_append(list, &row, NULL);
 	gtk_tree_store_set(list, &row, 0, tool, -1);
@@ -119,7 +119,7 @@ static void dialog_response(GtkDialog *dialog, gint response, gpointer user_data
   }
 
   //We need to re-establish all of the tools in the UI:
-  load_tools();
+  load_tools(NULL);
 }
 
 static gboolean on_change(GtkWidget *entry, GdkEventKey *event, gpointer user_data)
@@ -218,6 +218,8 @@ GtkWidget* plugin_configure(GtkDialog *dialog)
 	gtk_widget_show_all(hbox);
 	
 	g_signal_connect(dialog, "response", G_CALLBACK(dialog_response), NULL);
-
+	
+	load_tools(add_tool);
+	
 	return hbox;
 }
