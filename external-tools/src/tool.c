@@ -41,10 +41,16 @@ enum
 
 Tool* new_tool()
 {
-  Tool init = {_("New Tool"), -1, FALSE, FALSE, FALSE, FALSE};
+  Tool init = {g_strdup(_("New Tool")), -1, FALSE, FALSE, FALSE, FALSE};
   Tool *tool = g_slice_new(Tool);
   *tool = init;
   return tool;
+}
+
+void free_tool(Tool* tool)
+{
+  g_free(tool->name);
+  g_slice_free(Tool, tool);
 }
 
 void execute(Tool *tool)

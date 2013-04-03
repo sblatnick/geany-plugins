@@ -53,7 +53,8 @@ void delete_tool(GtkButton *button, gpointer data)
   {
     Tool *tool;
     gtk_tree_model_get(model, &iter, 0, &tool, -1);
-    g_free(tool);
+    free_tool(tool);
+    //gtk_tree_store_remove(list, &iter);
   }
 }
 
@@ -114,6 +115,7 @@ static gboolean on_change(GtkWidget *entry, GdkEventKey *event, gpointer user_da
 {
   Tool* tool = get_active_tool();
   if(tool != NULL) {
+    g_free(tool->name);
     tool->name = g_strdup(gtk_entry_get_text(GTK_ENTRY(entry)));
   }
 }
@@ -126,14 +128,13 @@ GtkWidget* plugin_configure(GtkDialog *dialog)
 	GtkWidget* settingsBox = gtk_vbox_new(FALSE, 6);
 	GtkWidget* buttonBox = gtk_hbox_new(FALSE, 6);
 
-	list = gtk_tree_store_new(1, G_TYPE_STRING);
+	list = gtk_tree_store_new(1, G_TYPE_POINTER);
 	tree = gtk_tree_view_new_with_model(GTK_TREE_MODEL(list));
 	render = gtk_cell_renderer_text_new();
 
 	GtkTreeViewColumn* column = gtk_tree_view_column_new_with_attributes("Tool Name", render, NULL);
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), column);
 
-	gtk_tree_view_column_add_attribute(column, render, "text", 0);
 	gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(tree), TRUE);
 
   gtk_tree_view_column_set_cell_data_func(column, render,
