@@ -91,11 +91,17 @@ void execute(Tool *tool)
 	utils_string_replace_all(cmd_str, "$script", g_build_path(G_DIR_SEPARATOR_S, tools, tool->name, NULL));
 	gchar *cmd = g_string_free(cmd_str, FALSE);
 	cmd = utils_get_locale_from_utf8(cmd);
+	
+	gchar **argv = utils_copy_environment(
+    NULL,
+		"GEANY_LINE", "12",
+  	NULL
+  );
 
 	if(g_spawn_async_with_pipes(
     home,
     &cmd,
-    NULL,
+    argv,
     0, NULL, NULL,
     &pid,
     &std_in,
@@ -109,7 +115,7 @@ void execute(Tool *tool)
     while(fgets(line, sizeof line, fp) != NULL )
     {
       printf(line, stdout);
-      printf("line: %s", line);
+      //printf("line: %s", line);
     }
     fclose(fp);
 	}
