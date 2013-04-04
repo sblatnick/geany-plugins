@@ -83,7 +83,7 @@ void execute(Tool *tool)
     home = g_get_home_dir();
   }
   
-	GError *error;
+	GError *error = NULL;
 	gint std_in, std_out, std_err;
 	GPid pid;
 
@@ -92,9 +92,20 @@ void execute(Tool *tool)
 	gchar *cmd = g_string_free(cmd_str, FALSE);
 	cmd = utils_get_locale_from_utf8(cmd);
 	
+	GeanyDocument *doc = document_get_current();
+
+	char geany_line_number[32];
+	gint line = sci_get_current_line(doc->editor->sci);
+  snprintf(geany_line_number, 32, "%d", line + 1);
+
 	gchar **argv = utils_copy_environment(
     NULL,
-		"GEANY_LINE", "12",
+    "GEANY_LINE_NUMBER", geany_line_number,
+		"GEANY_SELECTION", sci_get_selection_contents(doc->editor->sci),
+		"GEANY_SELECTED_LINE", sci_get_line(doc->editor->sci, line),
+    "GEANY_FILE_PATH", doc->file_name,
+    "GEANY_FILE_MIME_TYPE", doc->file_type->mime_type,
+    "GEANY_FILE_TYPE_NAME", doc->file_type->name,
   	NULL
   );
 
