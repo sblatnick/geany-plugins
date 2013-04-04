@@ -77,29 +77,45 @@ void free_tool(Tool* tool)
 void execute(Tool *tool)
 {
   printf("TOOL EXECUTED: %s\n", tool->name);
-	GError *error = NULL;
-	gint status;
-	gchar *std_out, *std_err;
+  
+  const char *home = g_getenv("HOME");
+  if (!home) {
+    home = g_get_home_dir();
+  }
+  
+	GError *error;
+	gint std_in, std_out, std_err;
+	GPid pid;
 
 	GString *cmd_str = g_string_new("$script");
-	utils_string_replace_all(cmd_str, "$script",
-		g_build_path(G_DIR_SEPARATOR_S, tools, tool->name, NULL));
+	utils_string_replace_all(cmd_str, "$script", g_build_path(G_DIR_SEPARATOR_S, tools, tool->name, NULL));
 	gchar *cmd = g_string_free(cmd_str, FALSE);
 	cmd = utils_get_locale_from_utf8(cmd);
 
-	if(g_spawn_command_line_sync(
-		cmd,
-		&std_out,
-		&std_err,
-		&status,
-		&error
+	if(g_spawn_async_with_pipes(
+    home,
+    &cmd,
+    NULL,
+    0, NULL, NULL,
+    &pid,
+    &std_in,
+    &std_out,
+    &std_err,
+    &error
 	))
 	{
-		printf("std_out: %s", std_out);
+		FILE *fp = fdopen(std_out, "r");
+		gchar line[256];
+    while(fgets(line, sizeof line, fp) != NULL )
+    {
+      printf(line, stdout);
+      printf("line: %s", line);
+    }
+    fclose(fp);
 	}
 	else {
-		printf("std_err:\n%s\n%s\n%s\n", cmd, std_err, error->message);
-		ui_set_statusbar(TRUE, _("ERROR %s: %s (%s)"), cmd, std_err, error->message);
+		printf("ERROR %s: %s (%d, %d, %d)", cmd, error->message, std_in, std_out, std_err);
+		ui_set_statusbar(TRUE, _("ERROR %s: %s (%d, %d, %d)"), cmd, error->message, std_in, std_out, std_err);
 		g_error_free(error);
 	}
 }
