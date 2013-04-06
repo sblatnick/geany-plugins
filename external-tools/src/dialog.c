@@ -8,7 +8,8 @@ extern GeanyFunctions *geany_functions;
 
 extern gchar *tools;
 
-static GtkWidget *scrollable, *tree, *title, *saveCheckbox, *contextCheckbox, *menuCheckbox, *shortcutCheckbox;
+static GtkWidget *scrollable, *tree, *title, *saveCheckbox, *contextCheckbox, 
+	*menuCheckbox, *shortcutCheckbox, *editButton;
 static GtkTreeStore *list;
 static GtkTreeIter row;
 static GtkDialog *configDialog;
@@ -30,13 +31,21 @@ static Tool* get_active_tool()
 
 static void selected_changed(GtkTreeView *view, gpointer data)
 {
+	gtk_widget_set_sensitive(GTK_WIDGET(title), TRUE);
+	gtk_widget_set_sensitive(GTK_WIDGET(saveCheckbox), TRUE);
+	gtk_widget_set_sensitive(GTK_WIDGET(contextCheckbox), TRUE);
+	gtk_widget_set_sensitive(GTK_WIDGET(menuCheckbox), TRUE);
+	gtk_widget_set_sensitive(GTK_WIDGET(shortcutCheckbox), TRUE);
+	gtk_widget_set_sensitive(GTK_WIDGET(shortcutCheckbox), TRUE);
+	gtk_widget_set_sensitive(GTK_WIDGET(editButton), TRUE);
+
   Tool* tool = get_active_tool();
-  printf("Tool name: %s save: %s\n", tool->name, tool->save ? "true" : "false");
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(saveCheckbox), tool->save);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(contextCheckbox), tool->context);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(menuCheckbox), tool->menu);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(shortcutCheckbox), tool->shortcut);
-  gtk_entry_set_text(GTK_ENTRY(title), tool->name);
+	printf("Tool name: %s save: %s\n", tool->name, tool->save ? "true" : "false");		
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(saveCheckbox), tool->save);
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(contextCheckbox), tool->context);
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(menuCheckbox), tool->menu);
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(shortcutCheckbox), tool->shortcut);
+	gtk_entry_set_text(GTK_ENTRY(title), tool->name);
 }
 
 static int add_tool(Tool *tool)
@@ -135,6 +144,7 @@ static gboolean on_change(GtkWidget *entry, GdkEventKey *event, gpointer user_da
       if(g_rename(old, new) != 0) {
         g_warning(_("external-tools: Unable to rename '%s' to '%s'"), old, new);
       }
+      printf("RENAMING: %s to %s\n", old, new);
       g_free(tool->name);
       g_free(old);
       g_free(new);
@@ -144,6 +154,7 @@ static gboolean on_change(GtkWidget *entry, GdkEventKey *event, gpointer user_da
       g_free(name);
     }
   }
+  return FALSE;
 }
 
 static void on_edit(GtkButton* button, gpointer data)
@@ -204,7 +215,7 @@ GtkWidget* plugin_configure(GtkDialog *dialog)
   shortcutCheckbox = checkbox("Shortcut", "Should there be a keyboard shortcut for this tool?", GINT_TO_POINTER(SHORTCUT));
   
   title = gtk_entry_new();
-	g_signal_connect(title, "changed", G_CALLBACK(on_change), NULL);
+	g_signal_connect(title, "focus-out-event", G_CALLBACK(on_change), NULL);
 	gtk_box_pack_start(GTK_BOX(settingsBox), title, FALSE, FALSE, 2);
 
   gtk_box_pack_start(GTK_BOX(settingsBox), saveCheckbox, FALSE, FALSE, 10);
@@ -212,7 +223,7 @@ GtkWidget* plugin_configure(GtkDialog *dialog)
   gtk_box_pack_start(GTK_BOX(settingsBox), menuCheckbox, FALSE, FALSE, 10);
   gtk_box_pack_start(GTK_BOX(settingsBox), shortcutCheckbox, FALSE, FALSE, 10);
 
-  GtkWidget* editButton = gtk_button_new_with_label(_("Edit"));
+  editButton = gtk_button_new_with_label(_("Edit"));
   g_signal_connect(editButton, "clicked", G_CALLBACK(on_edit), NULL);
   gtk_box_pack_start(GTK_BOX(settingsBox), editButton, FALSE, FALSE, 2);
 
@@ -222,6 +233,14 @@ GtkWidget* plugin_configure(GtkDialog *dialog)
 	g_signal_connect(dialog, "response", G_CALLBACK(dialog_response), NULL);
 	
 	load_tools(add_tool);
+	
+	gtk_widget_set_sensitive(GTK_WIDGET(title), FALSE);
+	gtk_widget_set_sensitive(GTK_WIDGET(saveCheckbox), FALSE);
+	gtk_widget_set_sensitive(GTK_WIDGET(contextCheckbox), FALSE);
+	gtk_widget_set_sensitive(GTK_WIDGET(menuCheckbox), FALSE);
+	gtk_widget_set_sensitive(GTK_WIDGET(shortcutCheckbox), FALSE);
+	gtk_widget_set_sensitive(GTK_WIDGET(shortcutCheckbox), FALSE);
+	gtk_widget_set_sensitive(GTK_WIDGET(editButton), FALSE);
 	
 	return hbox;
 }
