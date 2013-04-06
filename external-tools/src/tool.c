@@ -10,6 +10,8 @@ extern gchar *tools;
 extern GKeyFile *config;
 static GeanyKeyGroup *key_group;
 static gint shortcutCount = 0;
+static gint menuCount = 0;
+static GtkWidget **menu_tools;
 
 enum OUTPUT
 {
@@ -151,20 +153,17 @@ static void tool_shortcut_callback(G_GNUC_UNUSED guint key_id)
 	execute(shortcut_tools[key_id]);
 }
 
-int setup_tool(Tool* tool)
+int count_tools(Tool* tool)
 {
 	if(tool->shortcut) {
 		shortcutCount++;
 	}
 	if(tool->menu) {
-		GtkWidget *tool_menu_item = gtk_menu_item_new_with_mnemonic(tool->name);
-		gtk_widget_show(tool_menu_item);
-		gtk_container_add(GTK_CONTAINER(geany->main_widgets->tools_menu), tool_menu_item);
-		g_signal_connect(tool_menu_item, "activate", G_CALLBACK(tool_menu_callback), tool);
+		menuCount++;
 	}
 }
 
-int setup_shortcut(Tool* tool)
+int setup_tools(Tool* tool)
 {
 	if(tool->shortcut) {
 		shortcut_tools[shortcutCount] = tool;
@@ -172,11 +171,28 @@ int setup_shortcut(Tool* tool)
 			tool->name, tool->name, NULL);
 		shortcutCount++;
 	}
+	if(tool->menu) {
+		GtkWidget *tool_menu_item = gtk_menu_item_new_with_mnemonic(tool->name);
+		menu_tools[menuCount] = tool_menu_item;
+		gtk_widget_show(tool_menu_item);
+		gtk_container_add(GTK_CONTAINER(geany->main_widgets->tools_menu), tool_menu_item);
+		g_signal_connect(tool_menu_item, "activate", G_CALLBACK(tool_menu_callback), tool);
+		menuCount++;
+	}
 }
 
 void clean_tools()
 {
-
+	gint i = 0;
+	while(i < menuCount) {
+		gtk_container_remove(GTK_CONTAINER(geany->main_widgets->tools_menu), menu_tools[i]);
+		i++;
+	}
+	
+	shortcutCount = 0;
+	menuCount = 0;
+	g_free(shortcut_tools);
+	g_free(menu_tools);
 }
 
 Tool* load_tool(gchar *name)
@@ -213,15 +229,14 @@ void load_tools(int (*callback)(Tool*))
 
 void reload_tools()
 {
-	load_tools(setup_tool);
-
+	load_tools(count_tools);
 	key_group = plugin_set_key_group(geany_plugin, "external_tools_keyboard_shortcut", shortcutCount + 1, NULL);
-	g_free(shortcut_tools);
 	shortcut_tools = (Tool **) g_malloc(shortcutCount);
+	menu_tools = (GtkWidget **) g_malloc(menuCount);
 	shortcutCount = 0;
-	load_tools(setup_shortcut);
+	menuCount = 0;
+	load_tools(setup_tools);
 	keybindings_set_item(key_group, shortcutCount, key_callback, 0, 0, "external_tools_keyboard_shortcut", _("External Tools..."), NULL);
-	shortcutCount = 0;
 	keybindings_load_keyfile();
 }
 

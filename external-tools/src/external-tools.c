@@ -49,4 +49,5 @@ void plugin_cleanup(void)
 	g_free(conf);
 	g_free(tools);
 	g_key_file_free(config);
+	clean_tools();
 }
