@@ -34,7 +34,8 @@ typedef struct
 	gboolean menu;
 	gboolean shortcut;
 } Tool;
-Tool **shortcut_tools;
+static Tool **shortcut_tools;
+static gboolean shortcut_init = TRUE;
 
 enum
 {
@@ -174,8 +175,10 @@ int setup_shortcut(Tool* tool)
 {
   if(tool->shortcut) {
   	shortcut_tools[shortcutCount] = tool;
-    keybindings_set_item(key_group, shortcutCount, tool_shortcut_callback, 0, 0,
-    	tool->name, tool->name, NULL);
+  	if(shortcut_init) {
+		  keybindings_set_item(key_group, shortcutCount, tool_shortcut_callback, 0, 0,
+		  	tool->name, tool->name, NULL);
+		}
     shortcutCount++;
   }
 }
@@ -224,11 +227,16 @@ void reload_tools()
 	g_free(shortcut_tools);
   load_tools(setup_tool);
 
-  key_group = plugin_set_key_group(geany_plugin, "external_tools_keyboard_shortcut", shortcutCount + 1, NULL);
+	if(shortcut_init) {
+  	key_group = plugin_set_key_group(geany_plugin, "external_tools_keyboard_shortcut", shortcutCount + 1, NULL);
+  }
   shortcut_tools = (Tool **) g_malloc(shortcutCount);
   shortcutCount = 0;
   load_tools(setup_shortcut);
-	keybindings_set_item(key_group, shortcutCount, key_callback, 0, 0, "external_tools_keyboard_shortcut", _("External Tools..."), NULL);
+	if(shortcut_init) {
+		keybindings_set_item(key_group, shortcutCount, key_callback, 0, 0, "external_tools_keyboard_shortcut", _("External Tools..."), NULL);
+		shortcut_init = FALSE;
+	}
 	shortcutCount = 0;
 }
 
