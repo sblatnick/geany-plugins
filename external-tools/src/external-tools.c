@@ -42,6 +42,7 @@ void plugin_init(GeanyData *data)
 
 void plugin_cleanup(void)
 {
+	gtk_container_remove(GTK_CONTAINER(geany->main_widgets->tools_menu), tool_menu_item);
 	gchar *data = g_key_file_to_data(config, NULL, NULL);
 	utils_write_file(conf, data);
 	g_free(data);
