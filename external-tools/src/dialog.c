@@ -130,7 +130,7 @@ static void dialog_response(GtkDialog *dialog, gint response, gpointer user_data
   //Remove all shortcuts to tools from the UI for a refresh:
   clean_tools();
   //We need to re-establish all of the tools in the UI:
-  load_tools(setup_tool);
+  reload_tools();
 }
 
 static gboolean on_change(GtkWidget *entry, GdkEventKey *event, gpointer user_data)

@@ -9,7 +9,8 @@ extern GeanyFunctions *geany_functions;
 extern gchar *tools;
 extern GKeyFile *config;
 extern gint shortcutCount;
-extern GeanyKeyGroup *key_group;
+GeanyKeyGroup *key_group;
+gint shortcutCount = 0;
 
 enum OUTPUT
 {
@@ -33,6 +34,7 @@ typedef struct
 	gboolean menu;
 	gboolean shortcut;
 } Tool;
+Tool **shortcut_tools;
 
 enum
 {
@@ -41,6 +43,11 @@ enum
 	MENU,
 	SHORTCUT
 };
+
+static void key_callback(G_GNUC_UNUSED guint key_id)
+{
+  plugin_show_configure(geany_plugin);
+}
 
 Tool* new_tool()
 {
@@ -142,10 +149,14 @@ static void tool_menu_callback(GtkToggleButton *cb, gpointer data)
   execute(data);
 }
 
+static void tool_shortcut_callback(G_GNUC_UNUSED guint key_id)
+{
+  execute(shortcut_tools[key_id]);
+}
+
 int setup_tool(Tool* tool)
 {
   if(tool->shortcut) {
-    //Store tool in an array
     shortcutCount++;
   }
   if(tool->context) {
@@ -156,6 +167,16 @@ int setup_tool(Tool* tool)
     gtk_widget_show(tool_menu_item);
     gtk_container_add(GTK_CONTAINER(geany->main_widgets->tools_menu), tool_menu_item);
     g_signal_connect(tool_menu_item, "activate", G_CALLBACK(tool_menu_callback), tool);
+  }
+}
+
+int setup_shortcut(Tool* tool)
+{
+  if(tool->shortcut) {
+  	shortcut_tools[shortcutCount] = tool;
+    keybindings_set_item(key_group, shortcutCount, tool_shortcut_callback, 0, 0,
+    	tool->name, tool->name, NULL);
+    shortcutCount++;
   }
 }
 
@@ -196,6 +217,19 @@ void load_tools(int (*callback)(Tool*))
 		Tool *tool = load_tool(groups[i]);
 		callback(tool);
 	}
+}
+
+void reload_tools()
+{
+	g_free(shortcut_tools);
+  load_tools(setup_tool);
+
+  key_group = plugin_set_key_group(geany_plugin, "external_tools_keyboard_shortcut", shortcutCount + 1, NULL);
+  shortcut_tools = (Tool **) g_malloc(shortcutCount);
+  shortcutCount = 0;
+  load_tools(setup_shortcut);
+	keybindings_set_item(key_group, shortcutCount, key_callback, 0, 0, "external_tools_keyboard_shortcut", _("External Tools..."), NULL);
+	shortcutCount = 0;
 }
 
 void save_tool(Tool* tool)
