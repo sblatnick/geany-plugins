@@ -8,9 +8,8 @@ extern GeanyFunctions *geany_functions;
 
 extern gchar *tools;
 extern GKeyFile *config;
-extern gint shortcutCount;
-GeanyKeyGroup *key_group;
-gint shortcutCount = 0;
+static GeanyKeyGroup *key_group;
+static gint shortcutCount = 0;
 
 enum OUTPUT
 {
@@ -207,7 +206,6 @@ void load_tools(int (*callback)(Tool*))
 
 	for(i = 0; i < len; i++)
 	{
-		printf("loading data for group/tool %s\n", groups[i]);
 		Tool *tool = load_tool(groups[i]);
 		callback(tool);
 	}
@@ -227,16 +225,10 @@ void reload_tools()
 	keybindings_load_keyfile();
 }
 
-void save_tool(Tool* tool)
+int save_tool(Tool* tool)
 {
 	g_key_file_set_integer(config, tool->name, "output", tool->output);
 	g_key_file_set_boolean(config, tool->name, "save", tool->save);
 	g_key_file_set_boolean(config, tool->name, "menu", tool->menu);
 	g_key_file_set_boolean(config, tool->name, "shortcut", tool->shortcut);
-}
-
-void load_script(Tool *tool)
-{
-	//load the file of the script into geany
-	//and hide the dialog?
 }

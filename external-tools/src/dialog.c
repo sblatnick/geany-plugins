@@ -114,13 +114,7 @@ static void dialog_response(GtkDialog *dialog, gint response, gpointer user_data
 	GtkTreeIter iter;
 	gboolean valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(list), &iter);
 
-	while(valid)
-	{
-		Tool *tool;
-		gtk_tree_model_get(GTK_TREE_MODEL(list), &iter, 0, &tool, -1);
-		save_tool(tool);
-		valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(list), &iter);
-	}
+	load_tools(save_tool);
 
 	//Remove all shortcuts to tools from the UI for a refresh:
 	clean_tools();
