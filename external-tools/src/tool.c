@@ -224,12 +224,14 @@ void load_tools(int (*callback)(Tool*))
 
 void reload_tools()
 {
-	g_free(shortcut_tools);
   load_tools(setup_tool);
 
 	if(shortcut_init) {
   	key_group = plugin_set_key_group(geany_plugin, "external_tools_keyboard_shortcut", shortcutCount + 1, NULL);
   }
+  else {
+		g_free(shortcut_tools);
+	}
   shortcut_tools = (Tool **) g_malloc(shortcutCount);
   shortcutCount = 0;
   load_tools(setup_shortcut);
