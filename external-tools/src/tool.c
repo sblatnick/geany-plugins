@@ -6,8 +6,8 @@ extern GeanyPlugin *geany_plugin;
 extern GeanyData *geany_data;
 extern GeanyFunctions *geany_functions;
 
-extern gchar *tools;
-extern GKeyFile *config;
+extern gchar *tools, *conf;
+static GKeyFile *config;
 static GeanyKeyGroup *key_group;
 static gint shortcutCount = 0;
 static gint menuCount = 0;
@@ -55,13 +55,10 @@ Tool* new_tool()
 	gint count = 2;
 	gchar* new = g_build_path(G_DIR_SEPARATOR_S, tools, orig, NULL);
 	while(g_file_test(new, G_FILE_TEST_EXISTS)) {
-		printf("new: %s\n", new);
 		char counter[32];
 		snprintf(counter, 32, "%d", count);
 		setptr(name, g_strconcat(orig, " ", counter, NULL));
-		printf("try: %d\n", count);
 		setptr(new, g_build_path(G_DIR_SEPARATOR_S, tools, name, NULL));
-		printf("iterate\n");
 		count++;
 	}
 	g_creat(new, 0744);
@@ -83,12 +80,17 @@ void free_tool(Tool* tool)
 void execute(Tool *tool)
 {
 	printf("TOOL EXECUTED: %s\n", tool->name);
-	
+
+	GeanyDocument *doc = document_get_current();
+	if(tool->save) {
+		document_save_file(doc, TRUE);
+	}
+
 	const char *home = g_getenv("HOME");
 	if (!home) {
 		home = g_get_home_dir();
 	}
-	
+
 	GError *error = NULL;
 	gint std_in, std_out, std_err;
 	GPid pid;
@@ -97,8 +99,6 @@ void execute(Tool *tool)
 	utils_string_replace_all(cmd_str, "$script", g_build_path(G_DIR_SEPARATOR_S, tools, tool->name, NULL));
 	gchar *cmd = g_string_free(cmd_str, FALSE);
 	cmd = utils_get_locale_from_utf8(cmd);
-	
-	GeanyDocument *doc = document_get_current();
 
 	char geany_line_number[32];
 	gint line = sci_get_current_line(doc->editor->sci);
@@ -132,7 +132,6 @@ void execute(Tool *tool)
 		while(fgets(line, sizeof line, fp) != NULL )
 		{
 			printf(line, stdout);
-			//printf("line: %s", line);
 		}
 		fclose(fp);
 	}
@@ -183,12 +182,17 @@ int setup_tools(Tool* tool)
 
 void clean_tools()
 {
+	gchar *data = g_key_file_to_data(config, NULL, NULL);
+	utils_write_file(conf, data);
+	g_free(data);
+	g_key_file_free(config);
+
 	gint i = 0;
 	while(i < menuCount) {
 		gtk_container_remove(GTK_CONTAINER(geany->main_widgets->tools_menu), menu_tools[i]);
 		i++;
 	}
-	
+
 	shortcutCount = 0;
 	menuCount = 0;
 	g_free(shortcut_tools);
@@ -229,6 +233,8 @@ void load_tools(int (*callback)(Tool*))
 
 void reload_tools()
 {
+	config = g_key_file_new();
+	g_key_file_load_from_file(config, conf, G_KEY_FILE_NONE, NULL);
 	load_tools(count_tools);
 	key_group = plugin_set_key_group(geany_plugin, "external_tools_keyboard_shortcut", shortcutCount + 1, NULL);
 	shortcut_tools = (Tool **) g_malloc(shortcutCount);

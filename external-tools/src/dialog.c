@@ -39,7 +39,6 @@ static void selected_changed(GtkTreeView *view, gpointer data)
 	gtk_widget_set_sensitive(GTK_WIDGET(editButton), TRUE);
 
 	Tool* tool = get_active_tool();
-	printf("Tool name: %s save: %s\n", tool->name, tool->save ? "true" : "false");		
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(saveCheckbox), tool->save);
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(menuCheckbox), tool->menu);
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(shortcutCheckbox), tool->shortcut);
@@ -97,16 +96,15 @@ static void toggle_checkbox(GtkToggleButton *checkbox, gpointer data)
 				tool->shortcut = value;
 				break;
 		}
-		printf("Toggle: %d: %s\n", property, value ? "true" : "false");
 	}
 }
 
 static GtkWidget* checkbox(gchar *label, gchar *tooltip, gchar *key)
 {
-	GtkWidget *save_check = gtk_check_button_new_with_label(_(label));
-	ui_widget_set_tooltip_text(save_check, _(tooltip));
-	g_signal_connect(G_OBJECT(save_check), "toggled", G_CALLBACK(toggle_checkbox), key);
-	return save_check;
+	GtkWidget *check = gtk_check_button_new_with_label(_(label));
+	ui_widget_set_tooltip_text(check, _(tooltip));
+	g_signal_connect(G_OBJECT(check), "toggled", G_CALLBACK(toggle_checkbox), key);
+	return check;
 }
 
 static void dialog_response(GtkDialog *dialog, gint response, gpointer user_data)
@@ -114,7 +112,13 @@ static void dialog_response(GtkDialog *dialog, gint response, gpointer user_data
 	GtkTreeIter iter;
 	gboolean valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(list), &iter);
 
-	load_tools(save_tool);
+	while(valid)
+	{
+		Tool *tool;
+		gtk_tree_model_get(GTK_TREE_MODEL(list), &iter, 0, &tool, -1);
+		save_tool(tool);
+		valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(list), &iter);
+	}
 
 	//Remove all shortcuts to tools from the UI for a refresh:
 	clean_tools();
@@ -179,7 +183,7 @@ GtkWidget* plugin_configure(GtkDialog *dialog)
 	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrollable),
 		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 	gtk_container_add(GTK_CONTAINER(scrollable), tree);
-	
+
 	GtkTreeSelection *select = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
 	gtk_tree_selection_set_mode(select, GTK_SELECTION_SINGLE);
 	g_signal_connect(G_OBJECT(select), "changed",
@@ -201,7 +205,7 @@ GtkWidget* plugin_configure(GtkDialog *dialog)
 	saveCheckbox = checkbox("Save", "Should the active document be saved when this tool is run?", GINT_TO_POINTER(SAVE));
 	menuCheckbox = checkbox("Menu", "Should there be a menu for this tool?", GINT_TO_POINTER(MENU));
 	shortcutCheckbox = checkbox("Shortcut", "Should there be a keyboard shortcut for this tool?", GINT_TO_POINTER(SHORTCUT));
-	
+
 	title = gtk_entry_new();
 	g_signal_connect(title, "focus-out-event", G_CALLBACK(on_change), NULL);
 	gtk_box_pack_start(GTK_BOX(settingsBox), title, FALSE, FALSE, 2);
@@ -216,17 +220,17 @@ GtkWidget* plugin_configure(GtkDialog *dialog)
 
 	gtk_box_pack_start(GTK_BOX(hbox), settingsBox, TRUE, TRUE, 10);
 	gtk_widget_show_all(hbox);
-	
+
 	g_signal_connect(dialog, "response", G_CALLBACK(dialog_response), NULL);
-	
+
 	load_tools(add_tool);
-	
+
 	gtk_widget_set_sensitive(GTK_WIDGET(title), FALSE);
 	gtk_widget_set_sensitive(GTK_WIDGET(saveCheckbox), FALSE);
 	gtk_widget_set_sensitive(GTK_WIDGET(menuCheckbox), FALSE);
 	gtk_widget_set_sensitive(GTK_WIDGET(shortcutCheckbox), FALSE);
 	gtk_widget_set_sensitive(GTK_WIDGET(shortcutCheckbox), FALSE);
 	gtk_widget_set_sensitive(GTK_WIDGET(editButton), FALSE);
-	
+
 	return hbox;
 }
