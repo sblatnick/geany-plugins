@@ -30,7 +30,7 @@ void plugin_init(GeanyData *data)
 	conf = g_build_path(G_DIR_SEPARATOR_S, path, "external-tools.conf", NULL);
 	tools = g_build_path(G_DIR_SEPARATOR_S, path, "tools", NULL);
 	g_key_file_load_from_file(config, conf, G_KEY_FILE_NONE, NULL);
-  g_mkdir_with_parents(tools, S_IRUSR | S_IWUSR | S_IXUSR);
+	g_mkdir_with_parents(tools, S_IRUSR | S_IWUSR | S_IXUSR);
 
 	reload_tools();
 
