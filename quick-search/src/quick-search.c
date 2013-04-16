@@ -65,10 +65,10 @@ static void quick_next(G_GNUC_UNUSED guint key_id)
 	GeanyDocument *doc = document_get_current();
 	sci_goto_pos(doc->editor->sci, sci_get_selection_end(doc->editor->sci), TRUE);
 	sci_set_search_anchor(doc->editor->sci);
-	if(search_find_next(doc->editor->sci, text, 0) == -1) {
+	if(search_find_next(doc->editor->sci, text, 0, NULL) == -1) {
 		sci_goto_pos(doc->editor->sci, 0, TRUE);
 		sci_set_search_anchor(doc->editor->sci);
-		search_find_next(doc->editor->sci, text, 0);
+		search_find_next(doc->editor->sci, text, 0, NULL);
 	}
 	editor_display_current_line(doc->editor, 0.3F);
 }
@@ -118,7 +118,7 @@ static gboolean on_key(GtkWidget *widget, GdkEventKey *event, gpointer user_data
 			old = strlen(text);
 			GeanyDocument *doc = document_get_current();
 			search_mark_all(doc, text, 0);
-			search_find_next(doc->editor->sci, text, 0);
+			search_find_next(doc->editor->sci, text, 0, NULL);
 			editor_display_current_line(doc->editor, 0.3F);
 		}
 	}
