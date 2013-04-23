@@ -151,6 +151,8 @@ void execute(Tool *tool)
 		ui_set_statusbar(TRUE, _("ERROR %s: %s (%d, %d, %d)"), cmd, error->message, std_in, std_out, std_err);
 		g_error_free(error);
 	}
+	g_free(cmd);
+	g_free(argv);
 }
 
 static void tool_menu_callback(GtkToggleButton *cb, gpointer data)
