@@ -36,6 +36,7 @@ void plugin_init(GeanyData *data)
 	gtk_widget_show(tool_menu_item);
 	gtk_container_add(GTK_CONTAINER(geany->main_widgets->tools_menu), tool_menu_item);
 	g_signal_connect(tool_menu_item, "activate", G_CALLBACK(menu_callback), NULL);
+	panel_init();
 }
 
 void plugin_cleanup(void)
@@ -45,4 +46,5 @@ void plugin_cleanup(void)
 	g_free(path);
 	g_free(conf);
 	g_free(tools);
+	panel_cleanup();
 }
