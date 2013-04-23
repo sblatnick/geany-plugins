@@ -46,7 +46,7 @@ static GtkTextBuffer* buffer()
 	return gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
 }
 
-void panel_clear()
+void panel_prepare()
 {
 	gtk_text_buffer_set_text(buffer(), "", 0);
 	
