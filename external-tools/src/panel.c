@@ -49,6 +49,12 @@ static GtkTextBuffer* buffer()
 void panel_clear()
 {
 	gtk_text_buffer_set_text(buffer(), "", 0);
+	
+	//Focus the tab:
+	gtk_notebook_set_current_page(
+		GTK_NOTEBOOK(geany->main_widgets->message_window_notebook),
+		gtk_notebook_page_num(GTK_NOTEBOOK(geany->main_widgets->message_window_notebook), panel)
+	);
 }
 
 void panel_print(gchar *text)
@@ -56,6 +62,9 @@ void panel_print(gchar *text)
 	GtkTextIter iter;
 	gtk_text_buffer_get_end_iter(buffer(), &iter);
 	gtk_text_buffer_insert(buffer(), &iter, text, -1);
-	//gtk_text_buffer_get_end_iter(buffer(), &iter);
-	//gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(text_view), &iter, 0, FALSE, 0, 0);
+	
+	//Scroll to bottom:
+	GtkTextMark *mark;
+	mark = gtk_text_buffer_get_insert(buffer());
+	gtk_text_view_scroll_to_mark(GTK_TEXT_VIEW(text_view), mark, 0.0, FALSE, 0.0, 0.0);
 }
