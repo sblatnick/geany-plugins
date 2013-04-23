@@ -81,6 +81,7 @@ void free_tool(Tool* tool)
 void execute(Tool *tool)
 {
 	printf("TOOL EXECUTED: %s\n", tool->name);
+	panel_clear();
 
 	GeanyDocument *doc = document_get_current();
 	if(tool->save) {
@@ -133,6 +134,7 @@ void execute(Tool *tool)
 		while(fgets(line, sizeof line, fp) != NULL )
 		{
 			printf(line, stdout);
+			panel_print(line);
 		}
 		fclose(fp);
 	}

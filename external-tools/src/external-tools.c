@@ -3,9 +3,9 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <stdlib.h>
+#include "panel.c"
 #include "tool.c"
 #include "dialog.c"
-#include "panel.c"
 
 GeanyPlugin *geany_plugin;
 GeanyData *geany_data;
