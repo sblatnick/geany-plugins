@@ -31,18 +31,33 @@ static Tool* get_active_tool()
 
 static void selected_changed(GtkTreeView *view, gpointer data)
 {
-	gtk_widget_set_sensitive(GTK_WIDGET(title), TRUE);
-	gtk_widget_set_sensitive(GTK_WIDGET(saveCheckbox), TRUE);
-	gtk_widget_set_sensitive(GTK_WIDGET(menuCheckbox), TRUE);
-	gtk_widget_set_sensitive(GTK_WIDGET(shortcutCheckbox), TRUE);
-	gtk_widget_set_sensitive(GTK_WIDGET(shortcutCheckbox), TRUE);
-	gtk_widget_set_sensitive(GTK_WIDGET(editButton), TRUE);
-
 	Tool* tool = get_active_tool();
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(saveCheckbox), tool->save);
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(menuCheckbox), tool->menu);
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(shortcutCheckbox), tool->shortcut);
-	gtk_entry_set_text(GTK_ENTRY(title), tool->name);
+	if(tool == NULL) {
+		gtk_widget_set_sensitive(GTK_WIDGET(title), FALSE);
+		gtk_widget_set_sensitive(GTK_WIDGET(saveCheckbox), FALSE);
+		gtk_widget_set_sensitive(GTK_WIDGET(menuCheckbox), FALSE);
+		gtk_widget_set_sensitive(GTK_WIDGET(shortcutCheckbox), FALSE);
+		gtk_widget_set_sensitive(GTK_WIDGET(shortcutCheckbox), FALSE);
+		gtk_widget_set_sensitive(GTK_WIDGET(editButton), FALSE);
+
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(saveCheckbox), FALSE);
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(menuCheckbox), FALSE);
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(shortcutCheckbox), FALSE);
+		gtk_entry_set_text(GTK_ENTRY(title), "");
+	}
+	else {
+		gtk_widget_set_sensitive(GTK_WIDGET(title), TRUE);
+		gtk_widget_set_sensitive(GTK_WIDGET(saveCheckbox), TRUE);
+		gtk_widget_set_sensitive(GTK_WIDGET(menuCheckbox), TRUE);
+		gtk_widget_set_sensitive(GTK_WIDGET(shortcutCheckbox), TRUE);
+		gtk_widget_set_sensitive(GTK_WIDGET(shortcutCheckbox), TRUE);
+		gtk_widget_set_sensitive(GTK_WIDGET(editButton), TRUE);
+
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(saveCheckbox), tool->save);
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(menuCheckbox), tool->menu);
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(shortcutCheckbox), tool->shortcut);
+		gtk_entry_set_text(GTK_ENTRY(title), tool->name);
+	}
 }
 
 static int add_tool(Tool *tool)
@@ -60,8 +75,11 @@ static void delete_tool(GtkButton *button, gpointer data)
 	{
 		Tool *tool;
 		gtk_tree_model_get(model, &iter, 0, &tool, -1);
+		gchar *file = g_build_path(G_DIR_SEPARATOR_S, tools, tool->name, NULL);
+		g_remove(file);
 		free_tool(tool);
-		//gtk_tree_store_remove(list, &iter);
+		gtk_tree_selection_unselect_iter(selected, &iter);
+		gtk_tree_store_remove(list, &iter);
 	}
 }
 
@@ -136,12 +154,16 @@ static gboolean on_change(GtkWidget *entry, GdkEventKey *event, gpointer user_da
 			gchar *new = g_build_path(G_DIR_SEPARATOR_S, tools, name, NULL);
 			if(g_rename(old, new) != 0) {
 				g_warning(_("external-tools: Unable to rename '%s' to '%s'"), old, new);
+				g_free(old);
+				g_free(new);
 			}
-			printf("RENAMING: %s to %s\n", old, new);
-			g_free(tool->name);
-			g_free(old);
-			g_free(new);
-			tool->name = name;
+			else {
+				printf("RENAMING: %s to %s\n", old, new);
+				g_free(tool->name);
+				g_free(old);
+				g_free(new);
+				tool->name = name;
+			}
 		}
 		else {
 			g_free(name);

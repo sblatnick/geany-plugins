@@ -73,6 +73,7 @@ Tool* new_tool()
 
 void free_tool(Tool* tool)
 {
+	g_key_file_remove_group(config, tool->name, NULL);
 	g_free(tool->name);
 	g_slice_free(Tool, tool);
 }
