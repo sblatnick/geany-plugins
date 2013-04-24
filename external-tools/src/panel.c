@@ -12,6 +12,11 @@ static GtkWidget *label;
 static GtkWidget *text_view;
 static GtkWidget *scrollable;
 
+static GtkTextBuffer* buffer()
+{
+	return gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+}
+
 void panel_init()
 {
 	label = gtk_label_new(_("Tools"));
@@ -31,6 +36,9 @@ void panel_init()
 	
 	gtk_widget_show(label);
 	gtk_widget_show_all(panel);
+	
+	gtk_text_buffer_create_tag(buffer(), "error", "foreground", "#ff0000", NULL);
+	gtk_text_buffer_create_tag(buffer(), "link", "foreground", "#0000ff", NULL);
 }
 
 void panel_cleanup()
@@ -39,11 +47,6 @@ void panel_cleanup()
 		GTK_NOTEBOOK(geany->main_widgets->message_window_notebook),
 		gtk_notebook_page_num(GTK_NOTEBOOK(geany->main_widgets->message_window_notebook), panel)
 	);
-}
-
-static GtkTextBuffer* buffer()
-{
-	return gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
 }
 
 void panel_prepare()
@@ -57,11 +60,11 @@ void panel_prepare()
 	);
 }
 
-void panel_print(gchar *text)
+void panel_print(gchar *text, const gchar *color)
 {
 	GtkTextIter iter;
 	gtk_text_buffer_get_end_iter(buffer(), &iter);
-	gtk_text_buffer_insert(buffer(), &iter, text, -1);
+	gtk_text_buffer_insert_with_tags_by_name(buffer(), &iter, text, -1, color, NULL);
 	
 	//Scroll to bottom:
 	GtkTextMark *mark;
