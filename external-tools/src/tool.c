@@ -92,6 +92,7 @@ static gboolean cb_out(GIOChannel *channel, GIOCondition cond, gpointer user_dat
 	if(cond == G_IO_HUP)
 	{
 		g_io_channel_unref(channel);
+		lock = 0;
 		return FALSE;
 	}
 
@@ -114,6 +115,7 @@ static gboolean cb_err(GIOChannel *channel, GIOCondition cond, gpointer user_dat
 	if(cond == G_IO_HUP)
 	{
 		g_io_channel_unref(channel);
+		lock = 0;
 		return FALSE;
 	}
 
