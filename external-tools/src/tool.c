@@ -13,6 +13,7 @@ static gint shortcutCount = 0;
 static gint menuCount = 0;
 static GtkWidget **menu_tools;
 static GIOChannel *out_channel, *err_channel;
+static int lock = 0;
 
 enum OUTPUT
 {
@@ -81,6 +82,10 @@ void free_tool(Tool* tool)
 
 static gboolean cb_out(GIOChannel *channel, GIOCondition cond, gpointer user_data)
 {
+	if(lock == 1) {
+		return TRUE;
+	}
+	lock = 1;
 	gchar *string;
 	gsize size;
 
@@ -91,15 +96,18 @@ static gboolean cb_out(GIOChannel *channel, GIOCondition cond, gpointer user_dat
 	}
 
 	g_io_channel_read_line(channel, &string, &size, NULL, NULL);
-	//printf(string, stdout);
 	panel_print(string);
 	g_free(string);
-
+	lock = 0;
 	return TRUE;
 }
 
 static gboolean cb_err(GIOChannel *channel, GIOCondition cond, gpointer user_data)
 {
+	if(lock == 1) {
+		return TRUE;
+	}
+	lock = 1;
 	gchar *string;
 	gsize size;
 
@@ -110,15 +118,15 @@ static gboolean cb_err(GIOChannel *channel, GIOCondition cond, gpointer user_dat
 	}
 
 	g_io_channel_read_line(channel, &string, &size, NULL, NULL);
-	//printf(string, stdout);
 	panel_print(string);
 	g_free(string);
-
+	lock = 0;
 	return TRUE;
 }
 
 void execute(Tool *tool)
 {
+	lock = 0;
 	printf("TOOL EXECUTED: %s\n", tool->name);
 	panel_prepare();
 
