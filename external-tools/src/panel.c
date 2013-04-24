@@ -11,10 +11,16 @@ static GtkWidget *panel;
 static GtkWidget *label;
 static GtkWidget *text_view;
 static GtkWidget *scrollable;
+static GtkTextTag *error_tag, *link_tag;
 
 static GtkTextBuffer* buffer()
 {
 	return gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+}
+
+static void click_link(GtkTextTag *obj, gpointer data)
+{
+	printf("clicked!");
 }
 
 void panel_init()
@@ -37,8 +43,15 @@ void panel_init()
 	gtk_widget_show(label);
 	gtk_widget_show_all(panel);
 	
-	gtk_text_buffer_create_tag(buffer(), "error", "foreground", "#ff0000", NULL);
-	gtk_text_buffer_create_tag(buffer(), "link", "foreground", "#0000ff", NULL);
+	error_tag = gtk_text_buffer_create_tag(buffer(), "error", "foreground", "#ff0000", NULL);
+	link_tag = gtk_text_buffer_create_tag(buffer(), "link", "foreground", "#0000ff", "underline", PANGO_UNDERLINE_SINGLE, NULL);
+
+/*	GType param_types[1];*/
+/*	param_types[0] = G_TYPE_POINTER;*/
+/*	*/
+/*	g_signal_newv("clicked", G_TYPE(error_tag->g_class->g_type), G_SIGNAL_RUN_FIRST, NULL, NULL, NULL,*/
+/*		NULL, G_TYPE_NONE, 1, param_types);*/
+/*	g_signal_connect(link_tag, "clicked", G_CALLBACK(click_link), NULL);*/
 }
 
 void panel_cleanup()
