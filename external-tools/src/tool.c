@@ -12,6 +12,7 @@ static GeanyKeyGroup *key_group;
 static gint shortcutCount = 0;
 static gint menuCount = 0;
 static GtkWidget **menu_tools;
+static GIOChannel *out_channel, *err_channel;
 
 enum OUTPUT
 {
@@ -78,6 +79,44 @@ void free_tool(Tool* tool)
 	g_slice_free(Tool, tool);
 }
 
+static gboolean cb_out(GIOChannel *channel, GIOCondition cond, gpointer user_data)
+{
+	gchar *string;
+	gsize size;
+
+	if(cond == G_IO_HUP)
+	{
+		g_io_channel_unref(channel);
+		return FALSE;
+	}
+
+	g_io_channel_read_line(channel, &string, &size, NULL, NULL);
+	//printf(string, stdout);
+	panel_print(string);
+	g_free(string);
+
+	return TRUE;
+}
+
+static gboolean cb_err(GIOChannel *channel, GIOCondition cond, gpointer user_data)
+{
+	gchar *string;
+	gsize size;
+
+	if(cond == G_IO_HUP)
+	{
+		g_io_channel_unref(channel);
+		return FALSE;
+	}
+
+	g_io_channel_read_line(channel, &string, &size, NULL, NULL);
+	//printf(string, stdout);
+	panel_print(string);
+	g_free(string);
+
+	return TRUE;
+}
+
 void execute(Tool *tool)
 {
 	printf("TOOL EXECUTED: %s\n", tool->name);
@@ -129,22 +168,10 @@ void execute(Tool *tool)
 		&error
 	))
 	{
-		FILE *fp = fdopen(std_out, "r");
-		FILE *fp_err = fdopen(std_err, "r");
-		gchar line[256];
-		gchar line_err[256];
-		while(fgets(line, sizeof line, fp) != NULL)
-		{
-			printf(line, stdout);
-			panel_print(line);
-			fflush(fp);
-			while(fgets(line_err, sizeof line_err, fp_err) != NULL )
-			{
-				printf(line_err, stdout);
-				panel_print(line_err);
-			}
-		}
-		fclose(fp);
+		err_channel = g_io_channel_unix_new(std_err);
+		out_channel = g_io_channel_unix_new(std_out);
+		g_io_add_watch(err_channel, G_IO_IN | G_IO_HUP, (GIOFunc)cb_err, NULL);
+		g_io_add_watch(out_channel, G_IO_IN | G_IO_HUP, (GIOFunc)cb_out, NULL);
 	}
 	else {
 		printf("ERROR %s: %s (%d, %d, %d)", cmd, error->message, std_in, std_out, std_err);
