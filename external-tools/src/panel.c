@@ -73,11 +73,11 @@ void panel_prepare()
 	);
 }
 
-void panel_print(gchar *text, const gchar *color)
+void panel_print(gchar *text, const gchar *tag)
 {
 	GtkTextIter iter;
 	gtk_text_buffer_get_end_iter(buffer(), &iter);
-	gtk_text_buffer_insert_with_tags_by_name(buffer(), &iter, text, -1, color, NULL);
+	gtk_text_buffer_insert_with_tags_by_name(buffer(), &iter, text, -1, tag, NULL);
 	
 	//Scroll to bottom:
 	GtkTextMark *mark;
