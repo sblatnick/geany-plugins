@@ -9,8 +9,8 @@ extern GeanyFunctions *geany_functions;
 extern gchar *tools;
 
 static GtkWidget *scrollable, *tree, *title, *saveCheckbox, *menuCheckbox,
-	*shortcutCheckbox, *editButton;
-static GtkTreeStore *list;
+	*shortcutCheckbox, *outputCombo, *editButton;
+static GtkTreeStore *list, *outputs;
 static GtkTreeIter row;
 static GtkDialog *configDialog;
 
@@ -38,6 +38,7 @@ static void selected_changed(GtkTreeView *view, gpointer data)
 		gtk_widget_set_sensitive(GTK_WIDGET(menuCheckbox), FALSE);
 		gtk_widget_set_sensitive(GTK_WIDGET(shortcutCheckbox), FALSE);
 		gtk_widget_set_sensitive(GTK_WIDGET(shortcutCheckbox), FALSE);
+		gtk_widget_set_sensitive(GTK_WIDGET(outputCombo), FALSE);
 		gtk_widget_set_sensitive(GTK_WIDGET(editButton), FALSE);
 
 		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(saveCheckbox), FALSE);
@@ -51,12 +52,30 @@ static void selected_changed(GtkTreeView *view, gpointer data)
 		gtk_widget_set_sensitive(GTK_WIDGET(menuCheckbox), TRUE);
 		gtk_widget_set_sensitive(GTK_WIDGET(shortcutCheckbox), TRUE);
 		gtk_widget_set_sensitive(GTK_WIDGET(shortcutCheckbox), TRUE);
+		gtk_widget_set_sensitive(GTK_WIDGET(outputCombo), TRUE);
 		gtk_widget_set_sensitive(GTK_WIDGET(editButton), TRUE);
 
 		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(saveCheckbox), tool->save);
 		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(menuCheckbox), tool->menu);
 		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(shortcutCheckbox), tool->shortcut);
+		gtk_combo_box_set_active(GTK_COMBO_BOX(outputCombo), tool->output == -1 ? 0 : tool->output);
 		gtk_entry_set_text(GTK_ENTRY(title), tool->name);
+	}
+}
+
+static void combo_changed(GtkComboBox *combo, gpointer data)
+{
+	Tool* tool = get_active_tool();
+	if(tool != NULL) {
+		GtkTreeIter iter;
+		gint value;
+		GtkTreeModel *model;
+
+		if(gtk_combo_box_get_active_iter(combo, &iter)) {
+			model = gtk_combo_box_get_model(combo);
+			gtk_tree_model_get(model, &iter, 1, &value, -1);
+		}
+		tool->output = value;
 	}
 }
 
@@ -64,6 +83,12 @@ static int add_tool(Tool *tool)
 {
 	gtk_tree_store_append(list, &row, NULL);
 	gtk_tree_store_set(list, &row, 0, tool, -1);
+}
+
+static int add_output(gchar *label, gint position)
+{
+	gtk_tree_store_append(outputs, &row, NULL);
+	gtk_tree_store_set(outputs, &row, 0, label, 1, position, -1);
 }
 
 static void delete_tool(GtkButton *button, gpointer data)
@@ -189,6 +214,7 @@ GtkWidget* plugin_configure(GtkDialog *dialog)
 	GtkWidget* settingsBox = gtk_vbox_new(FALSE, 6);
 	GtkWidget* buttonBox = gtk_hbox_new(FALSE, 6);
 
+	//Tools (left half):
 	list = gtk_tree_store_new(1, G_TYPE_POINTER);
 	tree = gtk_tree_view_new_with_model(GTK_TREE_MODEL(list));
 	render = gtk_cell_renderer_text_new();
@@ -222,7 +248,24 @@ GtkWidget* plugin_configure(GtkDialog *dialog)
 	gtk_box_pack_start(GTK_BOX(vbox), scrollable, TRUE, TRUE, 10);
 	gtk_box_pack_start(GTK_BOX(vbox), buttonBox, FALSE, FALSE, 10);
 
+	//Properties (right half):
 	gtk_box_pack_start(GTK_BOX(hbox), vbox, TRUE, TRUE, 10);
+	
+	outputs = gtk_tree_store_new(2, G_TYPE_STRING, G_TYPE_INT);
+	outputCombo = gtk_combo_box_new_with_model(GTK_TREE_MODEL(outputs));
+	GtkCellRenderer *cell = gtk_cell_renderer_text_new();
+	gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(outputCombo), cell, TRUE );
+	gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(outputCombo), cell, "text", 0, NULL );
+	add_output("None", 0);
+	add_output("Message Text", 1);
+	add_output("Message Table", 2);
+	add_output("Replace Selected", 3);
+	add_output("Replace Line", 4);
+	add_output("Replace Word", 5);
+	add_output("Append Current Document", 6);
+	add_output("New Document", 7);
+
+	g_signal_connect(G_OBJECT(outputCombo), "changed", G_CALLBACK(combo_changed), NULL);
 
 	saveCheckbox = checkbox("Save", "Should the active document be saved when this tool is run?", GINT_TO_POINTER(SAVE));
 	menuCheckbox = checkbox("Menu", "Should there be a menu for this tool?", GINT_TO_POINTER(MENU));
@@ -235,6 +278,7 @@ GtkWidget* plugin_configure(GtkDialog *dialog)
 	gtk_box_pack_start(GTK_BOX(settingsBox), saveCheckbox, FALSE, FALSE, 10);
 	gtk_box_pack_start(GTK_BOX(settingsBox), menuCheckbox, FALSE, FALSE, 10);
 	gtk_box_pack_start(GTK_BOX(settingsBox), shortcutCheckbox, FALSE, FALSE, 10);
+	gtk_box_pack_start(GTK_BOX(settingsBox), outputCombo, FALSE, FALSE, 10);
 
 	editButton = gtk_button_new_with_label(_("Edit"));
 	g_signal_connect(editButton, "clicked", G_CALLBACK(on_edit), NULL);

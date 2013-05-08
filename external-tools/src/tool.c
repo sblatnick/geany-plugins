@@ -13,18 +13,6 @@ static gint shortcutCount = 0;
 static gint menuCount = 0;
 static GtkWidget **menu_tools;
 
-enum OUTPUT
-{
-	NOTHING = 0,
-	MESSAGE_PANEL,
-	TABLE_PANEL,
-	REPLACE_SELECTED,
-	REPLACE_LINE,
-	REPLACE_WORD,
-	APPEND_CURRENT,
-	NEW_DOCUMENT
-} output;
-
 typedef struct
 {
 	gchar *name;
