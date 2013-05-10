@@ -23,12 +23,25 @@ typedef struct
 	gboolean shortcut;
 } Tool;
 static Tool **shortcut_tools;
+static Tool *executed_tool;
 
 enum
 {
 	SAVE = 0,
 	MENU,
 	SHORTCUT
+};
+
+enum
+{
+	TOOL_OUTPUT_NONE = 0,
+	TOOL_OUTPUT_MESSAGE_TEXT,
+	TOOL_OUTPUT_MESSAGE_TABLE,
+	TOOL_OUTPUT_REPLACE_SELECTED,
+	TOOL_OUTPUT_REPLACE_LINE,
+	TOOL_OUTPUT_REPLACE_WORD,
+	TOOL_OUTPUT_APPEND_CURRENT_DOCUMENT,
+	TOOL_OUTPUT_NEW_DOCUMENT
 };
 
 static void key_callback(G_GNUC_UNUSED guint key_id)
@@ -80,7 +93,26 @@ static gboolean cb_iofunc(GIOChannel *channel, GIOCondition cond, gpointer type)
 	GIOStatus st;
 	while ((st = g_io_channel_read_line(channel, &string, NULL, NULL, NULL)) == G_IO_STATUS_NORMAL && string)
 	{
-		panel_print(string, GPOINTER_TO_UINT(type) == 1 ? "error" : NULL);
+		//executed_tool->output
+		switch(executed_tool->output) {
+			case TOOL_OUTPUT_NONE:
+				break;
+			case TOOL_OUTPUT_MESSAGE_TEXT:
+				panel_print(string, GPOINTER_TO_UINT(type) == 1 ? "error" : NULL);
+				break;
+			case TOOL_OUTPUT_MESSAGE_TABLE:
+				break;
+			case TOOL_OUTPUT_REPLACE_SELECTED:
+				break;
+			case TOOL_OUTPUT_REPLACE_LINE:
+				break;
+			case TOOL_OUTPUT_REPLACE_WORD:
+				break;
+			case TOOL_OUTPUT_APPEND_CURRENT_DOCUMENT:
+				break;
+			case TOOL_OUTPUT_NEW_DOCUMENT:
+				break;
+		}
 		g_free(string);	
 	}
 
@@ -89,6 +121,7 @@ static gboolean cb_iofunc(GIOChannel *channel, GIOCondition cond, gpointer type)
 
 void execute(Tool *tool)
 {
+	executed_tool = tool;
 	printf("TOOL EXECUTED: %s\n", tool->name);
 	panel_prepare();
 

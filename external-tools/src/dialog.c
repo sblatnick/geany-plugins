@@ -85,10 +85,10 @@ static int add_tool(Tool *tool)
 	gtk_tree_store_set(list, &row, 0, tool, -1);
 }
 
-static int add_output(gchar *label, gint position)
+static int add_output(gchar *label, gint value)
 {
 	gtk_tree_store_append(outputs, &row, NULL);
-	gtk_tree_store_set(outputs, &row, 0, label, 1, position, -1);
+	gtk_tree_store_set(outputs, &row, 0, label, 1, value, -1);
 }
 
 static void delete_tool(GtkButton *button, gpointer data)
@@ -256,14 +256,14 @@ GtkWidget* plugin_configure(GtkDialog *dialog)
 	GtkCellRenderer *cell = gtk_cell_renderer_text_new();
 	gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(outputCombo), cell, TRUE );
 	gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(outputCombo), cell, "text", 0, NULL );
-	add_output("None", 0);
-	add_output("Message Text", 1);
-	add_output("Message Table", 2);
-	add_output("Replace Selected", 3);
-	add_output("Replace Line", 4);
-	add_output("Replace Word", 5);
-	add_output("Append Current Document", 6);
-	add_output("New Document", 7);
+	add_output(_("None"), TOOL_OUTPUT_NONE);
+	add_output(_("Message Text"), TOOL_OUTPUT_MESSAGE_TEXT);
+	add_output(_("Message Table"), TOOL_OUTPUT_MESSAGE_TABLE);
+	add_output(_("Replace Selected"), TOOL_OUTPUT_REPLACE_SELECTED);
+	add_output(_("Replace Line"), TOOL_OUTPUT_REPLACE_LINE);
+	add_output(_("Replace Word"), TOOL_OUTPUT_REPLACE_WORD);
+	add_output(_("Append Current Document"), TOOL_OUTPUT_APPEND_CURRENT_DOCUMENT);
+	add_output(_("New Document"), TOOL_OUTPUT_NEW_DOCUMENT);
 
 	g_signal_connect(G_OBJECT(outputCombo), "changed", G_CALLBACK(combo_changed), NULL);
 
