@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "panel.c"
+#include "table.c"
 #include "tool.c"
 #include "dialog.c"
 

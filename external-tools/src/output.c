@@ -1,25 +1,35 @@
 
 static Tool *executed_tool;
 
-static void output_init()
+static void output_prepare()
 {
-	switch(executed_tool->output) {
-		case TOOL_OUTPUT_NONE:
-			break;
-		case TOOL_OUTPUT_MESSAGE_TEXT:
-			break;
-		case TOOL_OUTPUT_MESSAGE_TABLE:
-			break;
-		case TOOL_OUTPUT_REPLACE_SELECTED:
-			break;
-		case TOOL_OUTPUT_REPLACE_LINE:
-			break;
-		case TOOL_OUTPUT_REPLACE_WORD:
-			break;
-		case TOOL_OUTPUT_APPEND_CURRENT_DOCUMENT:
-			break;
-		case TOOL_OUTPUT_NEW_DOCUMENT:
-			break;
+	if(executed_tool->output != TOOL_OUTPUT_NONE) {
+		gtk_widget_hide_all(panel);
+		gtk_widget_show(panel);
+
+		//Focus the tab:
+		gtk_notebook_set_current_page(
+			GTK_NOTEBOOK(geany->main_widgets->message_window_notebook),
+			gtk_notebook_page_num(GTK_NOTEBOOK(geany->main_widgets->message_window_notebook), panel)
+		);
+		switch(executed_tool->output) {
+			case TOOL_OUTPUT_MESSAGE_TEXT:
+				panel_prepare();
+				break;
+			case TOOL_OUTPUT_MESSAGE_TABLE:
+				table_prepare();
+				break;
+			case TOOL_OUTPUT_REPLACE_SELECTED:
+				break;
+			case TOOL_OUTPUT_REPLACE_LINE:
+				break;
+			case TOOL_OUTPUT_REPLACE_WORD:
+				break;
+			case TOOL_OUTPUT_APPEND_CURRENT_DOCUMENT:
+				break;
+			case TOOL_OUTPUT_NEW_DOCUMENT:
+				break;
+		}
 	}
 }
 
@@ -44,6 +54,7 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 				panel_print(string, GPOINTER_TO_UINT(type) == 1 ? "error" : NULL);
 				break;
 			case TOOL_OUTPUT_MESSAGE_TABLE:
+				table_print(string, GPOINTER_TO_UINT(type) == 1 ? "error" : NULL);
 				break;
 			case TOOL_OUTPUT_REPLACE_SELECTED:
 				break;
@@ -65,9 +76,8 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 void execute(Tool *tool)
 {
 	executed_tool = tool;
-	output_init();
 	printf("TOOL EXECUTED: %s\n", tool->name);
-	panel_prepare();
+	output_prepare();
 
 	GeanyDocument *doc = document_get_current();
 	if(tool->save) {
