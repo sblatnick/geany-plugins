@@ -7,7 +7,8 @@ extern GeanyData *geany_data;
 extern GeanyFunctions *geany_functions;
 
 extern gchar *tools;
-static GtkWidget *panel; //All contents of the panel
+
+GtkWidget *panel; //All contents of the panel
 static GtkWidget *label;
 static GtkWidget *text_view;
 static GtkWidget *scrollable_text, *scrollable_table;
@@ -31,20 +32,20 @@ void panel_init()
 	gtk_text_view_set_editable(GTK_TEXT_VIEW(text_view), FALSE);
 	scrollable_text = gtk_scrolled_window_new(NULL, NULL);
 	scrollable_table = gtk_scrolled_window_new(NULL, NULL);
-	
+
 	gtk_container_add(GTK_CONTAINER(scrollable_text), text_view);
 	gtk_box_pack_start(GTK_BOX(panel), scrollable_text, TRUE, TRUE, 2);
 	gtk_box_pack_start(GTK_BOX(panel), scrollable_table, TRUE, TRUE, 2);
-	
+
 	gtk_notebook_append_page(
 		GTK_NOTEBOOK(geany->main_widgets->message_window_notebook),
 		panel,
 		label
 	);
-	
+
 	gtk_widget_show(label);
 	gtk_widget_show(panel);
-	
+
 	error_tag = gtk_text_buffer_create_tag(buffer(), "error", "foreground", "#ff0000", NULL);
 	link_tag = gtk_text_buffer_create_tag(buffer(), "link", "foreground", "#0000ff", "underline", PANGO_UNDERLINE_SINGLE, NULL);
 
@@ -75,7 +76,7 @@ void panel_print(gchar *text, const gchar *tag)
 	GtkTextIter iter;
 	gtk_text_buffer_get_end_iter(buffer(), &iter);
 	gtk_text_buffer_insert_with_tags_by_name(buffer(), &iter, text, -1, tag, NULL);
-	
+
 	//Scroll to bottom:
 	GtkTextMark *mark;
 	mark = gtk_text_buffer_get_insert(buffer());

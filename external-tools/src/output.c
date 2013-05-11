@@ -1,3 +1,9 @@
+extern GeanyPlugin *geany_plugin;
+extern GeanyData *geany_data;
+extern GeanyFunctions *geany_functions;
+
+extern gchar *tools;
+extern GtkWidget *panel;
 
 static Tool *executed_tool;
 
@@ -43,7 +49,7 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 		g_io_channel_unref(channel);
 		return FALSE;
 	}
-	
+
 	GIOStatus st;
 	while ((st = g_io_channel_read_line(channel, &string, NULL, NULL, NULL)) == G_IO_STATUS_NORMAL && string)
 	{
@@ -67,7 +73,7 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 			case TOOL_OUTPUT_NEW_DOCUMENT:
 				break;
 		}
-		g_free(string);	
+		g_free(string);
 	}
 
 	return TRUE;
@@ -132,7 +138,7 @@ void execute(Tool *tool)
 			GIOChannel *err_channel = g_io_channel_unix_new(std_err);
 			GIOChannel *out_channel = g_io_channel_unix_new(std_out);
 		#endif
-		
+
 		g_io_add_watch(out_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(0));
 		g_io_add_watch(err_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(1));
 	}
