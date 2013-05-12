@@ -34,8 +34,8 @@ void panel_init()
 	scrollable_table = gtk_scrolled_window_new(NULL, NULL);
 
 	gtk_container_add(GTK_CONTAINER(scrollable_text), text_view);
-	gtk_box_pack_start(GTK_BOX(panel), scrollable_text, TRUE, TRUE, 2);
 	gtk_box_pack_start(GTK_BOX(panel), scrollable_table, TRUE, TRUE, 2);
+	gtk_box_pack_start(GTK_BOX(panel), scrollable_text, TRUE, TRUE, 2);
 
 	gtk_notebook_append_page(
 		GTK_NOTEBOOK(geany->main_widgets->message_window_notebook),

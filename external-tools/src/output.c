@@ -7,33 +7,29 @@ extern GtkWidget *panel;
 
 static Tool *executed_tool;
 
+static void output_focus()
+{
+	//Focus the tab:
+	gtk_notebook_set_current_page(
+		GTK_NOTEBOOK(geany->main_widgets->message_window_notebook),
+		gtk_notebook_page_num(GTK_NOTEBOOK(geany->main_widgets->message_window_notebook), panel)
+	);
+}
+
 static void output_prepare()
 {
 	if(executed_tool->output != TOOL_OUTPUT_NONE) {
 		gtk_widget_hide_all(panel);
 		gtk_widget_show(panel);
 
-		//Focus the tab:
-		gtk_notebook_set_current_page(
-			GTK_NOTEBOOK(geany->main_widgets->message_window_notebook),
-			gtk_notebook_page_num(GTK_NOTEBOOK(geany->main_widgets->message_window_notebook), panel)
-		);
+		output_focus();
+		panel_prepare();
 		switch(executed_tool->output) {
-			case TOOL_OUTPUT_MESSAGE_TEXT:
-				panel_prepare();
-				break;
 			case TOOL_OUTPUT_MESSAGE_TABLE:
 				table_prepare();
 				break;
-			case TOOL_OUTPUT_REPLACE_SELECTED:
-				break;
-			case TOOL_OUTPUT_REPLACE_LINE:
-				break;
-			case TOOL_OUTPUT_REPLACE_WORD:
-				break;
-			case TOOL_OUTPUT_APPEND_CURRENT_DOCUMENT:
-				break;
 			case TOOL_OUTPUT_NEW_DOCUMENT:
+				document_new_file(NULL, NULL, NULL);
 				break;
 		}
 	}
@@ -50,28 +46,39 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 		return FALSE;
 	}
 
+	GeanyDocument *doc = document_get_current();
+
 	GIOStatus st;
 	while ((st = g_io_channel_read_line(channel, &string, NULL, NULL, NULL)) == G_IO_STATUS_NORMAL && string)
 	{
-		switch(executed_tool->output) {
-			case TOOL_OUTPUT_NONE:
-				break;
-			case TOOL_OUTPUT_MESSAGE_TEXT:
-				panel_print(string, GPOINTER_TO_UINT(type) == 1 ? "error" : NULL);
-				break;
-			case TOOL_OUTPUT_MESSAGE_TABLE:
-				table_print(string, GPOINTER_TO_UINT(type) == 1 ? "error" : NULL);
-				break;
-			case TOOL_OUTPUT_REPLACE_SELECTED:
-				break;
-			case TOOL_OUTPUT_REPLACE_LINE:
-				break;
-			case TOOL_OUTPUT_REPLACE_WORD:
-				break;
-			case TOOL_OUTPUT_APPEND_CURRENT_DOCUMENT:
-				break;
-			case TOOL_OUTPUT_NEW_DOCUMENT:
-				break;
+		if(GPOINTER_TO_UINT(type) == 1) {
+			output_focus();
+			panel_print(string, "error");
+		}
+		else {
+			switch(executed_tool->output) {
+				case TOOL_OUTPUT_NONE:
+					break;
+				case TOOL_OUTPUT_MESSAGE_TEXT:
+					panel_print(string, NULL);
+					break;
+				case TOOL_OUTPUT_MESSAGE_TABLE:
+					table_print(string, NULL);
+					break;
+				case TOOL_OUTPUT_REPLACE_SELECTED:
+					sci_replace_sel(doc->editor->sci, string);
+					break;
+				case TOOL_OUTPUT_REPLACE_LINE:
+					break;
+				case TOOL_OUTPUT_REPLACE_WORD:
+					break;
+				case TOOL_OUTPUT_APPEND_CURRENT_DOCUMENT:
+					sci_insert_text(doc->editor->sci, sci_get_length(doc->editor->sci), string);
+					break;
+				case TOOL_OUTPUT_NEW_DOCUMENT:
+					sci_insert_text(doc->editor->sci, -1, string);
+					break;
+			}
 		}
 		g_free(string);
 	}
