@@ -24,13 +24,24 @@ static void output_prepare()
 
 		output_focus();
 		panel_prepare();
-		switch(executed_tool->output) {
-			case TOOL_OUTPUT_MESSAGE_TABLE:
-				table_prepare();
-				break;
-			case TOOL_OUTPUT_NEW_DOCUMENT:
-				document_new_file(NULL, NULL, NULL);
-				break;
+		if(executed_tool->output == TOOL_OUTPUT_REPLACE_LINE) {
+			GeanyDocument *doc = document_get_current();
+			gint line = sci_get_current_line(doc->editor->sci);
+			gint length = sci_get_lines_selected(doc->editor->sci) - 1;
+			gint start = sci_get_pos_at_line_sel_start(doc->editor->sci, line);
+			gint end = sci_get_pos_at_line_sel_end(doc->editor->sci, line + length);
+			sci_set_selection_start(doc->editor->sci, start);
+			sci_set_selection_end(doc->editor->sci, end);
+		}
+		else {
+			switch(executed_tool->output) {
+				case TOOL_OUTPUT_MESSAGE_TABLE:
+					table_prepare();
+					break;
+				case TOOL_OUTPUT_NEW_DOCUMENT:
+					document_new_file(NULL, NULL, NULL);
+					break;
+			}
 		}
 	}
 }
@@ -66,17 +77,14 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 					table_print(string, NULL);
 					break;
 				case TOOL_OUTPUT_REPLACE_SELECTED:
-					sci_replace_sel(doc->editor->sci, string);
-					break;
 				case TOOL_OUTPUT_REPLACE_LINE:
+					sci_replace_sel(doc->editor->sci, string);
 					break;
 				case TOOL_OUTPUT_REPLACE_WORD:
 					break;
 				case TOOL_OUTPUT_APPEND_CURRENT_DOCUMENT:
-					sci_insert_text(doc->editor->sci, sci_get_length(doc->editor->sci), string);
-					break;
 				case TOOL_OUTPUT_NEW_DOCUMENT:
-					sci_insert_text(doc->editor->sci, -1, string);
+					sci_insert_text(doc->editor->sci, sci_get_length(doc->editor->sci), string);
 					break;
 			}
 		}
