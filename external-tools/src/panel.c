@@ -21,7 +21,20 @@ static GtkTextBuffer* buffer()
 
 static void click_link(GtkTextTag *obj, gpointer data)
 {
-	printf("clicked!");
+	printf("clicked!\n");
+}
+
+static gboolean panel_focus_tab(GtkWidget *widget, GdkEvent *event, gpointer data)
+{
+	GeanyKeyBinding *kb = keybindings_lookup_item(GEANY_KEY_GROUP_FOCUS, GEANY_KEYS_FOCUS_MESSAGE_WINDOW);
+	if (kb != NULL && event->key.keyval == kb->key && (event->key.state & gtk_accelerator_get_default_mod_mask()) == kb->mods) {
+		gint current = gtk_notebook_get_current_page(GTK_NOTEBOOK(geany->main_widgets->message_window_notebook));
+		gint tab = gtk_notebook_page_num(GTK_NOTEBOOK(geany->main_widgets->message_window_notebook), panel);
+		if(current == tab) {
+			gtk_widget_grab_focus(scrollable_text);
+		}
+	}
+	return FALSE;
 }
 
 void panel_init()
@@ -45,6 +58,10 @@ void panel_init()
 
 	gtk_widget_show(label);
 	gtk_widget_show(panel);
+	gtk_widget_show_all(scrollable_text);
+	gtk_container_set_focus_child(GTK_CONTAINER(panel), scrollable_text);
+	
+	g_signal_connect(geany->main_widgets->window, "key-release-event", G_CALLBACK(panel_focus_tab), NULL);
 
 	error_tag = gtk_text_buffer_create_tag(buffer(), "error", "foreground", "#ff0000", NULL);
 	link_tag = gtk_text_buffer_create_tag(buffer(), "link", "foreground", "#0000ff", "underline", PANGO_UNDERLINE_SINGLE, NULL);
@@ -67,7 +84,6 @@ void panel_cleanup()
 
 void panel_prepare()
 {
-	gtk_widget_show_all(scrollable_text);
 	gtk_text_buffer_set_text(buffer(), "", 0);
 }
 

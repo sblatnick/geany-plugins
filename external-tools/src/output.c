@@ -19,9 +19,6 @@ static void output_focus()
 static void output_prepare()
 {
 	if(executed_tool->output != TOOL_OUTPUT_NONE) {
-		gtk_widget_hide_all(panel);
-		gtk_widget_show(panel);
-
 		output_focus();
 		panel_prepare();
 		if(executed_tool->output == TOOL_OUTPUT_REPLACE_LINE) {
