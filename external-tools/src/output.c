@@ -57,7 +57,7 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 	GeanyDocument *doc = document_get_current();
 
 	GIOStatus st;
-	while ((st = g_io_channel_read_line(channel, &string, NULL, NULL, NULL)) == G_IO_STATUS_NORMAL && string)
+	if((st = g_io_channel_read_line(channel, &string, NULL, NULL, NULL)) == G_IO_STATUS_NORMAL && string)
 	{
 		if(GPOINTER_TO_UINT(type) == 1) {
 			output_focus();
