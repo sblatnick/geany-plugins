@@ -111,9 +111,7 @@ void execute(Tool *tool)
 	gint std_in, std_out, std_err;
 	GPid pid;
 
-	GString *cmd_str = g_string_new("$script");
-	utils_string_replace_all(cmd_str, "$script", g_build_path(G_DIR_SEPARATOR_S, tools, tool->name, NULL));
-	gchar *cmd = g_string_free(cmd_str, FALSE);
+	gchar *cmd = tool->id;
 	cmd = utils_get_locale_from_utf8(cmd);
 
 	char geany_line_number[32];

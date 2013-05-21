@@ -100,7 +100,7 @@ static void delete_tool(GtkButton *button, gpointer data)
 	{
 		Tool *tool;
 		gtk_tree_model_get(model, &iter, 0, &tool, -1);
-		gchar *file = g_build_path(G_DIR_SEPARATOR_S, tools, tool->name, NULL);
+		gchar *file = g_build_path(G_DIR_SEPARATOR_S, tools, tool->id, NULL);
 		g_remove(file);
 		free_tool(tool);
 		gtk_tree_selection_unselect_iter(selected, &iter);
@@ -173,26 +173,7 @@ static gboolean on_change(GtkWidget *entry, GdkEventKey *event, gpointer user_da
 {
 	Tool* tool = get_active_tool();
 	if(tool != NULL) {
-		gchar *name = g_strdup(gtk_entry_get_text(GTK_ENTRY(entry)));
-		if(strlen(name) > 0) {
-			gchar *old = g_build_path(G_DIR_SEPARATOR_S, tools, tool->name, NULL);
-			gchar *new = g_build_path(G_DIR_SEPARATOR_S, tools, name, NULL);
-			if(g_rename(old, new) != 0) {
-				g_warning(_("external-tools: Unable to rename '%s' to '%s'"), old, new);
-				g_free(old);
-				g_free(new);
-			}
-			else {
-				printf("RENAMING: %s to %s\n", old, new);
-				g_free(tool->name);
-				g_free(old);
-				g_free(new);
-				tool->name = name;
-			}
-		}
-		else {
-			g_free(name);
-		}
+		tool->name = g_strdup(gtk_entry_get_text(GTK_ENTRY(entry)));
 	}
 	return FALSE;
 }
@@ -201,8 +182,7 @@ static void on_edit(GtkButton* button, gpointer data)
 {
 	Tool* tool = get_active_tool();
 	gtk_dialog_response(configDialog, GTK_RESPONSE_OK);
-	gchar* file = g_build_path(G_DIR_SEPARATOR_S, tools, tool->name, NULL);
-	document_open_file(file, FALSE, NULL, NULL);
+	document_open_file(tool->id, FALSE, NULL, NULL);
 }
 
 GtkWidget* plugin_configure(GtkDialog *dialog)

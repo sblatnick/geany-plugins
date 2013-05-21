@@ -19,22 +19,11 @@ static void key_callback(G_GNUC_UNUSED guint key_id)
 
 Tool* new_tool()
 {
-	gchar* orig = g_strdup(_("New Tool"));
-	gchar* name = g_strdup(_("New Tool"));
-	gint count = 2;
-	gchar* new = g_build_path(G_DIR_SEPARATOR_S, tools, orig, NULL);
-	while(g_file_test(new, G_FILE_TEST_EXISTS)) {
-		char counter[32];
-		snprintf(counter, 32, "%d", count);
-		setptr(name, g_strconcat(orig, " ", counter, NULL));
-		setptr(new, g_build_path(G_DIR_SEPARATOR_S, tools, name, NULL));
-		count++;
-	}
-	g_creat(new, 0744);
-	g_free(orig);
-	g_free(new);
+  gchar* id = tempnam(tools, "tool");
+	g_creat(id, 0744);
 
-	Tool init = {name, -1, FALSE, FALSE, FALSE};
+  gchar* name = g_strdup(_("New Tool"));
+	Tool init = {id, name, -1, FALSE, FALSE, FALSE};
 	Tool *tool = g_slice_new(Tool);
 	*tool = init;
 	return tool;
@@ -42,7 +31,7 @@ Tool* new_tool()
 
 void free_tool(Tool* tool)
 {
-	g_key_file_remove_group(config, tool->name, NULL);
+	g_key_file_remove_group(config, tool->id, NULL);
 	g_free(tool->name);
 	g_slice_free(Tool, tool);
 }
@@ -104,14 +93,15 @@ void clean_tools()
 	g_free(menu_tools);
 }
 
-Tool* load_tool(gchar *name)
+Tool* load_tool(gchar *id)
 {
 	Tool init = {
-		name,
-		g_key_file_get_integer(config, name, "output", NULL),
-		g_key_file_get_boolean(config, name, "save", NULL),
-		g_key_file_get_boolean(config, name, "menu", NULL),
-		g_key_file_get_boolean(config, name, "shortcut", NULL)
+	  id,
+		g_key_file_get_string(config, id, "name", NULL),
+		g_key_file_get_integer(config, id, "output", NULL),
+		g_key_file_get_boolean(config, id, "save", NULL),
+		g_key_file_get_boolean(config, id, "menu", NULL),
+		g_key_file_get_boolean(config, id, "shortcut", NULL)
 	};
 	Tool *tool = g_slice_new(Tool);
 	*tool = init;
@@ -153,8 +143,9 @@ void reload_tools()
 
 int save_tool(Tool* tool)
 {
-	g_key_file_set_integer(config, tool->name, "output", tool->output);
-	g_key_file_set_boolean(config, tool->name, "save", tool->save);
-	g_key_file_set_boolean(config, tool->name, "menu", tool->menu);
-	g_key_file_set_boolean(config, tool->name, "shortcut", tool->shortcut);
+  g_key_file_set_string(config, tool->id, "name", tool->name);
+	g_key_file_set_integer(config, tool->id, "output", tool->output);
+	g_key_file_set_boolean(config, tool->id, "save", tool->save);
+	g_key_file_set_boolean(config, tool->id, "menu", tool->menu);
+	g_key_file_set_boolean(config, tool->id, "shortcut", tool->shortcut);
 }

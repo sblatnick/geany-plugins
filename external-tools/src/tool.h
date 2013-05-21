@@ -23,6 +23,7 @@ enum
 
 typedef struct
 {
+	gchar *id;
 	gchar *name;
 	gint output;
 
