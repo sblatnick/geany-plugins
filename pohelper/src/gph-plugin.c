@@ -76,6 +76,12 @@ static struct Plugin {
                         (doc)->file_type->id == GEANY_FILETYPES_PO)
 
 
+/* gets the smallest valid position between @a and @b */
+#define MIN_POS(a, b) ((a) < 0 ? (b) : (b) < 0 ? (a) : MIN ((a), (b)))
+/* gets the highest valid position between @a and @b */
+#define MAX_POS(a, b) (MAX ((a), (b)))
+
+
 /*
  * find_style:
  * @sci: a #ScintillaObject
@@ -371,9 +377,10 @@ goto_prev_untranslated_or_fuzzy (GeanyDocument *doc)
   if (doc_is_po (doc)) {
     gint pos1 = find_prev_untranslated (doc);
     gint pos2 = find_prev_fuzzy (doc);
+    gint pos = MAX_POS (pos1, pos2);
     
-    if (pos1 >= 0 || pos2 >= 0) {
-      editor_goto_pos (doc->editor, MAX (pos1, pos2), FALSE);
+    if (pos >= 0) {
+      editor_goto_pos (doc->editor, pos, FALSE);
     }
   }
 }
@@ -384,9 +391,10 @@ goto_next_untranslated_or_fuzzy (GeanyDocument *doc)
   if (doc_is_po (doc)) {
     gint pos1 = find_next_untranslated (doc);
     gint pos2 = find_next_fuzzy (doc);
+    gint pos = MIN_POS (pos1, pos2);
     
-    if (pos1 >= 0 || pos2 >= 0) {
-      editor_goto_pos (doc->editor, MIN (pos1, pos2), FALSE);
+    if (pos >= 0) {
+      editor_goto_pos (doc->editor, pos, FALSE);
     }
   }
 }
@@ -469,6 +477,39 @@ on_document_save (GObject        *obj,
     g_free (name);
     g_free (mail);
   }
+}
+
+static void
+update_menus (GeanyDocument *doc)
+{
+  if (plugin.menu_item) {
+    gtk_widget_set_sensitive (plugin.menu_item, doc_is_po (doc));
+  }
+}
+
+static void
+on_document_activate (GObject        *obj,
+                      GeanyDocument  *doc,
+                      gpointer        user_data)
+{
+  update_menus (doc);
+}
+
+static void
+on_document_filetype_set (GObject        *obj,
+                          GeanyDocument  *doc,
+                          GeanyFiletype  *old_ft,
+                          gpointer        user_data)
+{
+  update_menus (doc);
+}
+
+static void
+on_document_close (GObject       *obj,
+                   GeanyDocument *doc,
+                   gpointer       user_data)
+{
+  update_menus (NULL);
 }
 
 static void
@@ -800,6 +841,22 @@ find_first_non_default_style_on_line (ScintillaObject  *sci,
   return style;
 }
 
+/* checks whether @line is a primary msgid line, e.g. not a plural form */
+static gboolean
+line_is_primary_msgid (ScintillaObject *sci,
+                       gint             line)
+{
+  gint pos = (gint) scintilla_send_message (sci, SCI_GETLINEINDENTPOSITION,
+                                            (uptr_t) line, 0);
+  
+  return (sci_get_char_at (sci, pos++) == 'm' &&
+          sci_get_char_at (sci, pos++) == 's' &&
+          sci_get_char_at (sci, pos++) == 'g' &&
+          sci_get_char_at (sci, pos++) == 'i' &&
+          sci_get_char_at (sci, pos++) == 'd' &&
+          g_ascii_isspace (sci_get_char_at (sci, pos)));
+}
+
 /* parse flags line @line and puts the read flags in @flags
  * a flags line looks like:
  * #, flag-1, flag-2, flag-2, ... */
@@ -907,7 +964,9 @@ on_kb_toggle_fuzziness (guint key_id)
     
     /* find the msgid for the current line */
     while (line > 0 &&
-           (style == SCE_PO_MSGID_TEXT ||
+           (style == SCE_PO_DEFAULT ||
+            (style == SCE_PO_MSGID && ! line_is_primary_msgid (sci, line)) ||
+            style == SCE_PO_MSGID_TEXT ||
             style == SCE_PO_MSGSTR ||
             style == SCE_PO_MSGSTR_TEXT)) {
       line--;
@@ -1141,6 +1200,12 @@ plugin_init (GeanyData *data)
   }
   
   /* signal handlers */
+  plugin_signal_connect (geany_plugin, NULL, "document-activate", TRUE,
+                         G_CALLBACK (on_document_activate), NULL);
+  plugin_signal_connect (geany_plugin, NULL, "document-filetype-set", TRUE,
+                         G_CALLBACK (on_document_filetype_set), NULL);
+  plugin_signal_connect (geany_plugin, NULL, "document-close", TRUE,
+                         G_CALLBACK (on_document_close), NULL);
   plugin_signal_connect (geany_plugin, NULL, "document-before-save", TRUE,
                          G_CALLBACK (on_document_save), NULL);
   
