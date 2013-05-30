@@ -9,8 +9,7 @@ GeanyFunctions	*geany_functions;
 static GtkWidget *main_menu_item = NULL;
 static GtkWidget *dialog, *entry;
 static gulong handler;
-static gint old = 0;
-static const gchar *text;
+static const gchar *text, *old;
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Search", "Do a case-insensitive search on the current document while highlighting all results", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
@@ -23,14 +22,30 @@ enum
 	KB_GROUP
 };
 
-static gchar* replace_all(gchar *haystack, gchar *needle, gchar *replace)
+static gchar* replace_all(const gchar *haystack, gchar *needle, gchar *replace)
 {
 	gchar *result;
 	GString *str = g_string_new(haystack);
 	utils_string_replace_all(str, needle, replace);
-	strcpy(result, str->str);
+	result = utils_get_utf8_from_locale(str->str);
 	g_string_free(str, TRUE);
 	return result;
+}
+
+static gchar* escape(gchar *source)
+{
+	source = replace_all(source, "\n", "\\n");
+	source = replace_all(source, "\r", "\\r");
+	source = replace_all(source, "\t", "\\t");
+	return source;
+}
+
+static const gchar* unescape(const gchar *source)
+{
+	source = replace_all(source, "\\n", "\n");
+	source = replace_all(source, "\\r", "\r");
+	source = replace_all(source, "\\t", "\t");
+	return source;
 }
 
 static void quick_search(G_GNUC_UNUSED guint key_id)
@@ -51,8 +66,9 @@ static void quick_search(G_GNUC_UNUSED guint key_id)
 		
 		sci_goto_pos(doc->editor->sci, sci_get_selection_start(doc->editor->sci), TRUE);
 		sci_set_search_anchor(doc->editor->sci);
-		
-		old = strlen(selected);
+
+    old = selected;
+    selected = escape(selected);
 		search_mark_all(doc, selected, 0);
 		gtk_entry_set_text(GTK_ENTRY(entry), selected);
 		g_free(selected);
@@ -96,7 +112,7 @@ static gboolean on_out(GtkWidget *widget, GdkEventKey *event, gpointer user_data
 
 static gboolean on_activate(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 {
-	text = gtk_entry_get_text(GTK_ENTRY(entry));
+	text = unescape(gtk_entry_get_text(GTK_ENTRY(entry)));
 	on_out(NULL, NULL, NULL);
 	return FALSE;
 }
@@ -113,12 +129,12 @@ static gboolean on_key(GtkWidget *widget, GdkEventKey *event, gpointer user_data
 		on_out(NULL, NULL, NULL);
 	}
 	else {
-		text = gtk_entry_get_text(GTK_ENTRY(entry));
-		if(strlen(text) != old) {
-			old = strlen(text);
+		text = unescape(gtk_entry_get_text(GTK_ENTRY(entry)));
+		if(old == NULL || g_ascii_strcasecmp(old, text) != 0) {
+		  old = text;
 			GeanyDocument *doc = document_get_current();
-			search_mark_all(doc, text, 0);
-			search_find_next(doc->editor->sci, text, 0, NULL);
+			search_mark_all(doc, old, 0);
+			search_find_next(doc->editor->sci, old, 0, NULL);
 			editor_display_current_line(doc->editor, 0.3F);
 		}
 	}
