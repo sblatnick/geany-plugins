@@ -9,7 +9,8 @@ GeanyFunctions	*geany_functions;
 static GtkWidget *main_menu_item = NULL;
 static GtkWidget *dialog, *entry;
 static gulong handler;
-static const gchar *text, *old;
+static const gchar *text = "";
+static const gchar *old;
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Search", "Do a case-insensitive search on the current document while highlighting all results", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
