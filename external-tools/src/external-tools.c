@@ -17,6 +17,7 @@ PLUGIN_SET_INFO("External Tools", "Allow external tools to be integrated into ma
 
 gchar *path, *conf, *tools;
 const char *home;
+GRegex *name_regex, *path_regex, *match_regex;
 
 static GtkWidget *tool_menu_item = NULL;
 
@@ -27,6 +28,10 @@ static void menu_callback(GtkMenuItem *menuitem, gpointer gdata)
 
 void plugin_init(GeanyData *data)
 {
+	path_regex = g_regex_new("^\\.|^build$", G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
+	name_regex = g_regex_new("^\\.|\\.(o|so|exe|class|pyc)$", G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
+	match_regex = g_regex_new(g_strconcat("[^", G_DIR_SEPARATOR_S, "]+\\.[^\\s]+", NULL), G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
+
 	home = g_getenv("HOME");
 	if (!home) {
 		home = g_get_home_dir();
