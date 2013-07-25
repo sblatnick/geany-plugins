@@ -7,6 +7,7 @@ extern GeanyData *geany_data;
 extern GeanyFunctions *geany_functions;
 
 extern gchar *tools;
+extern GRegex *name_regex, *path_regex, *match_regex;
 
 GtkWidget *panel; //All contents of the panel
 static GtkWidget *label;
@@ -60,7 +61,7 @@ void panel_init()
 	gtk_widget_show(panel);
 	gtk_widget_show_all(scrollable_text);
 	gtk_container_set_focus_child(GTK_CONTAINER(panel), scrollable_text);
-	
+
 	g_signal_connect(geany->main_widgets->window, "key-release-event", G_CALLBACK(panel_focus_tab), NULL);
 
 	error_tag = gtk_text_buffer_create_tag(buffer(), "error", "foreground", "#ff0000", NULL);
@@ -87,11 +88,43 @@ void panel_prepare()
 	gtk_text_buffer_set_text(buffer(), "", 0);
 }
 
+static void list_files(gchar *base, const gchar *filter)
+{
+	//TODO (incomplete file searching copied from quick-opener)
+	GDir *dir;
+	gchar const *file_name;
+	gchar *path;
+	dir = g_dir_open(base, 0, NULL);
+	foreach_dir(file_name, dir)
+	{
+		path = g_build_path(G_DIR_SEPARATOR_S, base, file_name, NULL);
+
+		if(g_file_test(path, G_FILE_TEST_IS_DIR)) {
+			if(g_regex_match(path_regex, file_name, 0, NULL)) {
+				continue;
+			}
+			list_files(path, filter);
+		}
+		else {
+			if(g_regex_match(name_regex, file_name, 0, NULL)) {
+				continue;
+			}
+			GRegex *regex = g_regex_new(filter, G_REGEX_CASELESS, 0, NULL);
+			if(regex != NULL && g_regex_match(regex, file_name, 0, NULL)) {
+				//TODO
+			}
+		}
+	}
+	g_dir_close(dir);
+}
+
 void panel_print(gchar *text, const gchar *tag)
 {
 	GtkTextIter iter;
 	gtk_text_buffer_get_end_iter(buffer(), &iter);
 	gtk_text_buffer_insert_with_tags_by_name(buffer(), &iter, text, -1, tag, NULL);
+
+	//TODO look for files for links
 
 	//Scroll to bottom:
 	GtkTextMark *mark;

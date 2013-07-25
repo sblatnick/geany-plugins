@@ -3,6 +3,7 @@ extern GeanyData *geany_data;
 extern GeanyFunctions *geany_functions;
 
 extern gchar *tools;
+extern const gchar *home;
 extern GtkWidget *panel;
 
 static Tool *executed_tool;
@@ -102,11 +103,6 @@ void execute(Tool *tool)
 		document_save_file(doc, TRUE);
 	}
 
-	const char *home = g_getenv("HOME");
-	if (!home) {
-		home = g_get_home_dir();
-	}
-
 	GError *error = NULL;
 	gint std_in, std_out, std_err;
 	GPid pid;
@@ -118,6 +114,15 @@ void execute(Tool *tool)
 	gint line = sci_get_current_line(doc->editor->sci);
 	snprintf(geany_line_number, 32, "%d", line + 1);
 
+	gchar *project_dir;
+  GeanyProject *project = geany->app->project;
+	if(project) {
+		project_dir = project->base_path;
+	}
+	else {
+		project_dir = geany->prefs->default_open_path;
+	}
+
 	gchar **argv = utils_copy_environment(
 		NULL,
 		"GEANY_LINE_NUMBER", geany_line_number,
@@ -126,6 +131,7 @@ void execute(Tool *tool)
 		"GEANY_FILE_PATH", doc->file_name,
 		"GEANY_FILE_MIME_TYPE", doc->file_type->mime_type,
 		"GEANY_FILE_TYPE_NAME", doc->file_type->name,
+		"GEANY_PROJECT_DIRECTORY", project_dir,
 		NULL
 	);
 
