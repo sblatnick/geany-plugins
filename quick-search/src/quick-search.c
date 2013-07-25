@@ -6,13 +6,15 @@ GeanyPlugin		 *geany_plugin;
 GeanyData			 *geany_data;
 GeanyFunctions	*geany_functions;
 
-static gint QUICK_SEARCH_INDICATOR = 9;
+static gint QUICK_SEARCH_INDICATOR = 20;
+static gint SELECTED_SEARCH_INDICATOR = 21;
 
 static GtkWidget *main_menu_item = NULL;
 static GtkWidget *dialog, *entry;
 static gulong handler;
 static const gchar *text = "";
 static const gchar *old;
+static gboolean skip = FALSE;
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Search", "Do a case-insensitive search on the current document while highlighting all results", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
@@ -89,6 +91,7 @@ static void quick_next(G_GNUC_UNUSED guint key_id)
 		sci_set_search_anchor(doc->editor->sci);
 		search_find_next(doc->editor->sci, text, 0, NULL);
 	}
+	skip = TRUE;
 	editor_display_current_line(doc->editor, 0.3F);
 }
 
@@ -103,6 +106,7 @@ static void quick_prev(G_GNUC_UNUSED guint key_id)
 		sci_set_search_anchor(doc->editor->sci);
 		sci_search_prev(doc->editor->sci, 0, text);
 	}
+	skip = TRUE;
 	editor_display_current_line(doc->editor, 0.3F);
 }
 
@@ -202,8 +206,12 @@ static GSList *find_range(ScintillaObject *sci, gint flags, struct Sci_TextToFin
 gint mark_all(GeanyDocument *doc, const gchar *search_text, gint indicator)
 {
   scintilla_send_message(doc->editor->sci, SCI_INDICSETSTYLE, QUICK_SEARCH_INDICATOR, INDIC_ROUNDBOX);
-	scintilla_send_message(doc->editor->sci, SCI_INDICSETFORE, QUICK_SEARCH_INDICATOR, 0xaaaa00); //weird: 0xBBGGRR
+	scintilla_send_message(doc->editor->sci, SCI_INDICSETFORE, QUICK_SEARCH_INDICATOR, 0x00aa00); //weird: 0xBBGGRR
 	scintilla_send_message(doc->editor->sci, SCI_INDICSETALPHA, QUICK_SEARCH_INDICATOR, 100);
+
+	scintilla_send_message(doc->editor->sci, SCI_INDICSETSTYLE, SELECTED_SEARCH_INDICATOR, INDIC_ROUNDBOX);
+	scintilla_send_message(doc->editor->sci, SCI_INDICSETFORE, SELECTED_SEARCH_INDICATOR, 0xaaaa00);
+	scintilla_send_message(doc->editor->sci, SCI_INDICSETALPHA, SELECTED_SEARCH_INDICATOR, 100);
 
 	gint count = 0;
 	struct Sci_TextToFind ttf;
@@ -236,3 +244,24 @@ gint mark_all(GeanyDocument *doc, const gchar *search_text, gint indicator)
 
 	return count;
 }
+
+gboolean editor_notify_cb(GObject *object, GeanyEditor *editor, SCNotification *nt, gpointer data)
+{
+	if (nt->updated & SC_UPDATE_SELECTION && sci_has_selection(editor->sci)) {
+		if(skip) {
+			skip = FALSE;
+			return FALSE;
+		}
+		gchar *selected;
+		selected = g_malloc(sci_get_selected_text_length(editor->sci) + 1);
+		sci_get_selected_text(editor->sci, selected);
+		GeanyDocument *doc = document_get_current();
+		mark_all(doc, selected, SELECTED_SEARCH_INDICATOR);
+	}
+	return FALSE;
+}
+
+PluginCallback plugin_callbacks[] = {
+	{"editor-notify", (GCallback) &editor_notify_cb, TRUE, NULL},
+	{ NULL, NULL, FALSE, NULL }
+};
