@@ -7,6 +7,7 @@ GeanyData			 *geany_data;
 GeanyFunctions	*geany_functions;
 
 static gint QUICK_SEARCH_INDICATOR = 9;
+static gint SELECTED_SEARCH_INDICATOR = 10;
 
 static GtkWidget *main_menu_item = NULL;
 static GtkWidget *dialog, *entry;
@@ -205,6 +206,10 @@ gint mark_all(GeanyDocument *doc, const gchar *search_text, gint indicator)
 	scintilla_send_message(doc->editor->sci, SCI_INDICSETFORE, QUICK_SEARCH_INDICATOR, 0xaaaa00); //weird: 0xBBGGRR
 	scintilla_send_message(doc->editor->sci, SCI_INDICSETALPHA, QUICK_SEARCH_INDICATOR, 100);
 
+	scintilla_send_message(doc->editor->sci, SCI_INDICSETSTYLE, SELECTED_SEARCH_INDICATOR, INDIC_ROUNDBOX);
+	scintilla_send_message(doc->editor->sci, SCI_INDICSETFORE, SELECTED_SEARCH_INDICATOR, 0x00aa00); //weird: 0xBBGGRR
+	scintilla_send_message(doc->editor->sci, SCI_INDICSETALPHA, SELECTED_SEARCH_INDICATOR, 100);
+
 	gint count = 0;
 	struct Sci_TextToFind ttf;
 	GSList *match, *matches;
@@ -236,3 +241,20 @@ gint mark_all(GeanyDocument *doc, const gchar *search_text, gint indicator)
 
 	return count;
 }
+
+gboolean editor_notify_cb(GObject *object, GeanyEditor *editor, SCNotification *nt, gpointer data)
+{
+	if (nt->updated & SC_UPDATE_SELECTION && sci_has_selection(editor->sci)) {
+		gchar *selected;
+		selected = g_malloc(sci_get_selected_text_length(editor->sci) + 1);
+		sci_get_selected_text(editor->sci, selected);
+		GeanyDocument *doc = document_get_current();
+		mark_all(doc, selected, SELECTED_SEARCH_INDICATOR);
+	}
+	return FALSE;
+}
+
+PluginCallback plugin_callbacks[] = {
+	{"editor-notify", (GCallback) &editor_notify_cb, TRUE, NULL},
+	{ NULL, NULL, FALSE, NULL }
+};
