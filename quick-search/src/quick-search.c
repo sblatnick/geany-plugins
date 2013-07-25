@@ -6,6 +6,8 @@ GeanyPlugin		 *geany_plugin;
 GeanyData			 *geany_data;
 GeanyFunctions	*geany_functions;
 
+static gint QUICK_SEARCH_INDICATOR = 9;
+
 static GtkWidget *main_menu_item = NULL;
 static GtkWidget *dialog, *entry;
 static gulong handler;
@@ -70,7 +72,7 @@ static void quick_search(G_GNUC_UNUSED guint key_id)
 
     old = selected;
     selected = escape(selected);
-		search_mark_all(doc, selected, 0);
+		mark_all(doc, selected, QUICK_SEARCH_INDICATOR);
 		gtk_entry_set_text(GTK_ENTRY(entry), selected);
 		g_free(selected);
 	}
@@ -134,7 +136,7 @@ static gboolean on_key(GtkWidget *widget, GdkEventKey *event, gpointer user_data
 		if(old == NULL || g_ascii_strcasecmp(old, text) != 0) {
 		  old = text;
 			GeanyDocument *doc = document_get_current();
-			search_mark_all(doc, old, 0);
+			mark_all(doc, old, QUICK_SEARCH_INDICATOR);
 			search_find_next(doc->editor->sci, old, 0, NULL);
 			editor_display_current_line(doc->editor, 0.3F);
 		}
@@ -171,3 +173,66 @@ void plugin_cleanup(void)
 	gtk_widget_destroy(dialog);
 }
 
+static GSList *find_range(ScintillaObject *sci, gint flags, struct Sci_TextToFind *ttf)
+{
+	GSList *matches = NULL;
+	GeanyMatchInfo *info;
+
+	g_return_val_if_fail(sci != NULL && ttf->lpstrText != NULL, NULL);
+	if (! *ttf->lpstrText)
+		return NULL;
+
+	while (search_find_text(sci, flags, ttf, &info) != -1) {
+		if (ttf->chrgText.cpMax > ttf->chrg.cpMax) {
+			geany_match_info_free(info);
+			break;
+		}
+
+		matches = g_slist_prepend(matches, info);
+		ttf->chrg.cpMin = ttf->chrgText.cpMax;
+
+		if (ttf->chrgText.cpMax == ttf->chrgText.cpMin) {
+			ttf->chrg.cpMin ++;
+		}
+	}
+
+	return g_slist_reverse(matches);
+}
+
+gint mark_all(GeanyDocument *doc, const gchar *search_text, gint indicator)
+{
+  scintilla_send_message(doc->editor->sci, SCI_INDICSETSTYLE, QUICK_SEARCH_INDICATOR, INDIC_ROUNDBOX);
+	scintilla_send_message(doc->editor->sci, SCI_INDICSETFORE, QUICK_SEARCH_INDICATOR, 0xaaaa00); //weird: 0xBBGGRR
+	scintilla_send_message(doc->editor->sci, SCI_INDICSETALPHA, QUICK_SEARCH_INDICATOR, 100);
+
+	gint count = 0;
+	struct Sci_TextToFind ttf;
+	GSList *match, *matches;
+
+	g_return_val_if_fail(doc != NULL, 0);
+
+	/* clear previous search indicators */
+	editor_indicator_clear(doc->editor, indicator);
+
+	if (G_UNLIKELY(! NZV(search_text)))
+		return 0;
+
+	ttf.chrg.cpMin = 0;
+	ttf.chrg.cpMax = sci_get_length(doc->editor->sci);
+	ttf.lpstrText = (gchar *)search_text;
+
+	matches = find_range(doc->editor->sci, 0, &ttf);
+	foreach_slist (match, matches)
+	{
+		GeanyMatchInfo *info = match->data;
+
+		if (info->end != info->start)
+			editor_indicator_set_on_range(doc->editor, indicator, info->start, info->end);
+		count++;
+
+		geany_match_info_free(info);
+	}
+	g_slist_free(matches);
+
+	return count;
+}
