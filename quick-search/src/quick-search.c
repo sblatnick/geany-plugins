@@ -6,8 +6,8 @@ GeanyPlugin		 *geany_plugin;
 GeanyData			 *geany_data;
 GeanyFunctions	*geany_functions;
 
-static gint QUICK_SEARCH_INDICATOR = 9;
-static gint SELECTED_SEARCH_INDICATOR = 11;
+static gint QUICK_SEARCH_INDICATOR = 20;
+static gint SELECTED_SEARCH_INDICATOR = 21;
 
 static GtkWidget *main_menu_item = NULL;
 static GtkWidget *dialog, *entry;
@@ -206,11 +206,11 @@ static GSList *find_range(ScintillaObject *sci, gint flags, struct Sci_TextToFin
 gint mark_all(GeanyDocument *doc, const gchar *search_text, gint indicator)
 {
   scintilla_send_message(doc->editor->sci, SCI_INDICSETSTYLE, QUICK_SEARCH_INDICATOR, INDIC_ROUNDBOX);
-	scintilla_send_message(doc->editor->sci, SCI_INDICSETFORE, QUICK_SEARCH_INDICATOR, 0xaaaa00); //weird: 0xBBGGRR
+	scintilla_send_message(doc->editor->sci, SCI_INDICSETFORE, QUICK_SEARCH_INDICATOR, 0x00aa00); //weird: 0xBBGGRR
 	scintilla_send_message(doc->editor->sci, SCI_INDICSETALPHA, QUICK_SEARCH_INDICATOR, 100);
 
 	scintilla_send_message(doc->editor->sci, SCI_INDICSETSTYLE, SELECTED_SEARCH_INDICATOR, INDIC_ROUNDBOX);
-	scintilla_send_message(doc->editor->sci, SCI_INDICSETFORE, SELECTED_SEARCH_INDICATOR, 0x00aa00); //weird: 0xBBGGRR
+	scintilla_send_message(doc->editor->sci, SCI_INDICSETFORE, SELECTED_SEARCH_INDICATOR, 0xaaaa00);
 	scintilla_send_message(doc->editor->sci, SCI_INDICSETALPHA, SELECTED_SEARCH_INDICATOR, 100);
 
 	gint count = 0;
