@@ -6,8 +6,10 @@ GeanyPlugin		 *geany_plugin;
 GeanyData			 *geany_data;
 GeanyFunctions	*geany_functions;
 
-static const gchar *text = "";
-static GtkWidget *entry, *panel, *label, *scrollable_table;
+static GtkWidget *entry, *panel, *label, *scrollable_table, *tree;
+GtkTreeStore *list;
+GtkTreeIter row;
+gint row_pos;
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Find", "Quickly search documents based on the treebrowser root or project root using ack-grep.", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
@@ -34,7 +36,17 @@ static gboolean panel_focus_tab(GtkWidget *widget, GdkEvent *event, gpointer dat
 
 static void quick_find()
 {
-  text = gtk_entry_get_text(GTK_ENTRY(entry));
+  const gchar *text = gtk_entry_get_text(GTK_ENTRY(entry));
+  gchar *base_directory;
+  
+  GeanyProject *project	= geany->app->project;
+	if(project) {
+		base_directory = project->base_path;
+	}
+	else {
+		base_directory = geany->prefs->default_open_path;
+	}
+  
   //search files
 }
 
@@ -58,6 +70,16 @@ static void on_click(GtkButton* button, gpointer data)
 	quick_find();
 }
 
+static void selected_row(
+	GtkTreeView *treeview,
+	GtkTreePath *path,
+	GtkTreeViewColumn *col,
+	gpointer user_data
+)
+{
+  printf("selected_row\n");
+}
+
 void plugin_init(GeanyData *data)
 {
 	label = gtk_label_new(_("Find"));
@@ -79,11 +101,35 @@ void plugin_init(GeanyData *data)
 	gtk_box_pack_end(GTK_BOX(button_box), button, FALSE, TRUE, 0);
 	
 	gtk_box_pack_end(GTK_BOX(panel), button_box, FALSE, TRUE, 0);
-
-	gtk_widget_show(label);
-	gtk_widget_show_all(panel);
 	gtk_container_set_focus_child(GTK_CONTAINER(panel), entry);
 
+	GtkTreeViewColumn *number_column, *line_column, *file_column;
+	GtkCellRenderer *render;
+  
+  list = gtk_tree_store_new(3, G_TYPE_INT, G_TYPE_INT, G_TYPE_STRING);
+	tree = gtk_tree_view_new_with_model(GTK_TREE_MODEL(list));
+
+  number_column = gtk_tree_view_column_new();
+	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), number_column);
+	line_column = gtk_tree_view_column_new();
+	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), line_column);
+	file_column = gtk_tree_view_column_new();
+	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), file_column);
+	
+	render = gtk_cell_renderer_text_new();
+	
+	gtk_tree_view_column_pack_start(number_column, render, TRUE);
+	gtk_tree_view_column_pack_start(line_column, render, TRUE);
+	gtk_tree_view_column_pack_start(file_column, render, TRUE);
+	//gtk_tree_view_column_add_attribute(number_column, render, "text", 0);
+		
+	g_object_unref(GTK_TREE_MODEL(list));
+	g_signal_connect(tree, "row-activated", G_CALLBACK(selected_row), NULL);
+	
+	gtk_container_add(GTK_CONTAINER(scrollable_table), tree);
+  gtk_widget_show(label);
+	gtk_widget_show_all(panel);
+	
 	g_signal_connect(geany->main_widgets->window, "key-release-event", G_CALLBACK(panel_focus_tab), NULL);
 
 	GeanyKeyGroup *key_group;
