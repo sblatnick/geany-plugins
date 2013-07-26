@@ -37,7 +37,6 @@ static gboolean panel_focus_tab(GtkWidget *widget, GdkEvent *event, gpointer dat
 static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type)
 {
 	gchar *string;
-	gchar *err;
 
 	if(cond == G_IO_HUP)
 	{
@@ -64,10 +63,10 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 
 static void quick_find()
 {
-  const gchar *text = gtk_entry_get_text(GTK_ENTRY(entry));
-  gchar *base_directory;
-  
-  GeanyProject *project	= geany->app->project;
+	const gchar *text = gtk_entry_get_text(GTK_ENTRY(entry));
+	gchar *base_directory;
+	
+	GeanyProject *project	= geany->app->project;
 	if(project) {
 		base_directory = project->base_path;
 	}
@@ -76,15 +75,19 @@ static void quick_find()
 	}
 	
 	gboolean case_sensitive = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_case));
-  
-  GError *error = NULL;
+	
+	GError *error = NULL;
 	gint std_in, std_out, std_err;
 	GPid pid;
 
-  gchar *cmd = "/usr/bin/ack-grep";
-	cmd = utils_get_locale_from_utf8(cmd);
+	gchar **cmd;
+	if(!g_shell_parse_argv(g_strconcat("/usr/bin/ack-grep -1 '", text, "'", NULL), NULL, &cmd, &error)) {
+		ui_set_statusbar(TRUE, _("quick-find failed: %s"), error->message);
+		g_error_free(error);
+		return;
+	}
 
-  gchar **argv = utils_copy_environment(
+	gchar **argv = utils_copy_environment(
 		NULL,
 		"GEAN", "running from geany",
 		NULL
@@ -92,7 +95,7 @@ static void quick_find()
 
 	if(g_spawn_async_with_pipes(
 		base_directory,
-		&cmd,
+		cmd,
 		argv,
 		0, NULL, NULL,
 		&pid,
@@ -103,7 +106,7 @@ static void quick_find()
 	))
 	{
 		#ifdef G_OS_WIN32
-			GIOChannel err_channel = g_io_channel_win32_new_fd(std_err);
+			GIOChannel *err_channel = g_io_channel_win32_new_fd(std_err);
 			GIOChannel *out_channel = g_io_channel_win32_new_fd(std_out);
 		#else
 			GIOChannel *err_channel = g_io_channel_unix_new(std_err);
@@ -114,8 +117,8 @@ static void quick_find()
 		g_io_add_watch(err_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(1));
 	}
 	else {
-		printf("ERROR %s: %s (%d, %d, %d)", cmd, error->message, std_in, std_out, std_err);
-		ui_set_statusbar(TRUE, _("ERROR %s: %s (%d, %d, %d)"), cmd, error->message, std_in, std_out, std_err);
+		printf("quick-find ERROR %s: %s (%d, %d, %d)", cmd[0], error->message, std_in, std_out, std_err);
+		ui_set_statusbar(TRUE, _("quick-find ERROR %s: %s (%d, %d, %d)"), cmd[0], error->message, std_in, std_out, std_err);
 		g_error_free(error);
 	}
 	g_free(cmd);
@@ -124,7 +127,7 @@ static void quick_find()
 
 static void entry_focus(G_GNUC_UNUSED guint key_id)
 {
-  gtk_notebook_set_current_page(
+	gtk_notebook_set_current_page(
 		GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook),
 		gtk_notebook_page_num(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), panel)
 	);
@@ -133,7 +136,7 @@ static void entry_focus(G_GNUC_UNUSED guint key_id)
 
 static gboolean on_activate(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 {
-  quick_find();
+	quick_find();
 	return FALSE;
 }
 
@@ -149,7 +152,7 @@ static void selected_row(
 	gpointer user_data
 )
 {
-  printf("selected_row\n");
+	printf("selected_row\n");
 }
 
 void plugin_init(GeanyData *data)
@@ -181,11 +184,11 @@ void plugin_init(GeanyData *data)
 
 	GtkTreeViewColumn *number_column, *line_column, *file_column;
 	GtkCellRenderer *render;
-  
-  list = gtk_tree_store_new(3, G_TYPE_INT, G_TYPE_INT, G_TYPE_STRING);
+	
+	list = gtk_tree_store_new(3, G_TYPE_INT, G_TYPE_INT, G_TYPE_STRING);
 	tree = gtk_tree_view_new_with_model(GTK_TREE_MODEL(list));
 
-  number_column = gtk_tree_view_column_new();
+	number_column = gtk_tree_view_column_new();
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), number_column);
 	line_column = gtk_tree_view_column_new();
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), line_column);
@@ -203,7 +206,7 @@ void plugin_init(GeanyData *data)
 	g_signal_connect(tree, "row-activated", G_CALLBACK(selected_row), NULL);
 	
 	gtk_container_add(GTK_CONTAINER(scrollable_table), tree);
-  gtk_widget_show(label);
+	gtk_widget_show(label);
 	gtk_widget_show_all(panel);
 	
 	g_signal_connect(geany->main_widgets->window, "key-release-event", G_CALLBACK(panel_focus_tab), NULL);
