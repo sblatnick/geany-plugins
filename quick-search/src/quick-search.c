@@ -17,7 +17,7 @@ static const gchar *old;
 static gboolean skip = FALSE;
 
 PLUGIN_VERSION_CHECK(211)
-PLUGIN_SET_INFO("Quick Search", "Do a case-insensitive search on the current document while highlighting all results", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
+PLUGIN_SET_INFO("Quick Search", "Do a case-insensitive search on the current document while highlighting all results.  Also highlight all selected text.", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
 
 enum
 {
