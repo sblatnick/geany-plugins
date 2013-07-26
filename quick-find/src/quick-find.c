@@ -6,7 +6,7 @@ GeanyPlugin		 *geany_plugin;
 GeanyData			 *geany_data;
 GeanyFunctions	*geany_functions;
 
-static GtkWidget *entry, *panel, *label, *scrollable_table, *tree;
+static GtkWidget *entry, *panel, *label, *scrollable_table, *tree, *check_case;
 GtkTreeStore *list;
 GtkTreeIter row;
 gint row_pos;
@@ -34,6 +34,34 @@ static gboolean panel_focus_tab(GtkWidget *widget, GdkEvent *event, gpointer dat
 	return FALSE;
 }
 
+static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type)
+{
+	gchar *string;
+	gchar *err;
+
+	if(cond == G_IO_HUP)
+	{
+		g_io_channel_unref(channel);
+		return FALSE;
+	}
+
+	GeanyDocument *doc = document_get_current();
+
+	GIOStatus st;
+	if((st = g_io_channel_read_line(channel, &string, NULL, NULL, NULL)) == G_IO_STATUS_NORMAL && string)
+	{
+		if(GPOINTER_TO_UINT(type) == 1) {
+			printf("OUTPUT: %s", string);
+		}
+		else {
+			ui_set_statusbar(TRUE, _("ERROR: %s"), string);
+		}
+		g_free(string);
+	}
+
+	return TRUE;
+}
+
 static void quick_find()
 {
   const gchar *text = gtk_entry_get_text(GTK_ENTRY(entry));
@@ -46,8 +74,52 @@ static void quick_find()
 	else {
 		base_directory = geany->prefs->default_open_path;
 	}
+	
+	gboolean case_sensitive = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_case));
   
-  //search files
+  GError *error = NULL;
+	gint std_in, std_out, std_err;
+	GPid pid;
+
+  gchar *cmd = "/usr/bin/ack-grep";
+	cmd = utils_get_locale_from_utf8(cmd);
+
+  gchar **argv = utils_copy_environment(
+		NULL,
+		"GEAN", "running from geany",
+		NULL
+	);
+
+	if(g_spawn_async_with_pipes(
+		base_directory,
+		&cmd,
+		argv,
+		0, NULL, NULL,
+		&pid,
+		&std_in,
+		&std_out,
+		&std_err,
+		&error
+	))
+	{
+		#ifdef G_OS_WIN32
+			GIOChannel err_channel = g_io_channel_win32_new_fd(std_err);
+			GIOChannel *out_channel = g_io_channel_win32_new_fd(std_out);
+		#else
+			GIOChannel *err_channel = g_io_channel_unix_new(std_err);
+			GIOChannel *out_channel = g_io_channel_unix_new(std_out);
+		#endif
+
+		g_io_add_watch(out_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(0));
+		g_io_add_watch(err_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(1));
+	}
+	else {
+		printf("ERROR %s: %s (%d, %d, %d)", cmd, error->message, std_in, std_out, std_err);
+		ui_set_statusbar(TRUE, _("ERROR %s: %s (%d, %d, %d)"), cmd, error->message, std_in, std_out, std_err);
+		g_error_free(error);
+	}
+	g_free(cmd);
+	g_free(argv);
 }
 
 static void entry_focus(G_GNUC_UNUSED guint key_id)
@@ -100,6 +172,10 @@ void plugin_init(GeanyData *data)
 	g_signal_connect(button, "clicked", G_CALLBACK(on_click), NULL);
 	gtk_box_pack_end(GTK_BOX(button_box), button, FALSE, TRUE, 0);
 	
+	check_case = gtk_check_button_new_with_label(_("Case Sensitive"));
+	ui_widget_set_tooltip_text(check_case, _("Perform a case-sensitive search."));
+	
+	gtk_box_pack_end(GTK_BOX(panel), check_case, FALSE, TRUE, 0);
 	gtk_box_pack_end(GTK_BOX(panel), button_box, FALSE, TRUE, 0);
 	gtk_container_set_focus_child(GTK_CONTAINER(panel), entry);
 
