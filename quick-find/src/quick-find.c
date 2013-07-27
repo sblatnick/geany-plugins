@@ -77,8 +77,7 @@ static void quick_find()
 	gboolean case_sensitive = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_case));
 	
 	GError *error = NULL;
-	gint std_in, std_out, std_err;
-	GPid pid;
+	gint std_out, std_err;
 
 	gchar **cmd;
 	if(!g_shell_parse_argv(g_strconcat("/usr/bin/ack-grep -1 '", text, "'", NULL), NULL, &cmd, &error)) {
@@ -97,9 +96,7 @@ static void quick_find()
 		base_directory,
 		cmd,
 		argv,
-		0, NULL, NULL,
-		&pid,
-		&std_in,
+		0, NULL, NULL, NULL, NULL,
 		&std_out,
 		&std_err,
 		&error
@@ -117,8 +114,8 @@ static void quick_find()
 		g_io_add_watch(err_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(1));
 	}
 	else {
-		printf("quick-find ERROR %s: %s (%d, %d, %d)", cmd[0], error->message, std_in, std_out, std_err);
-		ui_set_statusbar(TRUE, _("quick-find ERROR %s: %s (%d, %d, %d)"), cmd[0], error->message, std_in, std_out, std_err);
+		printf("quick-find ERROR %s: %s (%d, %d)", cmd[0], error->message, std_out, std_err);
+		ui_set_statusbar(TRUE, _("quick-find ERROR %s: %s (%d, %d)"), cmd[0], error->message, std_out, std_err);
 		g_error_free(error);
 	}
 	g_free(cmd);
@@ -160,6 +157,7 @@ void plugin_init(GeanyData *data)
 	label = gtk_label_new(_("Find"));
 	panel = gtk_vbox_new(FALSE, 6);
 	scrollable_table = gtk_scrolled_window_new(NULL, NULL);
+	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrollable_table), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 
 	gtk_box_pack_start(GTK_BOX(panel), scrollable_table, TRUE, TRUE, 0);
 	gtk_notebook_append_page(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), panel, label);
@@ -218,6 +216,9 @@ void plugin_init(GeanyData *data)
 
 void plugin_cleanup(void)
 {
-
+	gtk_notebook_remove_page(
+		GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook),
+		gtk_notebook_page_num(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), panel)
+	);
 }
 
