@@ -61,7 +61,7 @@ int setup_tools(Tool* tool)
 	if(tool->shortcut) {
 		shortcut_tools[shortcutCount] = tool;
 		keybindings_set_item(key_group, shortcutCount, tool_shortcut_callback, 0, 0,
-			tool->name, tool->name, NULL);
+			tool->id, tool->name, NULL);
 		shortcutCount++;
 	}
 	if(tool->menu) {
