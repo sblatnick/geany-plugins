@@ -6,6 +6,7 @@ GeanyPlugin		 *geany_plugin;
 GeanyData			 *geany_data;
 GeanyFunctions	*geany_functions;
 
+static GRegex *trim_file, *trim_regex;
 static GtkWidget *entry, *panel, *label, *scrollable_table, *tree, *check_case;
 static GtkTreeStore *list;
 static GtkTreeIter row;
@@ -20,6 +21,14 @@ enum
 	KB_QUICK_FIND,
 	KB_GROUP
 };
+
+static void cell_data(GtkTreeViewColumn *tree_column, GtkCellRenderer *render, GtkTreeModel *model, GtkTreeIter *iter, gpointer data)
+{
+	gchar *file;
+	gtk_tree_model_get(model, iter, 2, &file, -1);
+	file = g_regex_replace(trim_file, file, -1, 0, "", 0, NULL);
+	g_object_set(render, "text", file, NULL);
+}
 
 static gboolean panel_focus_tab(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
@@ -52,6 +61,7 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 	{
 		printf("OUTPUT: %s", string);
 		gchar **column = g_strsplit(string, ":", 3);
+		column[2] = g_regex_replace(trim_regex, column[2], -1, 0, "", 0, NULL);
 		gtk_tree_store_append(list, &row, NULL);
 		gtk_tree_store_set(list, &row, 0, row_pos, 1, column[1], 2, column[0], 3, column[2], -1);
 		g_free(string);
@@ -159,6 +169,9 @@ static void selected_row(GtkTreeSelection *selected, gpointer data)
 
 void plugin_init(GeanyData *data)
 {
+	trim_file = g_regex_new(g_strconcat("^.*", G_DIR_SEPARATOR_S, NULL), G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
+	trim_regex = g_regex_new("\n$", G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
+	
 	label = gtk_label_new(_("Find"));
 	panel = gtk_vbox_new(FALSE, 6);
 	scrollable_table = gtk_scrolled_window_new(NULL, NULL);
@@ -208,6 +221,7 @@ void plugin_init(GeanyData *data)
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), file_column);
 	//gtk_tree_view_column_pack_start(file_column, render, TRUE);
 	gtk_tree_view_column_add_attribute(file_column, render, "text", 2);
+	gtk_tree_view_column_set_cell_data_func(file_column, render, (GtkTreeCellDataFunc)cell_data, NULL, NULL);
 	
 	render = gtk_cell_renderer_text_new();
 	text_column = gtk_tree_view_column_new_with_attributes("Text", render, NULL);
