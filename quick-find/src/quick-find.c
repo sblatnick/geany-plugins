@@ -59,7 +59,6 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 	GIOStatus st;
 	if((st = g_io_channel_read_line(channel, &string, NULL, NULL, NULL)) == G_IO_STATUS_NORMAL && string)
 	{
-		printf("OUTPUT: %s", string);
 		gchar **column = g_strsplit(string, ":", 3);
 		column[2] = g_regex_replace(trim_regex, column[2], -1, 0, "", 0, NULL);
 		gtk_tree_store_append(list, &row, NULL);
@@ -161,7 +160,9 @@ static void selected_row(GtkTreeSelection *selected, gpointer data)
     gchar *line, *file;
     gtk_tree_model_get(model, &iter, 1, &line, 2, &file, -1);
     file = g_build_path(G_DIR_SEPARATOR_S, base_directory, file, NULL);
-		document_open_file(file, FALSE, NULL, NULL);
+		GeanyDocument *doc = document_open_file(file, FALSE, NULL, NULL);
+    editor_goto_line(doc->editor, atoi(line) - 1, 0);
+    
     g_free(line);
     g_free(file);
   }
