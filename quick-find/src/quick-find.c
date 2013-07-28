@@ -73,6 +73,7 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 static void quick_find()
 {
 	const gchar *text = gtk_entry_get_text(GTK_ENTRY(entry));
+	//TODO: stop searching empty string (pull up everything)
 	row_pos = 1;
 	
 	GeanyProject *project	= geany->app->project;
@@ -82,6 +83,7 @@ static void quick_find()
 	else {
 		base_directory = geany->prefs->default_open_path;
 	}
+	//TODO: get treeBrowser path instead
 	
 	gboolean case_sensitive = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_case));
 	
@@ -89,6 +91,7 @@ static void quick_find()
 	gint std_out, std_err;
 
 	gchar **cmd;
+	//TODO: add a high limit to results?
 	if(!g_shell_parse_argv(g_strconcat("/usr/bin/ack-grep ", case_sensitive ? "-i " : "", "'", g_shell_quote(text), "'", NULL), NULL, &cmd, &error)) {
 		ui_set_statusbar(TRUE, _("quick-find failed: %s"), error->message);
 		g_error_free(error);
