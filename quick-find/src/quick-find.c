@@ -216,7 +216,8 @@ void plugin_init(GeanyData *data)
 	gtk_tree_view_column_add_attribute(text_column, render, "text", 3);	
 		
 	g_object_unref(GTK_TREE_MODEL(list));
-	g_signal_connect(tree, "changed", G_CALLBACK(selected_row), NULL);
+	GtkTreeSelection *select = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
+	g_signal_connect(select, "changed", G_CALLBACK(selected_row), NULL);
 	
 	gtk_container_add(GTK_CONTAINER(scrollable_table), tree);
 	gtk_widget_show(label);
