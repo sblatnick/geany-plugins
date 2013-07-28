@@ -7,9 +7,10 @@ GeanyData			 *geany_data;
 GeanyFunctions	*geany_functions;
 
 static GtkWidget *entry, *panel, *label, *scrollable_table, *tree, *check_case;
-GtkTreeStore *list;
-GtkTreeIter row;
-gint row_pos;
+static GtkTreeStore *list;
+static GtkTreeIter row;
+static gint row_pos;
+static gchar *base_directory;
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Find", "Quickly search documents based on the treebrowser root or project root using ack-grep.", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
@@ -63,7 +64,6 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 static void quick_find()
 {
 	const gchar *text = gtk_entry_get_text(GTK_ENTRY(entry));
-	gchar *base_directory;
 	row_pos = 1;
 	
 	GeanyProject *project	= geany->app->project;
@@ -150,6 +150,18 @@ static void selected_row(
 )
 {
 	printf("selected_row\n");
+	GtkTreeSelection *selected = gtk_tree_view_get_selection(treeview);
+	GtkTreeIter 		iter;
+	GtkTreeModel 		*model;	
+	if(gtk_tree_selection_get_selected(selected, &model, &iter))
+  {
+    gchar *line, *file;
+    gtk_tree_model_get(model, &iter, 1, &line, 2, &file, -1);
+    file = g_build_path(G_DIR_SEPARATOR_S, base_directory, file, NULL);
+		document_open_file(file, FALSE, NULL, NULL);
+    g_free(line);
+    g_free(file);
+  }
 }
 
 void plugin_init(GeanyData *data)
