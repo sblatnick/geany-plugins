@@ -49,13 +49,12 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 	GIOStatus st;
 	if((st = g_io_channel_read_line(channel, &string, NULL, NULL, NULL)) == G_IO_STATUS_NORMAL && string)
 	{
-		if(GPOINTER_TO_UINT(type) == 1) {
-			printf("OUTPUT: %s", string);
-		}
-		else {
-			ui_set_statusbar(TRUE, _("ERROR: %s"), string);
-		}
+		printf("OUTPUT: %s", string);
+		gchar **column = g_strsplit(string, ":", 3);
+		gtk_tree_store_append(list, &row, NULL);
+		gtk_tree_store_set(list, &row, 0, row_pos, 1, column[1], 2, column[0], 3, column[2], -1);
 		g_free(string);
+		row_pos++;
 	}
 
 	return TRUE;
@@ -65,6 +64,7 @@ static void quick_find()
 {
 	const gchar *text = gtk_entry_get_text(GTK_ENTRY(entry));
 	gchar *base_directory;
+	row_pos = 1;
 	
 	GeanyProject *project	= geany->app->project;
 	if(project) {
@@ -80,13 +80,13 @@ static void quick_find()
 	gint std_out, std_err;
 
 	gchar **cmd;
-	if(!g_shell_parse_argv(g_strconcat("/usr/bin/ack-grep -1 '", text, "'", NULL), NULL, &cmd, &error)) {
+	if(!g_shell_parse_argv(g_strconcat("/usr/bin/ack-grep ", case_sensitive ? "-i " : "", "'", g_shell_quote(text), "'", NULL), NULL, &cmd, &error)) {
 		ui_set_statusbar(TRUE, _("quick-find failed: %s"), error->message);
 		g_error_free(error);
 		return;
 	}
 
-	gchar **argv = utils_copy_environment(
+	gchar **env = utils_copy_environment(
 		NULL,
 		"GEAN", "running from geany",
 		NULL
@@ -95,7 +95,7 @@ static void quick_find()
 	if(g_spawn_async_with_pipes(
 		base_directory,
 		cmd,
-		argv,
+		env,
 		0, NULL, NULL, NULL, NULL,
 		&std_out,
 		&std_err,
@@ -114,12 +114,12 @@ static void quick_find()
 		g_io_add_watch(err_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(1));
 	}
 	else {
-		printf("quick-find ERROR %s: %s (%d, %d)", cmd[0], error->message, std_out, std_err);
-		ui_set_statusbar(TRUE, _("quick-find ERROR %s: %s (%d, %d)"), cmd[0], error->message, std_out, std_err);
+		printf("quick-find ERROR %s: %s", cmd[0], error->message);
+		ui_set_statusbar(TRUE, _("quick-find ERROR %s: %s"), cmd[0], error->message);
 		g_error_free(error);
 	}
 	g_free(cmd);
-	g_free(argv);
+	g_free(env);
 }
 
 static void entry_focus(G_GNUC_UNUSED guint key_id)
@@ -180,25 +180,35 @@ void plugin_init(GeanyData *data)
 	gtk_box_pack_end(GTK_BOX(panel), button_box, FALSE, TRUE, 0);
 	gtk_container_set_focus_child(GTK_CONTAINER(panel), entry);
 
-	GtkTreeViewColumn *number_column, *line_column, *file_column;
+	GtkTreeViewColumn *number_column, *line_column, *file_column, *text_column;
 	GtkCellRenderer *render;
 	
-	list = gtk_tree_store_new(3, G_TYPE_INT, G_TYPE_INT, G_TYPE_STRING);
+	list = gtk_tree_store_new(4, G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
 	tree = gtk_tree_view_new_with_model(GTK_TREE_MODEL(list));
 
-	number_column = gtk_tree_view_column_new();
+	render = gtk_cell_renderer_text_new();
+	number_column = gtk_tree_view_column_new_with_attributes("#", render, NULL);
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), number_column);
-	line_column = gtk_tree_view_column_new();
-	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), line_column);
-	file_column = gtk_tree_view_column_new();
-	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), file_column);
+	//gtk_tree_view_column_pack_start(number_column, render, TRUE);
+	gtk_tree_view_column_add_attribute(number_column, render, "text", 0);
 	
 	render = gtk_cell_renderer_text_new();
+	line_column = gtk_tree_view_column_new_with_attributes("Line", render, NULL);
+	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), line_column);
+	//gtk_tree_view_column_pack_start(line_column, render, TRUE);
+	gtk_tree_view_column_add_attribute(line_column, render, "text", 1);
 	
-	gtk_tree_view_column_pack_start(number_column, render, TRUE);
-	gtk_tree_view_column_pack_start(line_column, render, TRUE);
-	gtk_tree_view_column_pack_start(file_column, render, TRUE);
-	//gtk_tree_view_column_add_attribute(number_column, render, "text", 0);
+	render = gtk_cell_renderer_text_new();
+	file_column = gtk_tree_view_column_new_with_attributes("File", render, NULL);
+	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), file_column);
+	//gtk_tree_view_column_pack_start(file_column, render, TRUE);
+	gtk_tree_view_column_add_attribute(file_column, render, "text", 2);
+	
+	render = gtk_cell_renderer_text_new();
+	text_column = gtk_tree_view_column_new_with_attributes("Text", render, NULL);
+	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), text_column);
+	//gtk_tree_view_column_pack_start(text_column, render, TRUE);
+	gtk_tree_view_column_add_attribute(text_column, render, "text", 3);	
 		
 	g_object_unref(GTK_TREE_MODEL(list));
 	g_signal_connect(tree, "row-activated", G_CALLBACK(selected_row), NULL);
