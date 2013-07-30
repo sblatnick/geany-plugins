@@ -104,11 +104,9 @@ void execute(Tool *tool)
 	}
 
 	GError *error = NULL;
-	gint std_in, std_out, std_err;
-	GPid pid;
+	gint std_out, std_err;
 
 	gchar *cmd = tool->id;
-	cmd = utils_get_locale_from_utf8(cmd);
 
 	char geany_line_number[32];
 	gint line = sci_get_current_line(doc->editor->sci);
@@ -123,7 +121,7 @@ void execute(Tool *tool)
 		project_dir = geany->prefs->default_open_path;
 	}
 
-	gchar **argv = utils_copy_environment(
+	gchar **env = utils_copy_environment(
 		NULL,
 		"GEANY_LINE_NUMBER", geany_line_number,
 		"GEANY_SELECTION", sci_get_selection_contents(doc->editor->sci),
@@ -135,20 +133,26 @@ void execute(Tool *tool)
 		NULL
 	);
 
+	gchar **argv;
+	if(!g_shell_parse_argv(cmd, NULL, &argv, &error))
+	{
+		ui_set_statusbar(TRUE, _("Tool failed: %s"), error->message);
+		g_error_free(error);
+		return;
+	}
+
 	if(g_spawn_async_with_pipes(
 		home,
-		&cmd,
 		argv,
-		0, NULL, NULL,
-		&pid,
-		&std_in,
+		env,
+		0, NULL, NULL, NULL, NULL,
 		&std_out,
 		&std_err,
 		&error
 	))
 	{
 		#ifdef G_OS_WIN32
-			GIOChannel err_channel = g_io_channel_win32_new_fd(std_err);
+			GIOChannel *err_channel = g_io_channel_win32_new_fd(std_err);
 			GIOChannel *out_channel = g_io_channel_win32_new_fd(std_out);
 		#else
 			GIOChannel *err_channel = g_io_channel_unix_new(std_err);
@@ -159,10 +163,9 @@ void execute(Tool *tool)
 		g_io_add_watch(err_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(1));
 	}
 	else {
-		printf("ERROR %s: %s (%d, %d, %d)", cmd, error->message, std_in, std_out, std_err);
-		ui_set_statusbar(TRUE, _("ERROR %s: %s (%d, %d, %d)"), cmd, error->message, std_in, std_out, std_err);
+		printf("ERROR %s: %s (%d, %d)\n", cmd, error->message, std_out, std_err);
+		ui_set_statusbar(TRUE, _("ERROR %s: %s (%d, %d)"), cmd, error->message, std_out, std_err);
 		g_error_free(error);
 	}
-	g_free(cmd);
-	g_free(argv);
+	g_free(env);
 }
