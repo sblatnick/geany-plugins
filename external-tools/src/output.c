@@ -164,7 +164,7 @@ void execute(Tool *tool)
 	}
 	else {
 		printf("ERROR %s: %s (%d, %d)\n", cmd, error->message, std_out, std_err);
-		ui_set_statusbar(TRUE, _("ERROR %s: %s (%d, %d, %d)"), cmd, error->message, std_out, std_err);
+		ui_set_statusbar(TRUE, _("ERROR %s: %s (%d, %d)"), cmd, error->message, std_out, std_err);
 		g_error_free(error);
 	}
 	g_free(env);

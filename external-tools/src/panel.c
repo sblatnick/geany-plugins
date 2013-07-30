@@ -46,6 +46,8 @@ void panel_init()
 	gtk_text_view_set_editable(GTK_TEXT_VIEW(text_view), FALSE);
 	scrollable_text = gtk_scrolled_window_new(NULL, NULL);
 	scrollable_table = gtk_scrolled_window_new(NULL, NULL);
+	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrollable_text), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrollable_table), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 
 	gtk_container_add(GTK_CONTAINER(scrollable_text), text_view);
 	gtk_box_pack_start(GTK_BOX(panel), scrollable_table, TRUE, TRUE, 2);
