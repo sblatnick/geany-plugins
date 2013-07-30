@@ -72,6 +72,7 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 
 static void quick_find()
 {
+	gtk_tree_store_clear(list);
 	const gchar *text = gtk_entry_get_text(GTK_ENTRY(entry));
 	//TODO: stop searching empty string (pull up everything)
 	row_pos = 1;
