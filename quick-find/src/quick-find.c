@@ -64,6 +64,7 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 		gtk_tree_store_append(list, &row, NULL);
 		gtk_tree_store_set(list, &row, 0, row_pos, 1, column[1], 2, column[0], 3, column[2], -1);
 		g_free(string);
+		g_free(column);
 		row_pos++;
 	}
 
@@ -92,12 +93,15 @@ static void quick_find()
 	gint std_out, std_err;
 
 	gchar **cmd;
+	gchar *command = g_strconcat("/usr/bin/ack-grep ", case_sensitive ? "-i " : "", g_shell_quote(text), NULL);
 	//TODO: add a high limit to results?
-	if(!g_shell_parse_argv(g_strconcat("/usr/bin/ack-grep ", case_sensitive ? "-i " : "", "'", g_shell_quote(text), "'", NULL), NULL, &cmd, &error)) {
-		ui_set_statusbar(TRUE, _("quick-find failed: %s"), error->message);
+	if(!g_shell_parse_argv(command, NULL, &cmd, &error)) {
+		ui_set_statusbar(TRUE, _("quick-find failed: %s (%s)"), error->message, command);
 		g_error_free(error);
+		g_free(command);
 		return;
 	}
+	g_free(command);
 
 	gchar **env = utils_copy_environment(
 		NULL,
@@ -127,7 +131,7 @@ static void quick_find()
 		g_io_add_watch(err_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(1));
 	}
 	else {
-		printf("quick-find ERROR %s: %s", cmd[0], error->message);
+		printf("quick-find ERROR %s: %s\n", cmd[0], error->message);
 		ui_set_statusbar(TRUE, _("quick-find ERROR %s: %s"), cmd[0], error->message);
 		g_error_free(error);
 	}
