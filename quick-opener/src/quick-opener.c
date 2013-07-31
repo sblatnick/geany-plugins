@@ -62,23 +62,25 @@ static void list_files(gchar *base, const gchar *filter, gboolean usePath)
 {	
 	GDir *dir;
 	gchar const *file_name;
-	gchar *path;
 	dir = g_dir_open(base, 0, NULL);
 	foreach_dir(file_name, dir)
 	{
 		if(row_pos > MAX_LIST) {
+			g_dir_close(dir);
 			return;
 		}
-		path = g_build_path(G_DIR_SEPARATOR_S, base, file_name, NULL);
+		gchar *path = g_build_path(G_DIR_SEPARATOR_S, base, file_name, NULL);
 
 		if(g_file_test(path, G_FILE_TEST_IS_DIR)) {
 			if(g_regex_match(path_regex, file_name, 0, NULL)) {
+				g_free(path);
 				continue;
 			}
 			list_files(path, filter, usePath);
 		}
 		else {
 			if(g_regex_match(name_regex, file_name, 0, NULL)) {
+				g_free(path);
 				continue;
 			}
 			GRegex *regex = g_regex_new(filter, G_REGEX_CASELESS, 0, NULL);
@@ -91,11 +93,11 @@ static void list_files(gchar *base, const gchar *filter, gboolean usePath)
 				g_free(b_path);
 				row_pos++;
 			}
+			g_free(path);
 			g_regex_unref(regex);
 		}
 	}
 	g_dir_close(dir);
-	g_free(path);
 }
 
 static gboolean onkeypress(GtkEntry *entry, GdkEventKey *event, gpointer user_data)
@@ -260,7 +262,7 @@ static void dialog_response(GtkDialog *configure, gint response, gpointer user_d
 	}
 }
 
-static set_default(GtkButton* button, gpointer data)
+static void set_default(GtkButton* button, gpointer data)
 {
 	gint which = GPOINTER_TO_INT(data);
 	GtkWidget *entry;
@@ -326,6 +328,7 @@ void plugin_cleanup(void)
 	g_free(data);
 	g_key_file_free(config);
 	
+	g_free(conf);
 	g_free(text_path_regex);
 	g_free(text_name_regex);
 	g_regex_unref(path_regex);
