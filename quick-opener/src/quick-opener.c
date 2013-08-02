@@ -93,9 +93,9 @@ static void list_files(gchar *base, const gchar *filter, gboolean usePath)
 				g_free(b_path);
 				row_pos++;
 			}
-			g_free(path);
 			g_regex_unref(regex);
 		}
+		g_free(path);
 	}
 	g_dir_close(dir);
 }
