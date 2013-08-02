@@ -228,14 +228,8 @@ void plugin_init(GeanyData *data)
 	conf = g_build_path(G_DIR_SEPARATOR_S, geany_data->app->configdir, "plugins", "quick-opener.conf", NULL);
 	config = g_key_file_new();
 	g_key_file_load_from_file(config, conf, G_KEY_FILE_NONE, NULL);
-	path.text = g_key_file_get_string(config, "main", "path-regex", NULL);
-	name.text = g_key_file_get_string(config, "main", "name-regex", NULL);
-	if(path.text == NULL) {
-		path.text = path.DEFAULT;
-	}
-	if(name.text == NULL) {
-		name.text = name.DEFAULT;
-	}
+	path.text = utils_get_setting_string(config, "main", "path-regex", path.DEFAULT);
+	name.text = utils_get_setting_string(config, "main", "name-regex", name.DEFAULT);
 
 	setup_regex();
 	trim_path = g_regex_new(g_strconcat(G_DIR_SEPARATOR_S, "$", NULL), G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
