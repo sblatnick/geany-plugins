@@ -20,9 +20,9 @@ static gchar *conf;
 static GKeyFile *config;
 static GtkWidget *entry_path_regex, *entry_name_regex, *check_search_path;
 static gboolean include_path = FALSE;
-static gchar *text_path_regex, *text_name_regex;
-static gchar *DEFAULT_PATH_REGEX = "^\\.|^build$";
-static gchar *DEFAULT_NAME_REGEX = "^\\.|\\.(o|so|exe|class|pyc)$";
+static const gchar *text_path_regex, *text_name_regex;
+static const gchar *DEFAULT_PATH_REGEX = "^\\.|^build$";
+static const gchar *DEFAULT_NAME_REGEX = "^\\.|\\.(o|so|exe|class|pyc)$";
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Opener", "Search filenames while typing", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
@@ -102,7 +102,7 @@ static void list_files(gchar *base, const gchar *filter, gboolean usePath)
 
 static gboolean onkeypress(GtkEntry *entry, GdkEventKey *event, gpointer user_data)
 {
-	if(event->keyval == 65364) {
+	if(event->keyval == GDK_Down) {
 		gtk_tree_view_set_cursor(GTK_TREE_VIEW(tree), second, NULL, FALSE);
 	}
 	return FALSE;
@@ -140,25 +140,22 @@ static void quick_open()
 	dialog = gtk_dialog_new_with_buttons(_("Quick Open:"),
 		GTK_WINDOW(geany->main_widgets->window),
 		GTK_DIALOG_DESTROY_WITH_PARENT,NULL);
-	gtk_widget_set_size_request(dialog, 500, 250);
+	gtk_window_set_default_size(GTK_WINDOW(dialog), 500, 250);
 
 	gtk_dialog_add_button(GTK_DIALOG(dialog),_("_Open"), GTK_RESPONSE_OK);
 	gtk_dialog_add_button(GTK_DIALOG(dialog),_("_Cancel"), GTK_RESPONSE_CANCEL);
 	
 	hbox=gtk_hbox_new(FALSE, 0);
 	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox),hbox, FALSE, FALSE, 0);
-	gtk_widget_show(hbox);
 
 	label=gtk_label_new(_("File:"));
 	gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 2);
-	gtk_widget_show(label);
 
 	entry = gtk_entry_new();
 	g_signal_connect(entry, "key-press-event", G_CALLBACK(onkeypress), NULL);
 	g_signal_connect(entry, "key-release-event", G_CALLBACK(onkeyrelease), NULL);
 
 	gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 2);
-	gtk_widget_show(entry);
 	
 	//Table:
 	
@@ -183,7 +180,7 @@ static void quick_open()
 	gtk_tree_view_column_pack_start(name_column, renderLeft, TRUE);
 	gtk_tree_view_column_add_attribute(name_column, renderLeft, "text", 1);
 		
-	g_object_unref(GTK_TREE_MODEL(list));
+	g_object_unref(list);
 	gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(tree), FALSE);
 
 	//Scrollable:
@@ -251,8 +248,8 @@ static void dialog_response(GtkDialog *configure, gint response, gpointer user_d
 {
 	if(response == GTK_RESPONSE_OK || response == GTK_RESPONSE_APPLY) {
 		include_path = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_search_path));
-		text_path_regex = g_strdup(gtk_entry_get_text(GTK_ENTRY(entry_path_regex)));
-		text_name_regex = g_strdup(gtk_entry_get_text(GTK_ENTRY(entry_name_regex)));
+		text_path_regex = gtk_entry_get_text(GTK_ENTRY(entry_path_regex));
+		text_name_regex = gtk_entry_get_text(GTK_ENTRY(entry_name_regex));
 		g_key_file_set_string(config, "main", "path-regex", text_path_regex);
 		g_key_file_set_string(config, "main", "name-regex", text_name_regex);
 		
@@ -266,7 +263,7 @@ static void set_default(GtkButton* button, gpointer data)
 {
 	gint which = GPOINTER_TO_INT(data);
 	GtkWidget *entry;
-	gchar *default_regex;
+	const gchar *default_regex;
 	switch(which) {
 		case 0:
 			entry = entry_path_regex;
@@ -329,8 +326,6 @@ void plugin_cleanup(void)
 	g_key_file_free(config);
 	
 	g_free(conf);
-	g_free(text_path_regex);
-	g_free(text_name_regex);
 	g_regex_unref(path_regex);
 	g_regex_unref(name_regex);
 
