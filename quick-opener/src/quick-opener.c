@@ -24,7 +24,7 @@ static gboolean include_path = FALSE;
 
 typedef struct
 {
-  const gchar *text;
+  gchar *text;
   GtkWidget *entry;
   const gchar *DEFAULT;
 } RegexSetting;
@@ -249,8 +249,10 @@ static void dialog_response(GtkDialog *configure, gint response, gpointer user_d
 {
 	if(response == GTK_RESPONSE_OK || response == GTK_RESPONSE_APPLY) {
 		include_path = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_search_path));
-		path.text = gtk_entry_get_text(GTK_ENTRY(path.entry));
-		name.text = gtk_entry_get_text(GTK_ENTRY(name.entry));
+		g_free(path.text);
+		g_free(name.text);
+		path.text = g_strdup(gtk_entry_get_text(GTK_ENTRY(path.entry)));
+		name.text = g_strdup(gtk_entry_get_text(GTK_ENTRY(name.entry)));
 		g_key_file_set_string(config, "main", "path-regex", path.text);
 		g_key_file_set_string(config, "main", "name-regex", name.text);
 		
