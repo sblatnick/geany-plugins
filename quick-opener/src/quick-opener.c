@@ -5,15 +5,14 @@ GeanyPlugin		 *geany_plugin;
 GeanyData			 *geany_data;
 GeanyFunctions	*geany_functions;
 
-GtkWidget *dialog, *scrollable, *tree;
-GtkTreeStore *list;
-GtkTreeIter row;
-gint row_pos;
-gchar *base_directory;
-gint MAX_LIST = 20;
-GRegex *name_regex, *path_regex;
-GtkAdjustment *adjustment;
-GtkTreePath *first, *second;
+static GtkWidget *dialog, *scrollable, *tree;
+static GtkTreeStore *list;
+static GtkTreeIter row;
+static gint row_pos;
+static gchar *base_directory;
+static const gint MAX_LIST = 20;
+static GtkAdjustment *adjustment;
+static GtkTreePath *first, *second;
 
 //Config:
 static gchar *conf;
@@ -21,15 +20,15 @@ static GKeyFile *config;
 static GtkWidget *check_search_path;
 static gboolean include_path = FALSE;
 
-
 typedef struct
 {
   gchar *text;
   GtkWidget *entry;
   const gchar *DEFAULT;
+  GRegex *regex;
 } RegexSetting;
-static RegexSetting path = {NULL, NULL, "^\\.|^build$"};
-static RegexSetting name = {NULL, NULL, "^\\.|\\.(o|so|exe|class|pyc)$"};
+static RegexSetting pathRegexSetting = {NULL, NULL, "^\\.|^build$", NULL};
+static RegexSetting nameRegexSetting = {NULL, NULL, "^\\.|\\.(o|so|exe|class|pyc)$", NULL};
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Opener", "Search filenames while typing", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
@@ -84,14 +83,14 @@ static void list_files(gchar *base, const gchar *filter, gboolean usePath)
 		gchar *path = g_build_path(G_DIR_SEPARATOR_S, base, file_name, NULL);
 
 		if(g_file_test(path, G_FILE_TEST_IS_DIR)) {
-			if(g_regex_match(path_regex, file_name, 0, NULL)) {
+			if(g_regex_match(pathRegexSetting.regex, file_name, 0, NULL)) {
 				g_free(path);
 				continue;
 			}
 			list_files(path, filter, usePath);
 		}
 		else {
-			if(g_regex_match(name_regex, file_name, 0, NULL)) {
+			if(g_regex_match(nameRegexSetting.regex, file_name, 0, NULL)) {
 				g_free(path);
 				continue;
 			}
@@ -220,8 +219,8 @@ static void quick_open_keyboard_shortcut(G_GNUC_UNUSED guint key_id)
 
 static void setup_regex()
 {
-	path_regex = g_regex_new(path.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
-	name_regex = g_regex_new(name.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
+	pathRegexSetting.regex = g_regex_new(pathRegexSetting.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
+	nameRegexSetting.regex = g_regex_new(nameRegexSetting.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
 }
 
 void plugin_init(GeanyData *data)
@@ -229,8 +228,8 @@ void plugin_init(GeanyData *data)
 	conf = g_build_path(G_DIR_SEPARATOR_S, geany_data->app->configdir, "plugins", "quick-opener.conf", NULL);
 	config = g_key_file_new();
 	g_key_file_load_from_file(config, conf, G_KEY_FILE_NONE, NULL);
-	path.text = utils_get_setting_string(config, "main", "path-regex", path.DEFAULT);
-	name.text = utils_get_setting_string(config, "main", "name-regex", name.DEFAULT);
+	pathRegexSetting.text = utils_get_setting_string(config, "main", "path-regex", pathRegexSetting.DEFAULT);
+	nameRegexSetting.text = utils_get_setting_string(config, "main", "name-regex", nameRegexSetting.DEFAULT);
 
 	setup_regex();
 
@@ -249,15 +248,15 @@ static void dialog_response(GtkDialog *configure, gint response, gpointer user_d
 {
 	if(response == GTK_RESPONSE_OK || response == GTK_RESPONSE_APPLY) {
 		include_path = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_search_path));
-		g_free(path.text);
-		g_free(name.text);
-		path.text = g_strdup(gtk_entry_get_text(GTK_ENTRY(path.entry)));
-		name.text = g_strdup(gtk_entry_get_text(GTK_ENTRY(name.entry)));
-		g_key_file_set_string(config, "main", "path-regex", path.text);
-		g_key_file_set_string(config, "main", "name-regex", name.text);
+		g_free(pathRegexSetting.text);
+		g_free(nameRegexSetting.text);
+		pathRegexSetting.text = g_strdup(gtk_entry_get_text(GTK_ENTRY(pathRegexSetting.entry)));
+		nameRegexSetting.text = g_strdup(gtk_entry_get_text(GTK_ENTRY(nameRegexSetting.entry)));
+		g_key_file_set_string(config, "main", "path-regex", pathRegexSetting.text);
+		g_key_file_set_string(config, "main", "name-regex", nameRegexSetting.text);
 		
-		g_regex_unref(path_regex);
-		g_regex_unref(name_regex);
+		g_regex_unref(pathRegexSetting.regex);
+		g_regex_unref(nameRegexSetting.regex);
 		setup_regex();
 	}
 }
@@ -282,12 +281,12 @@ GtkWidget* plugin_configure(GtkDialog *configure)
 	gtk_misc_set_alignment(GTK_MISC(label_path), 0, 0);
 	gtk_box_pack_start(GTK_BOX(vbox), label_path, FALSE, FALSE, 2);
 
-	path.entry = gtk_entry_new();
-	gtk_entry_set_text(GTK_ENTRY(path.entry), path.text);
+	pathRegexSetting.entry = gtk_entry_new();
+	gtk_entry_set_text(GTK_ENTRY(pathRegexSetting.entry), pathRegexSetting.text);
 	GtkWidget *hbox_path = gtk_hbox_new(FALSE, 6);
 	GtkWidget *button_default_path = gtk_button_new_with_label(_("Default"));
-	g_signal_connect(button_default_path, "clicked", G_CALLBACK(set_default), &path);
-	gtk_box_pack_start(GTK_BOX(hbox_path), path.entry, TRUE, TRUE, 2);
+	g_signal_connect(button_default_path, "clicked", G_CALLBACK(set_default), &pathRegexSetting);
+	gtk_box_pack_start(GTK_BOX(hbox_path), pathRegexSetting.entry, TRUE, TRUE, 2);
 	gtk_box_pack_start(GTK_BOX(hbox_path), button_default_path, FALSE, FALSE, 2);
 	gtk_box_pack_start(GTK_BOX(vbox), hbox_path, FALSE, FALSE, 2);
 
@@ -295,12 +294,12 @@ GtkWidget* plugin_configure(GtkDialog *configure)
 	gtk_misc_set_alignment(GTK_MISC(label_name), 0, 0);
 	gtk_box_pack_start(GTK_BOX(vbox), label_name, FALSE, FALSE, 2);
 	
-	name.entry = gtk_entry_new();
-	gtk_entry_set_text(GTK_ENTRY(name.entry), name.text);
+	nameRegexSetting.entry = gtk_entry_new();
+	gtk_entry_set_text(GTK_ENTRY(nameRegexSetting.entry), nameRegexSetting.text);
 	GtkWidget *hbox_name = gtk_hbox_new(FALSE, 6);
 	GtkWidget *button_default_name = gtk_button_new_with_label(_("Default"));
-	g_signal_connect(button_default_name, "clicked", G_CALLBACK(set_default), &name);
-	gtk_box_pack_start(GTK_BOX(hbox_name), name.entry, TRUE, TRUE, 2);
+	g_signal_connect(button_default_name, "clicked", G_CALLBACK(set_default), &nameRegexSetting);
+	gtk_box_pack_start(GTK_BOX(hbox_name), nameRegexSetting.entry, TRUE, TRUE, 2);
 	gtk_box_pack_start(GTK_BOX(hbox_name), button_default_name, FALSE, FALSE, 2);
 	gtk_box_pack_start(GTK_BOX(vbox), hbox_name, FALSE, FALSE, 2);
 	
@@ -316,9 +315,10 @@ void plugin_cleanup(void)
 	g_free(data);
 	g_key_file_free(config);
 	
-	g_free(conf);
-	g_regex_unref(path_regex);
-	g_regex_unref(name_regex);
+	g_free(pathRegexSetting.text);
+	g_free(nameRegexSetting.text);
+	g_regex_unref(pathRegexSetting.regex);
+	g_regex_unref(nameRegexSetting.regex);
 
 	gtk_widget_destroy(main_menu_item);
 }
