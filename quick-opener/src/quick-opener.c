@@ -11,7 +11,7 @@ GtkTreeIter row;
 gint row_pos;
 gchar *base_directory;
 gint MAX_LIST = 20;
-GRegex *name_regex, *path_regex, *trim_path;
+GRegex *name_regex, *path_regex;
 GtkAdjustment *adjustment;
 GtkTreePath *first, *second;
 
@@ -70,14 +70,13 @@ static void list_files(gchar *base, const gchar *filter, gboolean usePath)
 	GDir *dir;
 	gchar const *file_name;
 	dir = g_dir_open(base, 0, NULL);
+	gchar *full_base = g_strconcat(base, G_DIR_SEPARATOR_S, NULL);
 	GRegex *regex = g_regex_new(filter, G_REGEX_CASELESS, 0, NULL);
-	gchar *r_base = g_regex_replace(trim_path, base, -1, 0, "", 0, NULL);
 	
 	foreach_dir(file_name, dir)
 	{
 		if(row_pos > MAX_LIST) {
-			g_dir_close(dir);
-			return;
+			break;
 		}
 		gchar *path = g_build_path(G_DIR_SEPARATOR_S, base, file_name, NULL);
 
@@ -95,16 +94,14 @@ static void list_files(gchar *base, const gchar *filter, gboolean usePath)
 			}
 			if(regex != NULL && g_regex_match(regex, usePath ? path : file_name, 0, NULL)) {
 				gtk_tree_store_append(list, &row, NULL);
-				gchar *b_path = g_strconcat(r_base, "/", NULL);
-				gtk_tree_store_set(list, &row, 0, b_path, 1, file_name, -1);
-				g_free(b_path);
+				gtk_tree_store_set(list, &row, 0, full_base, 1, file_name, -1);
 				row_pos++;
 			}
 		}
 		g_free(path);
 	}
+	g_free(full_base);
 	g_dir_close(dir);
-	g_free(r_base);
 	g_regex_unref(regex);
 }
 
@@ -233,7 +230,6 @@ void plugin_init(GeanyData *data)
 	name.text = utils_get_setting_string(config, "main", "name-regex", name.DEFAULT);
 
 	setup_regex();
-	trim_path = g_regex_new(g_strconcat(G_DIR_SEPARATOR_S, "$", NULL), G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
 
 	GeanyKeyGroup *key_group;
 	key_group = plugin_set_key_group(geany_plugin, "quick_open_keyboard_shortcut", COUNT_KB, NULL);
