@@ -66,10 +66,13 @@ static void submit(
 }
 
 static void list_files(gchar *base, const gchar *filter, gboolean usePath)
-{	
+{
 	GDir *dir;
 	gchar const *file_name;
 	dir = g_dir_open(base, 0, NULL);
+	GRegex *regex = g_regex_new(filter, G_REGEX_CASELESS, 0, NULL);
+	gchar *r_base = g_regex_replace(trim_path, base, -1, 0, "", 0, NULL);
+	
 	foreach_dir(file_name, dir)
 	{
 		if(row_pos > MAX_LIST) {
@@ -90,21 +93,19 @@ static void list_files(gchar *base, const gchar *filter, gboolean usePath)
 				g_free(path);
 				continue;
 			}
-			GRegex *regex = g_regex_new(filter, G_REGEX_CASELESS, 0, NULL);
 			if(regex != NULL && g_regex_match(regex, usePath ? path : file_name, 0, NULL)) {
 				gtk_tree_store_append(list, &row, NULL);
-				gchar *r_base = g_regex_replace(trim_path, base, -1, 0, "", 0, NULL);
 				gchar *b_path = g_strconcat(r_base, "/", NULL);
 				gtk_tree_store_set(list, &row, 0, b_path, 1, file_name, -1);
-				g_free(r_base);
 				g_free(b_path);
 				row_pos++;
 			}
-			g_regex_unref(regex);
 		}
 		g_free(path);
 	}
 	g_dir_close(dir);
+	g_free(r_base);
+	g_regex_unref(regex);
 }
 
 static gboolean onkeypress(GtkEntry *entry, GdkEventKey *event, gpointer user_data)
