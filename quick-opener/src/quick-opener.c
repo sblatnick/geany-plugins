@@ -56,7 +56,7 @@ static void submit(
 	{
 		gchar *path, *name, *file;
 		gtk_tree_model_get(model, &iter, 0, &path, 1, &name, -1);
-		file = g_build_path(G_DIR_SEPARATOR_S, path, name, NULL);
+		file = g_build_path(G_DIR_SEPARATOR_S, base_directory, path, name, NULL);
 		document_open_file(file, FALSE, NULL, NULL);
 		gtk_dialog_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
 		g_free(path);
@@ -70,7 +70,10 @@ static void list_files(gchar *base, const gchar *filter, gboolean usePath)
 	GDir *dir;
 	gchar const *file_name;
 	dir = g_dir_open(base, 0, NULL);
-	gchar *full_base = g_strconcat(base, G_DIR_SEPARATOR_S, NULL);
+	gchar *display_base = g_strconcat(base, G_DIR_SEPARATOR_S, NULL);
+	GString *g_display_base = g_string_new(display_base);
+	utils_string_replace_first(g_display_base, base_directory, "");
+	g_free(display_base);
 	GRegex *regex = g_regex_new(filter, G_REGEX_CASELESS, 0, NULL);
 	
 	foreach_dir(file_name, dir)
@@ -94,13 +97,13 @@ static void list_files(gchar *base, const gchar *filter, gboolean usePath)
 			}
 			if(regex != NULL && g_regex_match(regex, usePath ? path : file_name, 0, NULL)) {
 				gtk_tree_store_append(list, &row, NULL);
-				gtk_tree_store_set(list, &row, 0, full_base, 1, file_name, -1);
+				gtk_tree_store_set(list, &row, 0, g_display_base->str, 1, file_name, -1);
 				row_pos++;
 			}
 		}
 		g_free(path);
 	}
-	g_free(full_base);
+	g_string_free(g_display_base, TRUE);
 	g_dir_close(dir);
 	g_regex_unref(regex);
 }
