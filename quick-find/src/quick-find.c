@@ -11,7 +11,9 @@ static GtkWidget *entry, *panel, *label, *scrollable_table, *tree, *check_case;
 static GtkTreeStore *list;
 static GtkTreeIter row;
 static gint row_pos;
-static gchar *base_directory;
+static gint first_run = 1;
+static const gchar *base_directory;
+static GtkWidget *treebrowser_entry = NULL;
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Find", "Quickly search documents based on the treebrowser root or project root using ack-grep.", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
@@ -21,6 +23,53 @@ enum
 	KB_QUICK_FIND,
 	KB_GROUP
 };
+
+static GtkWidget* find_entry(GtkContainer *container)
+{
+  GtkWidget *entry = NULL;
+  GList *node;
+  GList *children = gtk_container_get_children(container);
+  for(node = children; !entry && node; node = node->next) {
+    if(GTK_IS_ENTRY(node->data) && strcmp(gtk_widget_get_tooltip_text(GTK_WIDGET(node->data)), "Addressbar for example '/projects/my-project'") == 0) {
+      entry = node->data;
+    }
+    else if(GTK_IS_CONTAINER(node->data)) {
+      entry = find_entry(node->data);
+    }
+  }
+  g_list_free(children);
+  return entry;
+}
+
+static void get_path()
+{
+  if(first_run == 1) {
+    for(gint i = 0; i < gtk_notebook_get_n_pages(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook)); i++) {
+      GtkWidget   *page;
+      const gchar *page_name;
+
+      page = gtk_notebook_get_nth_page(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), i);
+      page_name = gtk_notebook_get_tab_label_text(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), page);
+      if(page_name && strcmp(page_name, "Tree Browser") == 0) {
+        treebrowser_entry = find_entry(GTK_CONTAINER(page));
+        break;
+      }
+    }
+  }
+  
+  if(treebrowser_entry == NULL) {
+    GeanyProject *project	= geany->app->project;
+	  if(project) {
+		  base_directory = project->base_path;
+	  }
+	  else {
+		  base_directory = geany->prefs->default_open_path;
+	  }  
+  }
+  else {
+    base_directory = gtk_entry_get_text(GTK_ENTRY(treebrowser_entry));
+  }
+}
 
 static void cell_data(GtkTreeViewColumn *tree_column, GtkCellRenderer *render, GtkTreeModel *model, GtkTreeIter *iter, gpointer data)
 {
@@ -75,17 +124,12 @@ static void quick_find()
 {
 	gtk_tree_store_clear(list);
 	const gchar *text = gtk_entry_get_text(GTK_ENTRY(entry));
-	//TODO: stop searching empty string (pull up everything)
-	row_pos = 1;
+	if(strcmp(text, "") == 0) {
+	  return;
+	}
 	
-	GeanyProject *project	= geany->app->project;
-	if(project) {
-		base_directory = project->base_path;
-	}
-	else {
-		base_directory = geany->prefs->default_open_path;
-	}
-	//TODO: get treeBrowser path instead
+	get_path();
+	row_pos = 1;
 	
 	gboolean case_sensitive = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_case));
 	
@@ -93,8 +137,7 @@ static void quick_find()
 	gint std_out, std_err;
 
 	gchar **cmd;
-	gchar *command = g_strconcat("/usr/bin/ack-grep ", case_sensitive ? "-i " : "", g_shell_quote(text), NULL);
-	//TODO: add a high limit to results?
+	gchar *command = g_strconcat("/usr/bin/ack-grep ", case_sensitive ? "" : "-i ", g_shell_quote(text), NULL);
 	if(!g_shell_parse_argv(command, NULL, &cmd, &error)) {
 		ui_set_statusbar(TRUE, _("quick-find failed: %s (%s)"), error->message, command);
 		g_error_free(error);
