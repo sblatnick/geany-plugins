@@ -1,6 +1,7 @@
 #include <geanyplugin.h>
 #include <gdk/gdkkeysyms.h>
 #include <string.h>
+#include <stdlib.h>
 
 GeanyPlugin		 *geany_plugin;
 GeanyData			 *geany_data;
@@ -75,8 +76,10 @@ static void cell_data(GtkTreeViewColumn *tree_column, GtkCellRenderer *render, G
 {
 	gchar *file;
 	gtk_tree_model_get(model, iter, 2, &file, -1);
-	file = g_regex_replace(trim_file, file, -1, 0, "", 0, NULL);
-	g_object_set(render, "text", file, NULL);
+	gchar *clean_file = g_regex_replace(trim_file, file, -1, 0, "", 0, NULL);
+	g_object_set(render, "text", clean_file, NULL);
+	g_free(file);
+	g_free(clean_file);
 }
 
 static gboolean panel_focus_tab(GtkWidget *widget, GdkEvent *event, gpointer data)
@@ -95,27 +98,28 @@ static gboolean panel_focus_tab(GtkWidget *widget, GdkEvent *event, gpointer dat
 
 static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type)
 {
-	gchar *string;
-
 	if(cond == G_IO_HUP)
 	{
 		g_io_channel_unref(channel);
 		return FALSE;
 	}
 
+	gchar *string, **column;
 	GeanyDocument *doc = document_get_current();
 
 	GIOStatus st;
 	if((st = g_io_channel_read_line(channel, &string, NULL, NULL, NULL)) == G_IO_STATUS_NORMAL && string)
 	{
-		gchar **column = g_strsplit(string, ":", 3);
+		column = g_strsplit(string, ":", 3);
+		gchar *code = column[2];
 		column[2] = g_regex_replace(trim_regex, column[2], -1, 0, "", 0, NULL);
+		g_free(code);
 		gtk_tree_store_append(list, &row, NULL);
 		gtk_tree_store_set(list, &row, 0, row_pos, 1, column[1], 2, column[0], 3, column[2], -1);
-		g_free(string);
-		g_free(column);
 		row_pos++;
 	}
+	g_free(string);
+	g_strfreev(column);
 
 	return TRUE;
 }
@@ -302,5 +306,7 @@ void plugin_cleanup(void)
 		GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook),
 		gtk_notebook_page_num(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), panel)
 	);
+	g_regex_unref(trim_file);
+	g_regex_unref(trim_regex);
 }
 
