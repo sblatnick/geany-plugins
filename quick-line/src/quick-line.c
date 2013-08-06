@@ -2,9 +2,9 @@
 #include <gdk/gdkkeysyms.h>
 #include <string.h>
 
-GeanyPlugin		 *geany_plugin;
-GeanyData			 *geany_data;
-GeanyFunctions	*geany_functions;
+GeanyPlugin *geany_plugin;
+GeanyData *geany_data;
+GeanyFunctions *geany_functions;
 
 static GtkWidget *dialog, *entry;
 static gulong handler;
