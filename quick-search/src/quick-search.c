@@ -2,9 +2,9 @@
 #include <gdk/gdkkeysyms.h>
 #include <string.h>
 
-GeanyPlugin		 *geany_plugin;
-GeanyData			 *geany_data;
-GeanyFunctions	*geany_functions;
+GeanyPlugin *geany_plugin;
+GeanyData *geany_data;
+GeanyFunctions *geany_functions;
 
 static gint QUICK_SEARCH_INDICATOR = 20;
 static gint SELECTED_SEARCH_INDICATOR = 21;
@@ -17,7 +17,7 @@ static const gchar *old;
 static gboolean skip = FALSE;
 
 PLUGIN_VERSION_CHECK(211)
-PLUGIN_SET_INFO("Quick Search", "Do a case-insensitive search on the current document while highlighting all results.  Also highlight all selected text.", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
+PLUGIN_SET_INFO("Quick Search", "Do a case-insensitive search on the current document while highlighting all results.	Also highlight all selected text.", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
 
 enum
 {
@@ -68,12 +68,12 @@ static void quick_search(G_GNUC_UNUSED guint key_id)
 		gchar *selected;
 		selected = g_malloc(sci_get_selected_text_length(doc->editor->sci) + 1);
 		sci_get_selected_text(doc->editor->sci, selected);
-		
+
 		sci_goto_pos(doc->editor->sci, sci_get_selection_start(doc->editor->sci), TRUE);
 		sci_set_search_anchor(doc->editor->sci);
 
-    old = selected;
-    selected = escape(selected);
+		old = selected;
+		selected = escape(selected);
 		mark_all(doc, selected, QUICK_SEARCH_INDICATOR);
 		gtk_entry_set_text(GTK_ENTRY(entry), selected);
 		g_free(selected);
@@ -138,7 +138,7 @@ static gboolean on_key(GtkWidget *widget, GdkEventKey *event, gpointer user_data
 	else {
 		text = unescape(gtk_entry_get_text(GTK_ENTRY(entry)));
 		if(old == NULL || g_ascii_strcasecmp(old, text) != 0) {
-		  old = text;
+			old = text;
 			GeanyDocument *doc = document_get_current();
 			mark_all(doc, old, QUICK_SEARCH_INDICATOR);
 			search_find_next(doc->editor->sci, old, 0, NULL);
@@ -205,7 +205,7 @@ static GSList *find_range(ScintillaObject *sci, gint flags, struct Sci_TextToFin
 
 gint mark_all(GeanyDocument *doc, const gchar *search_text, gint indicator)
 {
-  scintilla_send_message(doc->editor->sci, SCI_INDICSETSTYLE, QUICK_SEARCH_INDICATOR, INDIC_ROUNDBOX);
+	scintilla_send_message(doc->editor->sci, SCI_INDICSETSTYLE, QUICK_SEARCH_INDICATOR, INDIC_ROUNDBOX);
 	scintilla_send_message(doc->editor->sci, SCI_INDICSETFORE, QUICK_SEARCH_INDICATOR, 0x00aa00); //weird: 0xBBGGRR
 	scintilla_send_message(doc->editor->sci, SCI_INDICSETALPHA, QUICK_SEARCH_INDICATOR, 100);
 
