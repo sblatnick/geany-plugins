@@ -1,6 +1,7 @@
 #include <geanyplugin.h>
 #include <gdk/gdkkeysyms.h>
 #include <string.h>
+#include <stdlib.h>
 
 GeanyPlugin		 *geany_plugin;
 GeanyData			 *geany_data;
@@ -11,7 +12,9 @@ static GtkWidget *entry, *panel, *label, *scrollable_table, *tree, *check_case;
 static GtkTreeStore *list;
 static GtkTreeIter row;
 static gint row_pos;
-static gchar *base_directory;
+static gint first_run = 1;
+static const gchar *base_directory;
+static GtkWidget *treebrowser_entry = NULL;
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Find", "Quickly search documents based on the treebrowser root or project root using ack-grep.", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
@@ -22,12 +25,61 @@ enum
 	KB_GROUP
 };
 
+static GtkWidget* find_entry(GtkContainer *container)
+{
+  GtkWidget *entry = NULL;
+  GList *node;
+  GList *children = gtk_container_get_children(container);
+  for(node = children; !entry && node; node = node->next) {
+    if(GTK_IS_ENTRY(node->data) && strcmp(gtk_widget_get_tooltip_text(GTK_WIDGET(node->data)), "Addressbar for example '/projects/my-project'") == 0) {
+      entry = node->data;
+    }
+    else if(GTK_IS_CONTAINER(node->data)) {
+      entry = find_entry(node->data);
+    }
+  }
+  g_list_free(children);
+  return entry;
+}
+
+static void get_path()
+{
+  if(first_run == 1) {
+    for(gint i = 0; i < gtk_notebook_get_n_pages(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook)); i++) {
+      GtkWidget   *page;
+      const gchar *page_name;
+
+      page = gtk_notebook_get_nth_page(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), i);
+      page_name = gtk_notebook_get_tab_label_text(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), page);
+      if(page_name && strcmp(page_name, "Tree Browser") == 0) {
+        treebrowser_entry = find_entry(GTK_CONTAINER(page));
+        break;
+      }
+    }
+  }
+  
+  if(treebrowser_entry == NULL) {
+    GeanyProject *project	= geany->app->project;
+	  if(project) {
+		  base_directory = project->base_path;
+	  }
+	  else {
+		  base_directory = geany->prefs->default_open_path;
+	  }  
+  }
+  else {
+    base_directory = gtk_entry_get_text(GTK_ENTRY(treebrowser_entry));
+  }
+}
+
 static void cell_data(GtkTreeViewColumn *tree_column, GtkCellRenderer *render, GtkTreeModel *model, GtkTreeIter *iter, gpointer data)
 {
 	gchar *file;
 	gtk_tree_model_get(model, iter, 2, &file, -1);
-	file = g_regex_replace(trim_file, file, -1, 0, "", 0, NULL);
-	g_object_set(render, "text", file, NULL);
+	gchar *clean_file = g_regex_replace(trim_file, file, -1, 0, "", 0, NULL);
+	g_object_set(render, "text", clean_file, NULL);
+	g_free(file);
+	g_free(clean_file);
 }
 
 static gboolean panel_focus_tab(GtkWidget *widget, GdkEvent *event, gpointer data)
@@ -46,26 +98,28 @@ static gboolean panel_focus_tab(GtkWidget *widget, GdkEvent *event, gpointer dat
 
 static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type)
 {
-	gchar *string;
-
 	if(cond == G_IO_HUP)
 	{
 		g_io_channel_unref(channel);
 		return FALSE;
 	}
 
+	gchar *string, **column;
 	GeanyDocument *doc = document_get_current();
 
 	GIOStatus st;
 	if((st = g_io_channel_read_line(channel, &string, NULL, NULL, NULL)) == G_IO_STATUS_NORMAL && string)
 	{
-		gchar **column = g_strsplit(string, ":", 3);
+		column = g_strsplit(string, ":", 3);
+		gchar *code = column[2];
 		column[2] = g_regex_replace(trim_regex, column[2], -1, 0, "", 0, NULL);
+		g_free(code);
 		gtk_tree_store_append(list, &row, NULL);
 		gtk_tree_store_set(list, &row, 0, row_pos, 1, column[1], 2, column[0], 3, column[2], -1);
-		g_free(string);
 		row_pos++;
 	}
+	g_free(string);
+	g_strfreev(column);
 
 	return TRUE;
 }
@@ -74,17 +128,12 @@ static void quick_find()
 {
 	gtk_tree_store_clear(list);
 	const gchar *text = gtk_entry_get_text(GTK_ENTRY(entry));
-	//TODO: stop searching empty string (pull up everything)
-	row_pos = 1;
+	if(strcmp(text, "") == 0) {
+	  return;
+	}
 	
-	GeanyProject *project	= geany->app->project;
-	if(project) {
-		base_directory = project->base_path;
-	}
-	else {
-		base_directory = geany->prefs->default_open_path;
-	}
-	//TODO: get treeBrowser path instead
+	get_path();
+	row_pos = 1;
 	
 	gboolean case_sensitive = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_case));
 	
@@ -92,12 +141,14 @@ static void quick_find()
 	gint std_out, std_err;
 
 	gchar **cmd;
-	//TODO: add a high limit to results?
-	if(!g_shell_parse_argv(g_strconcat("/usr/bin/ack-grep ", case_sensitive ? "-i " : "", "'", g_shell_quote(text), "'", NULL), NULL, &cmd, &error)) {
-		ui_set_statusbar(TRUE, _("quick-find failed: %s"), error->message);
+	gchar *command = g_strconcat("/usr/bin/ack-grep ", case_sensitive ? "" : "-i ", g_shell_quote(text), NULL);
+	if(!g_shell_parse_argv(command, NULL, &cmd, &error)) {
+		ui_set_statusbar(TRUE, _("quick-find failed: %s (%s)"), error->message, command);
 		g_error_free(error);
+		g_free(command);
 		return;
 	}
+	g_free(command);
 
 	gchar **env = utils_copy_environment(
 		NULL,
@@ -127,7 +178,7 @@ static void quick_find()
 		g_io_add_watch(err_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(1));
 	}
 	else {
-		printf("quick-find ERROR %s: %s", cmd[0], error->message);
+		printf("quick-find ERROR %s: %s\n", cmd[0], error->message);
 		ui_set_statusbar(TRUE, _("quick-find ERROR %s: %s"), cmd[0], error->message);
 		g_error_free(error);
 	}
@@ -255,5 +306,7 @@ void plugin_cleanup(void)
 		GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook),
 		gtk_notebook_page_num(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), panel)
 	);
+	g_regex_unref(trim_file);
+	g_regex_unref(trim_regex);
 }
 
