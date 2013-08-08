@@ -133,38 +133,40 @@ void execute(Tool *tool)
 	);
 
 	gchar **argv;
-	if(!g_shell_parse_argv(cmd, NULL, &argv, &error))
+	if(g_shell_parse_argv(cmd, NULL, &argv, &error))
+	{
+		if(g_spawn_async_with_pipes(
+			home,
+			argv,
+			env,
+			0, NULL, NULL, NULL, NULL,
+			&std_out,
+			&std_err,
+			&error
+		))
+		{
+			#ifdef G_OS_WIN32
+				GIOChannel *err_channel = g_io_channel_win32_new_fd(std_err);
+				GIOChannel *out_channel = g_io_channel_win32_new_fd(std_out);
+			#else
+				GIOChannel *err_channel = g_io_channel_unix_new(std_err);
+				GIOChannel *out_channel = g_io_channel_unix_new(std_out);
+			#endif
+
+			g_io_add_watch(out_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(0));
+			g_io_add_watch(err_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(1));
+		}
+		else {
+			printf("ERROR %s: %s (%d, %d)\n", cmd, error->message, std_out, std_err);
+			ui_set_statusbar(TRUE, _("ERROR %s: %s (%d, %d)"), cmd, error->message, std_out, std_err);
+			g_error_free(error);
+		}
+	}
+	else
 	{
 		ui_set_statusbar(TRUE, _("Tool failed: %s"), error->message);
 		g_error_free(error);
-		return;
 	}
 
-	if(g_spawn_async_with_pipes(
-		home,
-		argv,
-		env,
-		0, NULL, NULL, NULL, NULL,
-		&std_out,
-		&std_err,
-		&error
-	))
-	{
-		#ifdef G_OS_WIN32
-			GIOChannel *err_channel = g_io_channel_win32_new_fd(std_err);
-			GIOChannel *out_channel = g_io_channel_win32_new_fd(std_out);
-		#else
-			GIOChannel *err_channel = g_io_channel_unix_new(std_err);
-			GIOChannel *out_channel = g_io_channel_unix_new(std_out);
-		#endif
-
-		g_io_add_watch(out_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(0));
-		g_io_add_watch(err_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(1));
-	}
-	else {
-		printf("ERROR %s: %s (%d, %d)\n", cmd, error->message, std_out, std_err);
-		ui_set_statusbar(TRUE, _("ERROR %s: %s (%d, %d)"), cmd, error->message, std_out, std_err);
-		g_error_free(error);
-	}
 	g_free(env);
 }
