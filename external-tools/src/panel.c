@@ -88,6 +88,7 @@ void panel_cleanup()
 void panel_prepare()
 {
 	gtk_text_buffer_set_text(buffer(), "", 0);
+	gtk_widget_hide(scrollable_table);
 }
 
 static void list_files(gchar *base, const gchar *filter)

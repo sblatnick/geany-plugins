@@ -2,6 +2,7 @@
 #include <gdk/gdkkeysyms.h>
 #include <string.h>
 
+extern GtkWidget *scrollable_table;
 static GtkTreeStore *table;
 static GtkWidget *tree;
 static gboolean init;
