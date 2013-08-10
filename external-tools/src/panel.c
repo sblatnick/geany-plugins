@@ -22,6 +22,10 @@ static GtkTextBuffer* buffer()
 	return gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
 }
 
+static void goto_link(gchar *url) {
+	printf("url: %s", url);
+}
+
 static gboolean on_click(GtkWidget *widget, GdkEventButton *event, gpointer data)
 {
 	GtkTextIter iter;
@@ -37,7 +41,12 @@ static gboolean on_click(GtkWidget *widget, GdkEventButton *event, gpointer data
 			gchar *name;
 			g_object_get(G_OBJECT(tag), "name", &name, NULL);
 			if(strcmp(name, "link") == 0) {
-				printf("link found\n");
+				GtkTextIter end = iter;
+				gtk_text_iter_backward_to_tag_toggle(&iter, tag);
+				gtk_text_iter_forward_to_tag_toggle(&end, tag);
+				gchar *text = gtk_text_iter_get_text(&iter, &end);
+				goto_link(text);
+				g_free(text);
 				break;
 			}
 			g_free(name);
