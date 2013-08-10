@@ -52,6 +52,9 @@ void plugin_init(GeanyData *data)
 
 void plugin_cleanup(void)
 {
+	g_regex_unref(path_regex);
+	g_regex_unref(name_regex);
+	g_regex_unref(match_regex);
 	clean_tools();
 	gtk_container_remove(GTK_CONTAINER(geany->main_widgets->tools_menu), tool_menu_item);
 	g_free(path);

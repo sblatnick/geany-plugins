@@ -2,10 +2,6 @@
 #include <gdk/gdkkeysyms.h>
 #include <string.h>
 
-extern GeanyPlugin *geany_plugin;
-extern GeanyData *geany_data;
-extern GeanyFunctions *geany_functions;
-
 extern gchar *tools;
 
 static GtkWidget *scrollable, *tree, *title, *saveCheckbox, *menuCheckbox,
@@ -103,6 +99,7 @@ static void delete_tool(GtkButton *button, gpointer data)
 		gchar *file = g_build_path(G_DIR_SEPARATOR_S, tools, tool->id, NULL);
 		g_remove(file);
 		free_tool(tool);
+		g_free(file);
 		gtk_tree_selection_unselect_iter(selected, &iter);
 		gtk_tree_store_remove(list, &iter);
 	}
@@ -142,7 +139,7 @@ static void toggle_checkbox(GtkToggleButton *checkbox, gpointer data)
 	}
 }
 
-static GtkWidget* checkbox(gchar *label, gchar *tooltip, gchar *key)
+static GtkWidget* checkbox(const gchar *label, const gchar *tooltip, gchar *key)
 {
 	GtkWidget *check = gtk_check_button_new_with_label(_(label));
 	ui_widget_set_tooltip_text(check, _(tooltip));
@@ -173,6 +170,7 @@ static gboolean on_change(GtkWidget *entry, GdkEventKey *event, gpointer user_da
 {
 	Tool* tool = get_active_tool();
 	if(tool != NULL) {
+		g_free(tool->name);
 		tool->name = g_strdup(gtk_entry_get_text(GTK_ENTRY(entry)));
 	}
 	return FALSE;
