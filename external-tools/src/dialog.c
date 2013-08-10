@@ -5,7 +5,7 @@
 extern gchar *tools;
 
 static GtkWidget *scrollable, *tree, *title, *saveCheckbox, *menuCheckbox,
-	*shortcutCheckbox, *outputCombo, *editButton;
+	*shortcutCheckbox, *outputCombo, *editButton, *shortcutButton;
 static GtkTreeStore *list, *outputs;
 static GtkTreeIter row;
 static GtkDialog *configDialog;
@@ -183,12 +183,20 @@ static void on_edit(GtkButton* button, gpointer data)
 	document_open_file(tool->id, FALSE, NULL, NULL);
 }
 
+static void on_shortcut(GtkButton* button, gpointer data)
+{
+	Tool* tool = get_active_tool();
+	gtk_dialog_response(configDialog, GTK_RESPONSE_OK);
+	keybindings_dialog_show_prefs_scroll("External Tools");
+}
+
 GtkWidget* plugin_configure(GtkDialog *dialog)
 {
 	configDialog = dialog;
 	GtkCellRenderer *render;
 	GtkWidget* vbox = gtk_vbox_new(FALSE, 6);
 	GtkWidget* hbox = gtk_hbox_new(FALSE, 6);
+	GtkWidget* hboxButtons = gtk_hbox_new(FALSE, 6);
 	GtkWidget* settingsBox = gtk_vbox_new(FALSE, 6);
 	GtkWidget* buttonBox = gtk_hbox_new(FALSE, 6);
 
@@ -260,9 +268,14 @@ GtkWidget* plugin_configure(GtkDialog *dialog)
 
 	editButton = gtk_button_new_with_label(_("Edit"));
 	g_signal_connect(editButton, "clicked", G_CALLBACK(on_edit), NULL);
-	gtk_box_pack_start(GTK_BOX(settingsBox), editButton, FALSE, FALSE, 2);
+	gtk_box_pack_start(GTK_BOX(hboxButtons), editButton, TRUE, TRUE, 2);
 
-	gtk_box_pack_start(GTK_BOX(hbox), settingsBox, TRUE, TRUE, 10);
+	shortcutButton = gtk_button_new_with_label(_("Shortcut"));
+	g_signal_connect(shortcutButton, "clicked", G_CALLBACK(on_shortcut), NULL);
+	gtk_box_pack_start(GTK_BOX(hboxButtons), shortcutButton, TRUE, TRUE, 2);
+
+	gtk_box_pack_start(GTK_BOX(settingsBox), hboxButtons, FALSE, FALSE, 10);
+	gtk_box_pack_end(GTK_BOX(hbox), settingsBox, TRUE, TRUE, 10);
 	gtk_widget_show_all(hbox);
 
 	g_signal_connect(dialog, "response", G_CALLBACK(dialog_response), NULL);
