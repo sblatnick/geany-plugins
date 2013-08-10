@@ -17,13 +17,33 @@ static GtkWidget *text_view;
 static GtkWidget *scrollable_text, *scrollable_table;
 static GtkTextTag *error_tag, *link_tag;
 
-static GtkTextBuffer* buffer()
-{
-	return gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+static void goto_link(gchar *url) {
+	printf("url: %s\n", url);
 }
 
-static void goto_link(gchar *url) {
-	printf("url: %s", url);
+static gchar* get_link_at_iter(GtkTextIter in)
+{
+	GtkTextIter iter = in;
+	gchar *text = "";
+	GSList *list, *node;
+	list = gtk_text_iter_get_tags(&iter);
+	if(list != NULL) {
+	  foreach_slist_free(node, list) {
+			GtkTextTag *tag = node->data;
+			gchar *name;
+			g_object_get(G_OBJECT(tag), "name", &name, NULL);
+			if(strcmp(name, "error") == 0) {
+				GtkTextIter end = iter;
+				gtk_text_iter_backward_to_tag_toggle(&iter, tag);
+				gtk_text_iter_forward_to_tag_toggle(&end, tag);
+				text = gtk_text_iter_get_text(&iter, &end);
+				g_free(name);
+				break;
+			}
+			g_free(name);
+		}
+	}
+	return text;
 }
 
 static gboolean on_click(GtkWidget *widget, GdkEventButton *event, gpointer data)
@@ -33,25 +53,8 @@ static gboolean on_click(GtkWidget *widget, GdkEventButton *event, gpointer data
 	gtk_text_view_window_to_buffer_coords(GTK_TEXT_VIEW(text_view), GTK_TEXT_WINDOW_TEXT, event->x, event->y, &x, &y);
 	gtk_text_view_get_iter_at_location(GTK_TEXT_VIEW(text_view), &iter, x, y);
 	
-	GSList *list, *node;
-	list = gtk_text_iter_get_tags(&iter);
-	if(list != NULL) {
-	  foreach_slist_free(node, list) {
-			GtkTextTag *tag = node->data;
-			gchar *name;
-			g_object_get(G_OBJECT(tag), "name", &name, NULL);
-			if(strcmp(name, "link") == 0) {
-				GtkTextIter end = iter;
-				gtk_text_iter_backward_to_tag_toggle(&iter, tag);
-				gtk_text_iter_forward_to_tag_toggle(&end, tag);
-				gchar *text = gtk_text_iter_get_text(&iter, &end);
-				goto_link(text);
-				g_free(text);
-				break;
-			}
-			g_free(name);
-		}
-	}
+	gchar *text = get_link_at_iter(iter);
+	goto_link(text);
 	return FALSE;
 }
 
@@ -59,6 +62,12 @@ static gboolean on_keypress(GtkWidget *widget, GdkEventKey *event, gpointer data
 {
 	if(event->keyval == GDK_Return) {
 		printf("button!\n");
+		GtkTextIter iter;
+		GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+		GtkTextMark *cursor = gtk_text_buffer_get_mark(buffer, "insert");
+		gtk_text_buffer_get_iter_at_mark(buffer, &iter, cursor);
+		gchar *link = get_link_at_iter(iter);
+		goto_link(link);
 	}
 	return FALSE;
 }
@@ -104,10 +113,11 @@ void panel_init()
 
 	g_signal_connect(geany->main_widgets->window, "key-release-event", G_CALLBACK(panel_focus_tab), NULL);
 	g_signal_connect(text_view, "button-press-event", G_CALLBACK(on_click), NULL);
-	//~ g_signal_connect(text_view, "key-press-event", G_CALLBACK(on_keypress), NULL);
+	g_signal_connect(text_view, "key-press-event", G_CALLBACK(on_keypress), NULL);
 
-	error_tag = gtk_text_buffer_create_tag(buffer(), "error", "foreground", "#ff0000", NULL);
-	link_tag = gtk_text_buffer_create_tag(buffer(), "link", "foreground", "#0000ff", "underline", PANGO_UNDERLINE_SINGLE, NULL);
+	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+	error_tag = gtk_text_buffer_create_tag(buffer, "error", "foreground", "#ff0000", NULL);
+	link_tag = gtk_text_buffer_create_tag(buffer, "link", "foreground", "#0000ff", "underline", PANGO_UNDERLINE_SINGLE, NULL);
 
 /*	GType param_types[1];*/
 /*	param_types[0] = G_TYPE_POINTER;*/
@@ -127,7 +137,7 @@ void panel_cleanup()
 
 void panel_prepare()
 {
-	gtk_text_buffer_set_text(buffer(), "", 0);
+	gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view)), "", 0);
 	gtk_widget_hide(scrollable_table);
 }
 
@@ -164,13 +174,14 @@ static void list_files(gchar *base, const gchar *filter)
 void panel_print(gchar *text, const gchar *tag)
 {
 	GtkTextIter iter;
-	gtk_text_buffer_get_end_iter(buffer(), &iter);
-	gtk_text_buffer_insert_with_tags_by_name(buffer(), &iter, text, -1, tag, NULL);
+	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+	gtk_text_buffer_get_end_iter(buffer, &iter);
+	gtk_text_buffer_insert_with_tags_by_name(buffer, &iter, text, -1, tag, NULL);
 
 	//TODO look for files for links
 
 	//Scroll to bottom:
 	GtkTextMark *mark;
-	mark = gtk_text_buffer_get_insert(buffer());
+	mark = gtk_text_buffer_get_insert(buffer);
 	gtk_text_view_scroll_to_mark(GTK_TEXT_VIEW(text_view), mark, 0.0, FALSE, 0.0, 0.0);
 }
