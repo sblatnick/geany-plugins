@@ -15,7 +15,6 @@ static GtkWidget *panel; //All contents of the panel
 static GtkWidget *label;
 static GtkWidget *text_view;
 static GtkWidget *scrollable_text, *scrollable_table;
-static GtkTextTag *error_tag, *link_tag;
 
 static void goto_link(gchar *url) {
 	printf("url: %s\n", url);
@@ -116,8 +115,8 @@ void panel_init()
 	g_signal_connect(text_view, "key-press-event", G_CALLBACK(on_keypress), NULL);
 
 	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
-	error_tag = gtk_text_buffer_create_tag(buffer, "error", "foreground", "#ff0000", NULL);
-	link_tag = gtk_text_buffer_create_tag(buffer, "link", "foreground", "#0000ff", "underline", PANGO_UNDERLINE_SINGLE, NULL);
+	gtk_text_buffer_create_tag(buffer, "error", "foreground", "#ff0000", NULL);
+	gtk_text_buffer_create_tag(buffer, "link", "foreground", "#0000ff", "underline", PANGO_UNDERLINE_SINGLE, NULL);
 
 /*	GType param_types[1];*/
 /*	param_types[0] = G_TYPE_POINTER;*/
@@ -173,12 +172,35 @@ static void list_files(gchar *base, const gchar *filter)
 
 void panel_print(gchar *text, const gchar *tag)
 {
-	GtkTextIter iter;
+	GtkTextIter iter, prev;
 	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
 	gtk_text_buffer_get_end_iter(buffer, &iter);
-	gtk_text_buffer_insert_with_tags_by_name(buffer, &iter, text, -1, tag, NULL);
-
-	//TODO look for files for links
+	if(tag == NULL) {
+		gtk_text_buffer_insert(buffer, &iter, text, -1);
+	}
+	else {
+		gtk_text_buffer_insert_with_tags_by_name(buffer, &iter, text, -1, tag, NULL);
+	}
+	gtk_text_iter_backward_char(&iter);
+	while(1) {
+		prev = iter;
+		gtk_text_iter_backward_word_start(&iter);
+		gchar *word = gtk_text_iter_get_text(&iter, &prev);
+		if(gtk_text_iter_is_start(&iter) || gtk_text_iter_starts_line(&iter)) {
+			break;
+		}
+		printf("word: \"%s\"\n", word);
+		
+		//~ //Has line?
+		//~ if(NULL != strchr(word, ':')) {
+			//~ 
+		//~ }
+		//strstr - find first substr
+		//strchr - find first character
+		
+	}
+	
+	//gtk_text_buffer_apply_tag_by_name
 
 	//Scroll to bottom:
 	GtkTextMark *mark;
