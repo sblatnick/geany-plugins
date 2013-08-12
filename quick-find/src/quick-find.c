@@ -108,18 +108,17 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 	GeanyDocument *doc = document_get_current();
 
 	GIOStatus st;
-	if((st = g_io_channel_read_line(channel, &string, NULL, NULL, NULL)) == G_IO_STATUS_NORMAL && string)
-	{
+	if((st = g_io_channel_read_line(channel, &string, NULL, NULL, NULL)) == G_IO_STATUS_NORMAL && string) {
 		column = g_strsplit(string, ":", 3);
 		gchar *code = column[2];
 		column[2] = g_regex_replace(trim_regex, column[2], -1, 0, "", 0, NULL);
 		g_free(code);
 		gtk_tree_store_append(list, &row, NULL);
 		gtk_tree_store_set(list, &row, 0, row_pos, 1, column[1], 2, column[0], 3, column[2], -1);
+		g_strfreev(column);
 		row_pos++;
 	}
 	g_free(string);
-	g_strfreev(column);
 
 	return TRUE;
 }
