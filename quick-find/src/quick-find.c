@@ -107,8 +107,7 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 	gchar *string, **column;
 	GeanyDocument *doc = document_get_current();
 
-	GIOStatus st;
-	if((st = g_io_channel_read_line(channel, &string, NULL, NULL, NULL)) == G_IO_STATUS_NORMAL && string) {
+	if((g_io_channel_read_line(channel, &string, NULL, NULL, NULL)) == G_IO_STATUS_NORMAL && string) {
 		column = g_strsplit(string, ":", 3);
 		gchar *code = column[2];
 		column[2] = g_regex_replace(trim_regex, column[2], -1, 0, "", 0, NULL);
@@ -173,7 +172,10 @@ static void quick_find()
 			GIOChannel *out_channel = g_io_channel_unix_new(std_out);
 		#endif
 
+    g_io_channel_set_encoding(out_channel, NULL, NULL);
 		g_io_add_watch(out_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(0));
+
+    g_io_channel_set_encoding(err_channel, NULL, NULL);
 		g_io_add_watch(err_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(1));
 	}
 	else {
