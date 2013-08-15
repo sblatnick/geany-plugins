@@ -117,13 +117,6 @@ void panel_init()
 	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
 	gtk_text_buffer_create_tag(buffer, "error", "foreground", "#ff0000", NULL);
 	gtk_text_buffer_create_tag(buffer, "link", "foreground", "#0000ff", "underline", PANGO_UNDERLINE_SINGLE, NULL);
-
-/*	GType param_types[1];*/
-/*	param_types[0] = G_TYPE_POINTER;*/
-/*	*/
-/*	g_signal_newv("clicked", G_TYPE(error_tag->g_class->g_type), G_SIGNAL_RUN_FIRST, NULL, NULL, NULL,*/
-/*		NULL, G_TYPE_NONE, 1, param_types);*/
-/*	g_signal_connect(link_tag, "clicked", G_CALLBACK(click_link), NULL);*/
 }
 
 void panel_cleanup()
@@ -186,10 +179,14 @@ void panel_print(gchar *text, const gchar *tag)
 		prev = iter;
 		gtk_text_iter_backward_word_start(&iter);
 		gchar *word = gtk_text_iter_get_text(&iter, &prev);
+		printf("word: \"%s\"\n", word);
+		
+		
+		
+		
 		if(gtk_text_iter_is_start(&iter) || gtk_text_iter_starts_line(&iter)) {
 			break;
 		}
-		printf("word: \"%s\"\n", word);
 		
 		//~ //Has line?
 		//~ if(NULL != strchr(word, ':')) {
