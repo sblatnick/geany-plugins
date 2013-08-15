@@ -9,12 +9,20 @@ extern GeanyData *geany_data;
 extern GeanyFunctions *geany_functions;
 
 extern gchar *tools;
-extern GRegex *name_regex, *path_regex, *match_regex;
 
 static GtkWidget *panel; //All contents of the panel
 static GtkWidget *label;
 static GtkWidget *text_view;
 static GtkWidget *scrollable_text, *scrollable_table;
+
+typedef struct
+{
+	const gchar *text;
+	GRegex *regex;
+} RegexSetting;
+static RegexSetting pathRegexSetting = {"^\\.|^build$", NULL};
+static RegexSetting nameRegexSetting = {"^\\.|\\.(o|so|exe|class|pyc)$", NULL};
+static RegexSetting fileRegexSetting = {"[\\w./-]+\\.[\\w./-]+:?(\\d+)?", NULL};
 
 static void goto_link(gchar *url) {
 	printf("url: %s\n", url);
@@ -117,6 +125,10 @@ void panel_init()
 	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
 	gtk_text_buffer_create_tag(buffer, "error", "foreground", "#ff0000", NULL);
 	gtk_text_buffer_create_tag(buffer, "link", "foreground", "#0000ff", "underline", PANGO_UNDERLINE_SINGLE, NULL);
+	
+  pathRegexSetting.regex = g_regex_new(pathRegexSetting.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
+	nameRegexSetting.regex = g_regex_new(nameRegexSetting.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
+	fileRegexSetting.regex = g_regex_new(fileRegexSetting.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
 }
 
 void panel_cleanup()
@@ -125,6 +137,10 @@ void panel_cleanup()
 		GTK_NOTEBOOK(geany->main_widgets->message_window_notebook),
 		gtk_notebook_page_num(GTK_NOTEBOOK(geany->main_widgets->message_window_notebook), panel)
 	);
+
+	g_regex_unref(pathRegexSetting.regex);
+	g_regex_unref(nameRegexSetting.regex);
+	g_regex_unref(fileRegexSetting.regex);
 }
 
 void panel_prepare()
@@ -133,39 +149,9 @@ void panel_prepare()
 	gtk_widget_hide(scrollable_table);
 }
 
-static void list_files(gchar *base, const gchar *filter)
-{
-	//TODO (incomplete file searching copied from quick-opener)
-	GDir *dir;
-	gchar const *file_name;
-	gchar *path;
-	dir = g_dir_open(base, 0, NULL);
-	foreach_dir(file_name, dir)
-	{
-		path = g_build_path(G_DIR_SEPARATOR_S, base, file_name, NULL);
-
-		if(g_file_test(path, G_FILE_TEST_IS_DIR)) {
-			if(g_regex_match(path_regex, file_name, 0, NULL)) {
-				continue;
-			}
-			list_files(path, filter);
-		}
-		else {
-			if(g_regex_match(name_regex, file_name, 0, NULL)) {
-				continue;
-			}
-			GRegex *regex = g_regex_new(filter, G_REGEX_CASELESS, 0, NULL);
-			if(regex != NULL && g_regex_match(regex, file_name, 0, NULL)) {
-				//TODO
-			}
-		}
-	}
-	g_dir_close(dir);
-}
-
 void panel_print(gchar *text, const gchar *tag)
 {
-	GtkTextIter iter, prev;
+	GtkTextIter iter, end;
 	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
 	gtk_text_buffer_get_end_iter(buffer, &iter);
 	if(tag == NULL) {
@@ -175,27 +161,30 @@ void panel_print(gchar *text, const gchar *tag)
 		gtk_text_buffer_insert_with_tags_by_name(buffer, &iter, text, -1, tag, NULL);
 	}
 	gtk_text_iter_backward_char(&iter);
-	while(1) {
-		prev = iter;
-		gtk_text_iter_backward_word_start(&iter);
-		gchar *word = gtk_text_iter_get_text(&iter, &prev);
-		printf("word: \"%s\"\n", word);
-		
-		
-		
-		
-		if(gtk_text_iter_is_start(&iter) || gtk_text_iter_starts_line(&iter)) {
-			break;
-		}
-		
-		//~ //Has line?
-		//~ if(NULL != strchr(word, ':')) {
-			//~ 
-		//~ }
-		//strstr - find first substr
-		//strchr - find first character
-		
+	end = iter;
+	gtk_text_iter_backward_line(&iter);
+
+  gchar *line_text = gtk_text_iter_get_text(&iter, &end);
+	printf("line: \"%s\"\n", text);
+	
+	GMatchInfo *info;
+	if(g_regex_match(fileRegexSetting.regex, line_text, 0, &info)) {
+    while(g_match_info_matches(info))
+    {
+      gchar *word = g_match_info_fetch(info, 0);
+      g_print("Found: %s\n", word);
+      g_free (word);
+      g_match_info_next(info, NULL);
+    }
 	}
+	
+	g_match_info_free(info);
+	g_free(line_text);
+
+  //fileRegexSetting
+	//strstr - find first substr
+	//strchr - find first character
+
 	
 	//gtk_text_buffer_apply_tag_by_name
 
