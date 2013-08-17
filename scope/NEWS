@@ -1,6 +1,37 @@
+Scope 0.91.1 (2013-07-11)
+
+    * (Un)Block toolbar Toggle Breakpoint when saving a document or
+      switching to another document.
+
+    * Added F77 to the list of gdb-supported source file types.
+
+
+Scope 0.91 (2013-07-05)
+
+    * Better support for float frame Inspect variables.
+
+    * Unified and documented the Watch/Memory/Inspect update policy.
+
+
+Scope 0.90 (2013-06-24)
+
+    * Added Registers next to Inspect.
+
+    * Display win32 error texts instead of codes.
+
+    * Changing the thread/frame honours "Update all views".
+
+
+Scope 0.89 (2013-05-17)
+
+    * Small fixes and improvements. This should be the last version
+      before a Registers view is added.
+
+
 Scope 0.87 (2013-04-14)
 
-    * Switched to ScpTreeStore.
+    * Performance improvements for large Inspect tree and large number
+      of Threads, Breakpoints etc.
 
     * Added GTK+ 3 support.
 

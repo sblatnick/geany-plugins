@@ -51,12 +51,16 @@
 		<li><a href="#local_watch">Locals/Watches</a></li>
 		<li><a href="#console">Debug Console</a></li>
 	</ul></li>
-	<li><a href="#inspect">Inspect page</a></li>
+	<li>Side panel<ul>
+		<li><a href="#inspect">Inspect</a></li>
+		<li><a href="#register">Registers</a></li>
+	</ul></li>
 </ul></li>
 <li><a href="#preferences">Preferences</a></li>
 <li><a href="#notes">Notes</a><ul>
 	<li><a href="#editing_values">Editing values</a></li>
 	<li><a href="#keeping_modes">Keeping modes</a></li>
+	<li><a href="#shared_memory">Shared memory</a></li>
 	<li><a href="#xos4_colors">Sample dark colors</a></li>
 </ul></li>
 <li><a href="#pre_faq">Pre-FAQ</a>
@@ -143,7 +147,7 @@ stepping, toggle breakpoint etc.) If Scope can't access the main menu, it'll pla
 Tools.</li>
 <li>Debug page in the lower panel, with subpages that display the program output, threads,
 breakpoints etc.</li>
-<li>Inspect page in the side panel.</li>
+<li>Inspect and Registers page in the side panel.</li>
 <li>Toolbar items - identical to their Debug menu counterparts.</li>
 <li>Command Dialog - to enter gdb commands. Will be closed automatically if gdb exits.</li>
 <li>A small label on the right of your Geany status bar, which displays the current debugging
@@ -412,8 +416,8 @@ function. Depends on GDB &quot;print entry-values&quot;. Applies to <em>Locals</
 <p><b><a name="watch">Watches</a></b></p>
 
 <p>This is a flat list of expressions, evaluated each time the current thread stops or changes
-(subject to <em>update_all_views</em>), in the context of the current thread and frame. Unlike
-<em>Inspect</em>, any gdb-evaluatable expressions may be used, there is no need to apply 
+(subject to <em>Update all views</em>), in the context of the current thread and frame. Unlike
+<em>Inspect</em>, any gdb-evaluatable expressions may be used, and there is no need to apply 
 them.</p>
 
 <p><b><a name="local_watch">Locals/Watches</a></b></p>
@@ -437,9 +441,6 @@ in <em>Setup Program</em>.</p>
 <p>A maximum of 16K may be displayed (128 lines * 128 bytes); <em>gdb_buffer_length</em> also
 limits the size.</p>
 
-<p><em>Memory</em> empty but <em>Clear</em> available means that the subpage can not be
-updated ATM; if you explicitly <em>Clear</em> it, no further updates will take place.</p>
-
 <p><b><a name="console">Debug Console</a></b></p>
 
 <div><table>
@@ -456,7 +457,7 @@ if GDB is ready to receive commands. For example, in synchronous mode, GDB displ
 immediately resuming the program execution; or the prompt may be followed by asynchronous
 messages. The Scope state (Busy, Debug etc.) is more accurate.</p>
 
-<p><b><a name="inspect">Inspect Page</a></b></p>
+<p><b><a name="inspect">Inspect</a></b></p>
 
 <p>All -var-* commands except -var-update will be ignored when entered from the command line,
 because their output does not provide enough information to identify the variable object.</p>
@@ -482,6 +483,12 @@ will a letter (&quot;-&quot; will not do).</p>
 <p>The format and 7-bit mode are saved only for the top-level variables, not for children (but
 see <a href="#keeping_modes">Keeping modes</a>).</p>
 
+<p><b><a name="registers">Registers</a></b></p>
+
+<p>Scope will query the register names once after a program is loaded, or when the gdb
+executable is changed. If you switch to a different architecture, but your gdb name remains
+the same, invoke <em>Query</em> from the local menu.</p>
+
 <h3><a name="preferences">Preferences</a></h3>
 
 <p>Once again, trivial items are not included.</p>
@@ -491,7 +498,7 @@ see <a href="#keeping_modes">Keeping modes</a>).</p>
 <p><em>gdb_buffer_length</em> - the maximum length of a single gdb output message. Longer
 messages will be cut, and an "overflow" will be displayed in the debug console, possibly
 followed by a few other parsing errors. Default = 16383. Actual value is (the nearest larger
-power of 2) - 1, for example 16384 becomes 65535.
+power of 2) - 1, for example 32768 becomes 65535.
 
 <p><em>gdb_wait_death</em> - hundreds of seconds to wait(3) gdb death on scope unload.
 Default = 20. When closing Geany, gdb will be destroyed by the operating system.</p>
@@ -612,10 +619,24 @@ column, the entire value will be cleared - but that is not guaranteed to work ei
 <p><b><a name="keeping_modes">Keeping modes</a></b></p>
 
 <p>The 7-bit, .names etc. modes for temporary objects, such as local variables, are not saved.
-However, there is a global list with names and modes, and when you change a mode, it's saved
+However, there is a global list with names and modes, and when you change a mode, it is saved
 in that list. Then, when a temporary object is created, Scope searches the list, and sets the
 modes (if any) for that object. For inspect children, the displayed names are used (including
 numbers for array elements), not the fully qualified names.</p>
+
+<p><b><a name="shared_memory">Shared memory</a></b></p>
+
+<div>Scope does not know which Inspect/Watch expressions are thread and frame dependent, as
+well as whether the Memory address and range are process/thread dependent, so their handling
+is a compromise.<br>
+In particular:</div>
+<div class="tab">
+- the values will not be updated if threads exist, but none is selected, or if the selected
+thread is running<br>
+- for <em>Watches</em> and <em>Inspect</em>, Scope will try to select a frame before
+sending the update command(s)<br>
+- on a thread or frame change, if the values can not be updated at the moment, they will not
+be cleared.</div>
 
 <p><b><a name="xos4_colors">Sample dark colors</a></b></p>
 
@@ -661,7 +682,7 @@ GDB command line if you need it.</p>
 
 <p>A. They must be removed before sending the value to GDB. Leaving them while editing gives
 the false impression that you can assign selectively, while in fact omitting a &quot;foo =
-value, &quot; <em>moves</em> all values left by 1, and changing a name or index has
+value,&quot; <em>moves</em> all values left by 1, and changing a name or index has
 <em>no</em> effect.</p>
 
 <p>Q. A "signal `project-before-save' is invalid" warning is displayed on Geany startup, and
@@ -684,7 +705,11 @@ program/thread. The other Geany debugger plugin has the same problem.</p>
 
 <h3><a name="todo">TODO</a></h3>
 
-<p>See TODO.</p>
+<p>Various tests, source code checks etc.<br>
+Format (natural, decimal...) for Watches?<br>
+Add clear icon to entries? not very useful.<br>
+Don't remove [index] along with member names?<br>
+libtool support / exec wrapper support.</p>
 
 <h3><a name="not_todo">Not TODO</a></h3>
 
@@ -713,7 +738,7 @@ later version.</p>
 
 <b><a name="copyright">Copyright</a></b>
 
-<p>Scope 0.88, Copyright (C) 2013 Dimitar Toshkov Zhekov</p>
+<p>Scope 0.91.1, Copyright (C) 2013 Dimitar Toshkov Zhekov</p>
 
 <p>The menu and toolbar icons are from <a href="http://netbeans.org">Netbeans</a>, except for
 BreakPoint.</p>

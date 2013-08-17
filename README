@@ -5,7 +5,7 @@ Geany-Plugins
 Installation
 ------------
 
-You can build the plugins using either autotools or waf. 
+You can build the plugins using either autotools or waf.
 
 Building with autotools
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -38,9 +38,10 @@ automatically based on whether the dependency exists on your system.
 to fail with an error message if you have missing
 dependencies. --disable-<option> causes the feature to be forcefully disabled.
 
-Avaialble plugins are:
+Available plugins are:
 
 * addons -- the Addons plugin
+* autoclose -- the Autoclose plugin
 * codenav -- the CodeNav plugin
 * commander -- the Commander plugin
 * debugger -- the Debugger plugin

@@ -135,22 +135,16 @@ gboolean program_non_stop_mode;
 gboolean program_temp_breakpoint;
 gchar *program_temp_break_location;
 
-static gboolean program_find(GtkTreeIter *iter, const char *name)
+static gint program_compare(ScpTreeStore *store, GtkTreeIter *iter, const char *name)
 {
-	gboolean valid = scp_tree_store_get_iter_first(recent_programs, iter);
+	const char *name1;
 
-	while (valid)
-	{
-		const char *name1;
-
-		scp_tree_store_get(recent_programs, iter, PROGRAM_NAME, &name1, -1);
-		if (!utils_filenamecmp(name1, name))
-			break;
-		valid = scp_tree_store_iter_next(recent_programs, iter);
-	}
-
-	return valid;
+	scp_tree_store_get(store, iter, PROGRAM_NAME, &name1, -1);
+	return !utils_filenamecmp(name1, name);
 }
+
+#define program_find(iter, name) scp_tree_store_traverse(recent_programs, FALSE, (iter), \
+	NULL, (ScpTreeStoreTraverseFunc) program_compare, (gpointer) (name))
 
 static void save_program_settings(void)
 {
@@ -195,6 +189,7 @@ static void save_program_settings(void)
 		breaks_save(config);
 		watches_save(config);
 		inspects_save(config);
+		registers_save(config);
 		parse_save(config);
 		utils_key_file_write_to_file(config, configfile);
 		g_free(configfile);
@@ -251,6 +246,7 @@ static void on_recent_menu_item_activate(G_GNUC_UNUSED GtkMenuItem *menuitem, co
 			breaks_load(config);
 			watches_load(config);
 			inspects_load(config);
+			registers_load(config);
 			parse_load(config);
 			message = g_strdup_printf(_("Loaded debug settings for %s."), name);
 			program_find(&iter, name);
@@ -416,11 +412,12 @@ static void on_program_ok_button_clicked(G_GNUC_UNUSED GtkButton *button,
 		gtk_widget_hide(program_dialog);
 
 		if (gtk_toggle_button_get_active(delete_all_items) &&
-			dialogs_show_question(_("Delete all breakpoints, watches and inspects?")))
+			dialogs_show_question(_("Delete all breakpoints, watches et cetera?")))
 		{
 			breaks_delete_all();
 			watches_delete_all();
 			inspects_delete_all();
+			registers_delete_all();
 		}
 	}
 }

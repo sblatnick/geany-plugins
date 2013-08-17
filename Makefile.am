@@ -1,9 +1,13 @@
-ACLOCAL_AMFLAGS = -I build/cache -I build -I build/bundled --install
+ACLOCAL_AMFLAGS = -I build/cache -I build -I build/bundled -I geanypy/m4 --install
 
 SUBDIRS = po
 
 if ENABLE_ADDONS
 SUBDIRS += addons
+endif
+
+if ENABLE_AUTOCLOSE
+SUBDIRS += autoclose
 endif
 
 if ENABLE_CODENAV
@@ -68,6 +72,10 @@ endif
 
 if ENABLE_GEANYPRJ
 SUBDIRS += geanyprj
+endif
+
+if ENABLE_GEANYPY
+SUBDIRS += geanypy
 endif
 
 if ENABLE_GEANYSENDMAIL
