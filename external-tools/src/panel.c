@@ -31,7 +31,6 @@ static void goto_link(gchar *url)
 static gboolean find_files(gchar *base, const gchar *file, gboolean open)
 {
 	gchar *path = g_build_path(G_DIR_SEPARATOR_S, base, file, NULL);
-	printf("search: %s\n", path);
 	if(g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
 		return TRUE;
 	}
@@ -98,17 +97,21 @@ static gchar* get_treebrowser_path()
 
 static gboolean file_found(gchar *file_path)
 {
+	gchar **column = g_strsplit(file_path, ":", 2);
+	gchar *file = column[0];
+	gchar *line = column[1];
+
 	//Find in abs path
-	if(g_file_test(file_path, G_FILE_TEST_IS_REGULAR)) {
-		printf("abs path: %s\n", file_path);
+	if(g_file_test(file, G_FILE_TEST_IS_REGULAR)) {
+		g_strfreev(column);
 		return TRUE;
 	}
 	//Find in current doc path:
 	GeanyDocument *doc = document_get_current();
 	gchar *current = g_path_get_dirname(doc->file_name);
-	if(find_files(current, file_path, FALSE)) {
-		printf("current doc path: %s\n", file_path);
+	if(find_files(current, file, FALSE)) {
 		g_free(current);
+		g_strfreev(column);
 		return TRUE;
 	}
 	g_free(current);
@@ -121,15 +124,16 @@ static gboolean file_found(gchar *file_path)
 	else {
 		base_directory = geany->prefs->default_open_path;
 	}
-	if(find_files(base_directory, file_path, FALSE)) {
-		printf("project path: %s\n", file_path);
+	if(find_files(base_directory, file, FALSE)) {
+		g_strfreev(column);
 		return TRUE;
 	}
 	//Find in Treebrowser Directory
-	if(find_files(treebrowser_path, file_path, FALSE)) {
-		printf("treebrowser path: %s\n", file_path);
+	if(find_files(treebrowser_path, file, FALSE)) {
+		g_strfreev(column);
 		return TRUE;
 	}
+	g_strfreev(column);
 	return FALSE;
 }
 
@@ -240,18 +244,19 @@ void panel_cleanup()
 		gtk_notebook_page_num(GTK_NOTEBOOK(geany->main_widgets->message_window_notebook), panel)
 	);
 
+	g_free(treebrowser_path);
 	g_regex_unref(fileRegexSetting.regex);
 }
 
 void panel_prepare()
 {
+	treebrowser_path = get_treebrowser_path();
 	gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view)), "", 0);
 	gtk_widget_hide(scrollable_table);
 }
 
 void panel_print(gchar *text, const gchar *tag)
 {
-	treebrowser_path = get_treebrowser_path();
 	GtkTextIter iter, start, end;
 	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
 	gtk_text_buffer_get_end_iter(buffer, &iter);
@@ -291,5 +296,4 @@ void panel_print(gchar *text, const gchar *tag)
 	GtkTextMark *mark;
 	mark = gtk_text_buffer_get_insert(buffer);
 	gtk_text_view_scroll_to_mark(GTK_TEXT_VIEW(text_view), mark, 0.0, FALSE, 0.0, 0.0);
-	g_free(treebrowser_path);
 }
