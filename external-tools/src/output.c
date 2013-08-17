@@ -150,7 +150,12 @@ void execute(Tool *tool)
 				GIOChannel *out_channel = g_io_channel_unix_new(std_out);
 			#endif
 
+			g_io_channel_set_flags(out_channel, G_IO_FLAG_NONBLOCK, NULL);
+			g_io_channel_set_encoding(out_channel, NULL, NULL);
 			g_io_add_watch(out_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(0));
+
+			g_io_channel_set_flags(err_channel, G_IO_FLAG_NONBLOCK, NULL);
+			g_io_channel_set_encoding(err_channel, NULL, NULL);
 			g_io_add_watch(err_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(1));
 		}
 		else {

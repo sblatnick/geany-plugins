@@ -22,7 +22,7 @@ typedef struct
 } RegexSetting;
 static RegexSetting pathRegexSetting = {"^\\.|^build$", NULL};
 static RegexSetting nameRegexSetting = {"^\\.|\\.(o|so|exe|class|pyc)$", NULL};
-static RegexSetting fileRegexSetting = {"[\\w./-]+\\.[\\w./-]+:?(\\d+)?", NULL};
+static RegexSetting fileRegexSetting = {"[\\w./-]+\\.[\\w./-]+(:\\d+)?", NULL};
 
 static void goto_link(gchar *url) {
 	printf("url: %s\n", url);
@@ -35,11 +35,11 @@ static gchar* get_link_at_iter(GtkTextIter in)
 	GSList *list, *node;
 	list = gtk_text_iter_get_tags(&iter);
 	if(list != NULL) {
-	  foreach_slist_free(node, list) {
+		foreach_slist_free(node, list) {
 			GtkTextTag *tag = node->data;
 			gchar *name;
 			g_object_get(G_OBJECT(tag), "name", &name, NULL);
-			if(strcmp(name, "error") == 0) {
+			if(strcmp(name, "link") == 0) {
 				GtkTextIter end = iter;
 				gtk_text_iter_backward_to_tag_toggle(&iter, tag);
 				gtk_text_iter_forward_to_tag_toggle(&end, tag);
@@ -68,7 +68,6 @@ static gboolean on_click(GtkWidget *widget, GdkEventButton *event, gpointer data
 static gboolean on_keypress(GtkWidget *widget, GdkEventKey *event, gpointer data)
 {
 	if(event->keyval == GDK_Return) {
-		printf("button!\n");
 		GtkTextIter iter;
 		GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
 		GtkTextMark *cursor = gtk_text_buffer_get_mark(buffer, "insert");
@@ -126,7 +125,7 @@ void panel_init()
 	gtk_text_buffer_create_tag(buffer, "error", "foreground", "#ff0000", NULL);
 	gtk_text_buffer_create_tag(buffer, "link", "foreground", "#0000ff", "underline", PANGO_UNDERLINE_SINGLE, NULL);
 	
-  pathRegexSetting.regex = g_regex_new(pathRegexSetting.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
+	pathRegexSetting.regex = g_regex_new(pathRegexSetting.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
 	nameRegexSetting.regex = g_regex_new(nameRegexSetting.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
 	fileRegexSetting.regex = g_regex_new(fileRegexSetting.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
 }
@@ -164,29 +163,36 @@ void panel_print(gchar *text, const gchar *tag)
 	end = iter;
 	gtk_text_iter_backward_line(&iter);
 
-  gchar *line_text = gtk_text_iter_get_text(&iter, &end);
-	printf("line: \"%s\"\n", text);
+	gchar *line_text = gtk_text_iter_get_text(&iter, &end);
+	
 	
 	GMatchInfo *info;
 	if(g_regex_match(fileRegexSetting.regex, line_text, 0, &info)) {
-    while(g_match_info_matches(info))
-    {
-      gchar *word = g_match_info_fetch(info, 0);
-      g_print("Found: %s\n", word);
-      g_free (word);
-      g_match_info_next(info, NULL);
-    }
+		while(g_match_info_matches(info))
+		{
+			gchar *word = g_match_info_fetch(info, 0);
+			g_print("Found: %s\n", word);
+			g_free(word);
+
+			gint start_pos, end_pos;
+			g_match_info_fetch_pos(info, 0, &start_pos, &end_pos);
+			GtkTextIter start = iter;
+			GtkTextIter end = iter;
+			gtk_text_iter_forward_chars(&start, start_pos);
+			gtk_text_iter_forward_chars(&end, end_pos);
+			gtk_text_buffer_apply_tag_by_name(buffer, "link", &start, &end);
+
+			g_match_info_next(info, NULL);
+			g_match_info_next(info, NULL);
+		}
 	}
 	
 	g_match_info_free(info);
 	g_free(line_text);
 
-  //fileRegexSetting
+	//fileRegexSetting
 	//strstr - find first substr
 	//strchr - find first character
-
-	
-	//gtk_text_buffer_apply_tag_by_name
 
 	//Scroll to bottom:
 	GtkTextMark *mark;
