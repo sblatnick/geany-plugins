@@ -23,15 +23,21 @@ typedef struct
 } RegexSetting;
 static RegexSetting fileRegexSetting = {"[\\w./-]+\\.[\\w./-]+(:\\d+)?", NULL};
 
-static void goto_link(gchar *url)
+static void open_path(gchar *path, gchar *line)
 {
-	printf("url: %s\n", url);
+	GeanyDocument *doc = document_open_file(path, FALSE, NULL, NULL);
+	if(line != NULL) {
+		editor_goto_line(doc->editor, atoi(line) - 1, 0);
+	}
 }
 
-static gboolean find_files(gchar *base, const gchar *file, gboolean open)
+static gboolean find_files(gchar *base, const gchar *file, gchar* line, gboolean open)
 {
 	gchar *path = g_build_path(G_DIR_SEPARATOR_S, base, file, NULL);
 	if(g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
+		if(open) {
+			open_path(path, line);
+		}
 		return TRUE;
 	}
 	
@@ -43,7 +49,7 @@ static gboolean find_files(gchar *base, const gchar *file, gboolean open)
 	{
 		gchar *path = g_build_path(G_DIR_SEPARATOR_S, base, file_name, NULL);
 		if(g_file_test(path, G_FILE_TEST_IS_DIR)) {
-			if(find_files(path, file, open)) {
+			if(find_files(path, file, line, open)) {
 				g_dir_close(dir);
 				g_free(path);
 				return TRUE;
@@ -95,21 +101,24 @@ static gchar* get_treebrowser_path()
 	}
 }
 
-static gboolean file_found(gchar *file_path)
+static gboolean file_found(gchar *file_path, gboolean open)
 {
 	gchar **column = g_strsplit(file_path, ":", 2);
 	gchar *file = column[0];
 	gchar *line = column[1];
 
 	//Find in abs path
-	if(g_file_test(file, G_FILE_TEST_IS_REGULAR)) {
+	if(g_path_is_absolute(file) && g_file_test(file, G_FILE_TEST_IS_REGULAR)) {
 		g_strfreev(column);
+		if(open) {
+			open_path(file, line);
+		}
 		return TRUE;
 	}
 	//Find in current doc path:
 	GeanyDocument *doc = document_get_current();
 	gchar *current = g_path_get_dirname(doc->file_name);
-	if(find_files(current, file, FALSE)) {
+	if(find_files(current, file, line, open)) {
 		g_free(current);
 		g_strfreev(column);
 		return TRUE;
@@ -124,17 +133,24 @@ static gboolean file_found(gchar *file_path)
 	else {
 		base_directory = geany->prefs->default_open_path;
 	}
-	if(find_files(base_directory, file, FALSE)) {
+	if(find_files(base_directory, file, line, open)) {
 		g_strfreev(column);
 		return TRUE;
 	}
 	//Find in Treebrowser Directory
-	if(find_files(treebrowser_path, file, FALSE)) {
+	if(find_files(treebrowser_path, file, line, open)) {
 		g_strfreev(column);
 		return TRUE;
 	}
 	g_strfreev(column);
 	return FALSE;
+}
+
+static void goto_link(gchar *url)
+{
+	if(strcmp("", url) != 0) {
+		file_found(url, TRUE);
+	}
 }
 
 static gchar* get_link_at_iter(GtkTextIter in)
@@ -276,7 +292,7 @@ void panel_print(gchar *text, const gchar *tag)
 		while(g_match_info_matches(info))
 		{
 			gchar *file_path = g_match_info_fetch(info, 0);
-			if(file_found(file_path)) {
+			if(file_found(file_path, FALSE)) {
 				gint start_pos, end_pos;
 				g_match_info_fetch_pos(info, 0, &start_pos, &end_pos);
 				GtkTextIter start = iter;
