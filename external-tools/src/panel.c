@@ -21,7 +21,6 @@ typedef struct
 	GRegex *regex;
 } RegexSetting;
 static RegexSetting pathRegexSetting = {"^\\.|^build$", NULL};
-static RegexSetting nameRegexSetting = {"^\\.|\\.(o|so|exe|class|pyc)$", NULL};
 static RegexSetting fileRegexSetting = {"[\\w./-]+\\.[\\w./-]+(:\\d+)?", NULL};
 
 static void goto_link(gchar *url)
@@ -29,8 +28,51 @@ static void goto_link(gchar *url)
 	printf("url: %s\n", url);
 }
 
-static gboolean file_found(file_path)
+static void list_files(gchar *base, const gchar *filter)
 {
+	GDir *dir;
+	gchar const *file_name;
+	dir = g_dir_open(base, 0, NULL);
+	
+	foreach_dir(file_name, dir)
+	{
+		gchar *path = g_build_path(G_DIR_SEPARATOR_S, base, file_name, NULL);
+
+		if(g_file_test(path, G_FILE_TEST_IS_DIR)) {
+			if(g_regex_match(pathRegexSetting.regex, file_name, 0, NULL)) {
+				g_free(path);
+				continue;
+			}
+			list_files(path, filter);
+		}
+		else {
+			//if(regex != NULL && g_regex_match(regex, path, 0, NULL)) {
+				//
+			//}
+		}
+		g_free(path);
+	}
+	g_dir_close(dir);
+}
+
+static gboolean file_found(gchar *file_path)
+{
+	gchar **parts = g_strsplit(file_path, ":", 2);
+	gchar *path = parts[0];
+	gchar *line = parts[1];
+	
+	//Find in abs path
+	if(strchr(path, '/') - path == 0) {
+		printf("in abs path\n");
+	}
+	//Find in Tree Browser Directory
+	//Find in Project Directory
+
+	//strstr - find first substr
+	//strchr - find first character
+	
+	
+	g_strfreev(parts);
 	return TRUE;
 }
 
@@ -132,7 +174,6 @@ void panel_init()
 	gtk_text_buffer_create_tag(buffer, "link", "foreground", "#0000ff", "underline", PANGO_UNDERLINE_SINGLE, NULL);
 	
 	pathRegexSetting.regex = g_regex_new(pathRegexSetting.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
-	nameRegexSetting.regex = g_regex_new(nameRegexSetting.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
 	fileRegexSetting.regex = g_regex_new(fileRegexSetting.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
 }
 
@@ -144,7 +185,6 @@ void panel_cleanup()
 	);
 
 	g_regex_unref(pathRegexSetting.regex);
-	g_regex_unref(nameRegexSetting.regex);
 	g_regex_unref(fileRegexSetting.regex);
 }
 
@@ -156,7 +196,7 @@ void panel_prepare()
 
 void panel_print(gchar *text, const gchar *tag)
 {
-	GtkTextIter iter, end;
+	GtkTextIter iter, start, end;
 	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
 	gtk_text_buffer_get_end_iter(buffer, &iter);
 	if(tag == NULL) {
@@ -165,19 +205,16 @@ void panel_print(gchar *text, const gchar *tag)
 	else {
 		gtk_text_buffer_insert_with_tags_by_name(buffer, &iter, text, -1, tag, NULL);
 	}
-	gtk_text_iter_backward_char(&iter);
 	end = iter;
 	gtk_text_iter_backward_line(&iter);
+	start = iter;
 
-	gchar *line_text = gtk_text_iter_get_text(&iter, &end);
-	
-	
+	gchar *line_text = gtk_text_iter_get_text(&start, &end);
 	GMatchInfo *info;
 	if(g_regex_match(fileRegexSetting.regex, line_text, 0, &info)) {
 		while(g_match_info_matches(info))
 		{
 			gchar *file_path = g_match_info_fetch(info, 0);
-			g_print("Found: %s\n", file_path);
 			if(file_found(file_path)) {
 				gint start_pos, end_pos;
 				g_match_info_fetch_pos(info, 0, &start_pos, &end_pos);
@@ -189,16 +226,10 @@ void panel_print(gchar *text, const gchar *tag)
 			}
 			g_free(file_path);
 			g_match_info_next(info, NULL);
-			g_match_info_next(info, NULL);
 		}
-	}
-	
+	}	
 	g_match_info_free(info);
 	g_free(line_text);
-
-	//fileRegexSetting
-	//strstr - find first substr
-	//strchr - find first character
 
 	//Scroll to bottom:
 	GtkTextMark *mark;
