@@ -24,8 +24,14 @@ static RegexSetting pathRegexSetting = {"^\\.|^build$", NULL};
 static RegexSetting nameRegexSetting = {"^\\.|\\.(o|so|exe|class|pyc)$", NULL};
 static RegexSetting fileRegexSetting = {"[\\w./-]+\\.[\\w./-]+(:\\d+)?", NULL};
 
-static void goto_link(gchar *url) {
+static void goto_link(gchar *url)
+{
 	printf("url: %s\n", url);
+}
+
+static gboolean file_found(file_path)
+{
+	return TRUE;
 }
 
 static gchar* get_link_at_iter(GtkTextIter in)
@@ -170,18 +176,18 @@ void panel_print(gchar *text, const gchar *tag)
 	if(g_regex_match(fileRegexSetting.regex, line_text, 0, &info)) {
 		while(g_match_info_matches(info))
 		{
-			gchar *word = g_match_info_fetch(info, 0);
-			g_print("Found: %s\n", word);
-			g_free(word);
-
-			gint start_pos, end_pos;
-			g_match_info_fetch_pos(info, 0, &start_pos, &end_pos);
-			GtkTextIter start = iter;
-			GtkTextIter end = iter;
-			gtk_text_iter_forward_chars(&start, start_pos);
-			gtk_text_iter_forward_chars(&end, end_pos);
-			gtk_text_buffer_apply_tag_by_name(buffer, "link", &start, &end);
-
+			gchar *file_path = g_match_info_fetch(info, 0);
+			g_print("Found: %s\n", file_path);
+			if(file_found(file_path)) {
+				gint start_pos, end_pos;
+				g_match_info_fetch_pos(info, 0, &start_pos, &end_pos);
+				GtkTextIter start = iter;
+				GtkTextIter end = iter;
+				gtk_text_iter_forward_chars(&start, start_pos);
+				gtk_text_iter_forward_chars(&end, end_pos);
+				gtk_text_buffer_apply_tag_by_name(buffer, "link", &start, &end);
+			}
+			g_free(file_path);
 			g_match_info_next(info, NULL);
 			g_match_info_next(info, NULL);
 		}
