@@ -10,6 +10,7 @@ extern GeanyFunctions *geany_functions;
 
 extern gchar *tools;
 
+static gchar *treebrowser_path = NULL;
 static GtkWidget *panel; //All contents of the panel
 static GtkWidget *label;
 static GtkWidget *text_view;
@@ -20,7 +21,6 @@ typedef struct
 	const gchar *text;
 	GRegex *regex;
 } RegexSetting;
-static RegexSetting pathRegexSetting = {"^\\.|^build$", NULL};
 static RegexSetting fileRegexSetting = {"[\\w./-]+\\.[\\w./-]+(:\\d+)?", NULL};
 
 static void goto_link(gchar *url)
@@ -28,8 +28,14 @@ static void goto_link(gchar *url)
 	printf("url: %s\n", url);
 }
 
-static void list_files(gchar *base, const gchar *filter)
+static gboolean find_files(gchar *base, const gchar *file, gboolean open)
 {
+	gchar *path = g_build_path(G_DIR_SEPARATOR_S, base, file, NULL);
+	printf("search: %s\n", path);
+	if(g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
+		return TRUE;
+	}
+	
 	GDir *dir;
 	gchar const *file_name;
 	dir = g_dir_open(base, 0, NULL);
@@ -37,43 +43,94 @@ static void list_files(gchar *base, const gchar *filter)
 	foreach_dir(file_name, dir)
 	{
 		gchar *path = g_build_path(G_DIR_SEPARATOR_S, base, file_name, NULL);
-
 		if(g_file_test(path, G_FILE_TEST_IS_DIR)) {
-			if(g_regex_match(pathRegexSetting.regex, file_name, 0, NULL)) {
+			if(find_files(path, file, open)) {
+				g_dir_close(dir);
 				g_free(path);
-				continue;
+				return TRUE;
 			}
-			list_files(path, filter);
-		}
-		else {
-			//if(regex != NULL && g_regex_match(regex, path, 0, NULL)) {
-				//
-			//}
 		}
 		g_free(path);
 	}
 	g_dir_close(dir);
+	return FALSE;
+}
+
+static GtkWidget* find_entry(GtkContainer *container)
+{
+	GtkWidget *entry = NULL;
+	GList *node;
+	GList *children = gtk_container_get_children(container);
+	for(node = children; !entry && node; node = node->next) {
+		if(GTK_IS_ENTRY(node->data) && strcmp(gtk_widget_get_tooltip_text(GTK_WIDGET(node->data)), "Addressbar for example '/projects/my-project'") == 0) {
+			entry = node->data;
+		}
+		else if(GTK_IS_CONTAINER(node->data)) {
+			entry = find_entry(node->data);
+		}
+	}
+	g_list_free(children);
+	return entry;
+}
+
+static gchar* get_treebrowser_path()
+{
+	GtkWidget *treebrowser_entry = NULL;
+	gint i;
+	for(i = 0; i < gtk_notebook_get_n_pages(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook)); i++) {
+		GtkWidget *page;
+		const gchar *page_name;
+		page = gtk_notebook_get_nth_page(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), i);
+		page_name = gtk_notebook_get_tab_label_text(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), page);
+		if(page_name && strcmp(page_name, "Tree Browser") == 0) {
+			treebrowser_entry = find_entry(GTK_CONTAINER(page));
+			break;
+		}
+	}
+
+	if(treebrowser_entry == NULL) {
+		return NULL;	
+	}
+	else {
+		return g_strdup(gtk_entry_get_text(GTK_ENTRY(treebrowser_entry)));
+	}
 }
 
 static gboolean file_found(gchar *file_path)
 {
-	gchar **parts = g_strsplit(file_path, ":", 2);
-	gchar *path = parts[0];
-	gchar *line = parts[1];
-	
 	//Find in abs path
-	if(strchr(path, '/') - path == 0) {
-		printf("in abs path\n");
+	if(g_file_test(file_path, G_FILE_TEST_IS_REGULAR)) {
+		printf("abs path: %s\n", file_path);
+		return TRUE;
 	}
-	//Find in Tree Browser Directory
+	//Find in current doc path:
+	GeanyDocument *doc = document_get_current();
+	gchar *current = g_path_get_dirname(doc->file_name);
+	if(find_files(current, file_path, FALSE)) {
+		printf("current doc path: %s\n", file_path);
+		g_free(current);
+		return TRUE;
+	}
+	g_free(current);
 	//Find in Project Directory
-
-	//strstr - find first substr
-	//strchr - find first character
-	
-	
-	g_strfreev(parts);
-	return TRUE;
+	gchar *base_directory;
+	GeanyProject *project = geany->app->project;
+	if(project) {
+		base_directory = project->base_path;
+	}
+	else {
+		base_directory = geany->prefs->default_open_path;
+	}
+	if(find_files(base_directory, file_path, FALSE)) {
+		printf("project path: %s\n", file_path);
+		return TRUE;
+	}
+	//Find in Treebrowser Directory
+	if(find_files(treebrowser_path, file_path, FALSE)) {
+		printf("treebrowser path: %s\n", file_path);
+		return TRUE;
+	}
+	return FALSE;
 }
 
 static gchar* get_link_at_iter(GtkTextIter in)
@@ -173,7 +230,6 @@ void panel_init()
 	gtk_text_buffer_create_tag(buffer, "error", "foreground", "#ff0000", NULL);
 	gtk_text_buffer_create_tag(buffer, "link", "foreground", "#0000ff", "underline", PANGO_UNDERLINE_SINGLE, NULL);
 	
-	pathRegexSetting.regex = g_regex_new(pathRegexSetting.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
 	fileRegexSetting.regex = g_regex_new(fileRegexSetting.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
 }
 
@@ -184,7 +240,6 @@ void panel_cleanup()
 		gtk_notebook_page_num(GTK_NOTEBOOK(geany->main_widgets->message_window_notebook), panel)
 	);
 
-	g_regex_unref(pathRegexSetting.regex);
 	g_regex_unref(fileRegexSetting.regex);
 }
 
@@ -196,6 +251,7 @@ void panel_prepare()
 
 void panel_print(gchar *text, const gchar *tag)
 {
+	treebrowser_path = get_treebrowser_path();
 	GtkTextIter iter, start, end;
 	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
 	gtk_text_buffer_get_end_iter(buffer, &iter);
@@ -235,4 +291,5 @@ void panel_print(gchar *text, const gchar *tag)
 	GtkTextMark *mark;
 	mark = gtk_text_buffer_get_insert(buffer);
 	gtk_text_view_scroll_to_mark(GTK_TEXT_VIEW(text_view), mark, 0.0, FALSE, 0.0, 0.0);
+	g_free(treebrowser_path);
 }
