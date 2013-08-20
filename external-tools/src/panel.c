@@ -144,7 +144,6 @@ static gboolean on_click(GtkWidget *widget, GdkEventButton *event, gpointer data
 	
 	gchar *text = get_link_at_iter(iter);
 	goto_link(text);
-	g_free(text);
 	return FALSE;
 }
 
