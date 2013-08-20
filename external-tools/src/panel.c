@@ -70,10 +70,10 @@ static gboolean file_found(gchar *file_path, gboolean open)
 
 	//Find in abs path
 	if(g_path_is_absolute(file) && g_file_test(file, G_FILE_TEST_IS_REGULAR)) {
-		g_strfreev(column);
 		if(open) {
 			open_path(file, line);
 		}
+		g_strfreev(column);
 		return TRUE;
 	}
 	//Find in current doc path:
