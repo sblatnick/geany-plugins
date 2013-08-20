@@ -10,7 +10,6 @@ extern GeanyFunctions *geany_functions;
 
 extern gchar *tools;
 
-static gchar *treebrowser_path = NULL;
 static GtkWidget *panel; //All contents of the panel
 static GtkWidget *label;
 static GtkWidget *text_view;
@@ -38,8 +37,10 @@ static gboolean find_files(gchar *base, const gchar *file, gchar* line, gboolean
 		if(open) {
 			open_path(path, line);
 		}
+		g_free(path);
 		return TRUE;
 	}
+	g_free(path);
 	
 	GDir *dir;
 	gchar const *file_name;
@@ -59,46 +60,6 @@ static gboolean find_files(gchar *base, const gchar *file, gchar* line, gboolean
 	}
 	g_dir_close(dir);
 	return FALSE;
-}
-
-static GtkWidget* find_entry(GtkContainer *container)
-{
-	GtkWidget *entry = NULL;
-	GList *node;
-	GList *children = gtk_container_get_children(container);
-	for(node = children; !entry && node; node = node->next) {
-		if(GTK_IS_ENTRY(node->data) && strcmp(gtk_widget_get_tooltip_text(GTK_WIDGET(node->data)), "Addressbar for example '/projects/my-project'") == 0) {
-			entry = node->data;
-		}
-		else if(GTK_IS_CONTAINER(node->data)) {
-			entry = find_entry(node->data);
-		}
-	}
-	g_list_free(children);
-	return entry;
-}
-
-static gchar* get_treebrowser_path()
-{
-	GtkWidget *treebrowser_entry = NULL;
-	gint i;
-	for(i = 0; i < gtk_notebook_get_n_pages(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook)); i++) {
-		GtkWidget *page;
-		const gchar *page_name;
-		page = gtk_notebook_get_nth_page(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), i);
-		page_name = gtk_notebook_get_tab_label_text(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), page);
-		if(page_name && strcmp(page_name, "Tree Browser") == 0) {
-			treebrowser_entry = find_entry(GTK_CONTAINER(page));
-			break;
-		}
-	}
-
-	if(treebrowser_entry == NULL) {
-		return NULL;	
-	}
-	else {
-		return g_strdup(gtk_entry_get_text(GTK_ENTRY(treebrowser_entry)));
-	}
 }
 
 static gboolean file_found(gchar *file_path, gboolean open)
@@ -124,6 +85,7 @@ static gboolean file_found(gchar *file_path, gboolean open)
 		return TRUE;
 	}
 	g_free(current);
+
 	//Find in Project Directory
 	gchar *base_directory;
 	GeanyProject *project = geany->app->project;
@@ -134,11 +96,6 @@ static gboolean file_found(gchar *file_path, gboolean open)
 		base_directory = geany->prefs->default_open_path;
 	}
 	if(find_files(base_directory, file, line, open)) {
-		g_strfreev(column);
-		return TRUE;
-	}
-	//Find in Treebrowser Directory
-	if(find_files(treebrowser_path, file, line, open)) {
 		g_strfreev(column);
 		return TRUE;
 	}
@@ -187,6 +144,7 @@ static gboolean on_click(GtkWidget *widget, GdkEventButton *event, gpointer data
 	
 	gchar *text = get_link_at_iter(iter);
 	goto_link(text);
+	g_free(text);
 	return FALSE;
 }
 
@@ -199,6 +157,7 @@ static gboolean on_keypress(GtkWidget *widget, GdkEventKey *event, gpointer data
 		gtk_text_buffer_get_iter_at_mark(buffer, &iter, cursor);
 		gchar *link = get_link_at_iter(iter);
 		goto_link(link);
+		g_free(link);
 	}
 	return FALSE;
 }
@@ -260,13 +219,11 @@ void panel_cleanup()
 		gtk_notebook_page_num(GTK_NOTEBOOK(geany->main_widgets->message_window_notebook), panel)
 	);
 
-	g_free(treebrowser_path);
 	g_regex_unref(fileRegexSetting.regex);
 }
 
 void panel_prepare()
 {
-	treebrowser_path = get_treebrowser_path();
 	gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view)), "", 0);
 	gtk_widget_hide(scrollable_table);
 }
