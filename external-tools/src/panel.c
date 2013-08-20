@@ -76,6 +76,7 @@ static gboolean file_found(gchar *file_path, gboolean open)
 		g_strfreev(column);
 		return TRUE;
 	}
+
 	//Find in current doc path:
 	GeanyDocument *doc = document_get_current();
 	gchar *current = g_path_get_dirname(doc->file_name);
