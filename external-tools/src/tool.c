@@ -5,7 +5,7 @@ extern GeanyPlugin *geany_plugin;
 extern GeanyData *geany_data;
 extern GeanyFunctions *geany_functions;
 
-extern gchar *tools, *conf;
+extern const gchar *tools, *conf;
 static GKeyFile *config;
 static GeanyKeyGroup *key_group;
 static gint shortcutCount = 0;
@@ -29,9 +29,12 @@ Tool* new_tool()
 	return tool;
 }
 
-void free_tool(Tool* tool)
+void free_tool(Tool* tool, gboolean purge)
 {
-	g_key_file_remove_group(config, tool->id, NULL);
+  if(purge) {
+	  g_key_file_remove_group(config, tool->id, NULL);
+	}
+	g_free(tool->id);
 	g_free(tool->name);
 	g_slice_free(Tool, tool);
 }
@@ -84,6 +87,11 @@ void clean_tools()
 	gint i = 0;
 	while(i < menuCount) {
 		gtk_container_remove(GTK_CONTAINER(geany->main_widgets->tools_menu), menu_tools[i]);
+		i++;
+	}
+	i = 0;
+	while(i < shortcutCount) {
+		free_tool(shortcut_tools[i], FALSE);
 		i++;
 	}
 

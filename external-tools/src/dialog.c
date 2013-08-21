@@ -2,7 +2,7 @@
 #include <gdk/gdkkeysyms.h>
 #include <string.h>
 
-extern gchar *tools;
+extern const gchar *tools;
 
 static GtkWidget *scrollable, *tree, *title, *saveCheckbox, *menuCheckbox,
 	*shortcutCheckbox, *outputCombo, *editButton, *shortcutButton;
@@ -97,7 +97,7 @@ static void delete_tool(GtkButton *button, gpointer data)
 		Tool *tool;
 		gtk_tree_model_get(model, &iter, 0, &tool, -1);
 		g_remove(tool->id);
-		free_tool(tool);
+		free_tool(tool, TRUE);
 		gtk_tree_selection_unselect_iter(selected, &iter);
 		gtk_tree_store_remove(list, &iter);
 	}

@@ -8,7 +8,7 @@ extern GeanyPlugin *geany_plugin;
 extern GeanyData *geany_data;
 extern GeanyFunctions *geany_functions;
 
-extern gchar *tools;
+extern const gchar *tools;
 
 static GtkWidget *panel; //All contents of the panel
 static GtkWidget *label;

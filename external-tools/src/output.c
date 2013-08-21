@@ -2,8 +2,7 @@ extern GeanyPlugin *geany_plugin;
 extern GeanyData *geany_data;
 extern GeanyFunctions *geany_functions;
 
-extern gchar *tools;
-extern const gchar *home;
+extern const gchar *tools, *home;
 extern GtkWidget *panel;
 
 static Tool *executed_tool;
