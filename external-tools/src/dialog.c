@@ -96,10 +96,8 @@ static void delete_tool(GtkButton *button, gpointer data)
 	{
 		Tool *tool;
 		gtk_tree_model_get(model, &iter, 0, &tool, -1);
-		gchar *file = g_build_path(G_DIR_SEPARATOR_S, tools, tool->id, NULL);
-		g_remove(file);
+		g_remove(tool->id);
 		free_tool(tool);
-		g_free(file);
 		gtk_tree_selection_unselect_iter(selected, &iter);
 		gtk_tree_store_remove(list, &iter);
 	}
