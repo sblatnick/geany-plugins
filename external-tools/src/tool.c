@@ -8,9 +8,7 @@ extern GeanyFunctions *geany_functions;
 extern const gchar *tools, *conf;
 static GKeyFile *config;
 static GeanyKeyGroup *key_group;
-static gint shortcutCount = 0;
-static gint menuCount = 0;
-static GtkWidget **menu_tools;
+static gint shortcutCount, menuCount;
 
 static void key_callback(G_GNUC_UNUSED guint key_id)
 {
@@ -82,7 +80,6 @@ void clean_tools()
 	gchar *data = g_key_file_to_data(config, NULL, NULL);
 	utils_write_file(conf, data);
 	g_free(data);
-	g_key_file_free(config);
 
 	gint i = 0;
 	while(i < menuCount) {
@@ -97,8 +94,6 @@ void clean_tools()
 
 	shortcutCount = 0;
 	menuCount = 0;
-	g_free(shortcut_tools);
-	g_free(menu_tools);
 }
 
 Tool* load_tool(gchar *id)
@@ -136,6 +131,11 @@ void load_tools(int (*callback)(Tool*))
 
 void reload_tools()
 {
+	shortcutCount = 0;
+	menuCount = 0;
+	if(config != NULL) {
+		g_key_file_free(config);
+	}
 	config = g_key_file_new();
 	g_key_file_load_from_file(config, conf, G_KEY_FILE_NONE, NULL);
 	load_tools(count_tools);
