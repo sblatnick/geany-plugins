@@ -141,7 +141,7 @@ void reload_tools()
 	load_tools(count_tools);
 	key_group = plugin_set_key_group(geany_plugin, "external_tools_keyboard_shortcut", shortcutCount + 1, NULL);
 	shortcut_tools = (Tool **) g_malloc(shortcutCount);
-	menu_tools = (GtkWidget **) g_malloc(menuCount);
+	menu_tools = (GtkWidget **) g_malloc(menuCount * sizeof(GtkWidget*));
 	shortcutCount = 0;
 	menuCount = 0;
 	load_tools(setup_tools);
