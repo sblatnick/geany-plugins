@@ -50,7 +50,7 @@ static ViewInfo views[VIEW_COUNT] =
 	{ FALSE, VC_FRAME, watches_clear,   watches_update,   FALSE, DS_VARIABLE },
 	{ FALSE, VC_DATA,  memory_clear,    memory_update,    FALSE, DS_VARIABLE },
 	{ FALSE, VC_NONE,  NULL,            dc_update,        FALSE, DS_DEBUG },
-	{ FALSE, VC_FRAME, inspects_clear,  inspects_update,  FALSE, DS_VARIABLE },
+	{ FALSE, VC_FRAME, inspects_clear,  inspects_update,  FALSE, DS_DEBUG },
 	{ FALSE, VC_FRAME, registers_clear, registers_update, TRUE,  DS_DEBUG },
 	{ FALSE, VC_DATA,  tooltip_clear,   tooltip_update,   FALSE, DS_SENDABLE },
 	{ FALSE, VC_NONE,  menu_clear,      NULL,             FALSE, 0 }
@@ -114,7 +114,7 @@ void views_context_dirty(DebugState state, gboolean frame_only)
 	}
 }
 
-static ViewIndex view_current = 0;
+static ViewIndex view_current;
 
 void views_clear(void)
 {
@@ -258,8 +258,7 @@ static void on_editing_started(G_GNUC_UNUSED GtkCellRenderer *cell, GtkCellEdita
 		gtk_entry_set_cursor_hadjustment(GTK_ENTRY(editable), hadjustment);
 }
 
-static gboolean on_display_editable_map_event(GtkWidget *widget, G_GNUC_UNUSED GdkEvent *event,
-	gchar *display)
+static gboolean on_display_editable_map(GtkWidget *widget, gchar *display)
 {
 	gint position = 0;
 	GtkEditable *editable = GTK_EDITABLE(widget);
@@ -282,7 +281,7 @@ static void on_display_editing_started(G_GNUC_UNUSED GtkCellRenderer *cell,
 	scp_tree_store_get_iter_from_string(store, &iter, path_str);
 	scp_tree_store_get(store, &iter, COLUMN_VALUE, &value, COLUMN_HB_MODE, &hb_mode, -1);
 	/* scrolling editable to the proper position is left as an exercise for the reader */
-	g_signal_connect(editable, "map-event", G_CALLBACK(on_display_editable_map_event),
+	g_signal_connect(editable, "map", G_CALLBACK(on_display_editable_map),
 		parse_get_display_from_7bit(value, hb_mode, MR_EDITVC));
 }
 
@@ -580,18 +579,18 @@ gboolean view_command_active(void)
 	return gtk_widget_get_visible(command_dialog);
 }
 
+static DebugState last_views_state;
+
 void views_update_state(DebugState state)
 {
-	static DebugState last_state = 0;
-
-	if (state != last_state)
+	if (state != last_views_state)
 	{
 		if (gtk_widget_get_visible(command_dialog))
 			command_line_update_state(state);
 		locals_update_state(state);
 		watches_update_state(state);
 		inspects_update_state(state);
-		last_state = state;
+		last_views_state = state;
 	}
 }
 
@@ -605,6 +604,16 @@ static gulong switch_sidebar_page_id;
 
 void views_init(void)
 {
+#ifdef G_OS_UNIX
+	view_current = VIEW_TERMINAL;
+#else
+	view_current = VIEW_THREADS;
+#endif
+	last_views_state = 0;
+
+	if (!pref_var_update_bug)
+		views[VIEW_INSPECT].state = DS_VARIABLE;
+
 	command_dialog = dialog_connect("command_dialog");
 	command_view = get_widget("command_view");
 	command_text = gtk_text_view_get_buffer(GTK_TEXT_VIEW(command_view));

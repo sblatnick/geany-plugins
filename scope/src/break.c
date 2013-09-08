@@ -676,27 +676,16 @@ void on_break_list(GArray *nodes)
 	}
 }
 
-gint break_async = -1;
+gint break_async;
 
 void on_break_stopped(GArray *nodes)
 {
 	if (break_async < TRUE)
 	{
 		const char *id = parse_find_value(nodes, "bkptno");
-		const char *disp = parse_find_value(nodes, "disp");
 
-		if (id && disp)
-		{
-			if (!strcmp(disp, "dis"))
-			{
-				GtkTreeIter iter;
-
-				if (store_find(store, &iter, BREAK_ID, id))
-					break_enable(&iter, FALSE);
-			}
-			else if (!strcmp(disp, "del"))
-				break_remove_all(id, FALSE);
-		}
+		if (id && !g_strcmp0(parse_find_value(nodes, "disp"), "del"))
+			break_remove_all(id, FALSE);
 	}
 
 	on_thread_stopped(nodes);
@@ -1298,6 +1287,8 @@ void break_init(void)
 {
 	GtkWidget *menu;
 	guint i;
+
+	break_async = -1;
 
 	tree = view_connect("break_view", &store, &selection, break_cells, "break_window", NULL);
 	gtk_tree_view_column_set_cell_data_func(get_column("break_type_column"),
