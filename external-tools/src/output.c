@@ -2,8 +2,7 @@ extern GeanyPlugin *geany_plugin;
 extern GeanyData *geany_data;
 extern GeanyFunctions *geany_functions;
 
-extern gchar *tools;
-extern const gchar *home;
+extern const gchar *tools, *home;
 extern GtkWidget *panel;
 
 static Tool *executed_tool;
@@ -108,13 +107,13 @@ void execute(Tool *tool)
 	gint line = sci_get_current_line(doc->editor->sci);
 	snprintf(geany_line_number, 32, "%d", line + 1);
 
-	gchar *project_dir;
+	const gchar *project_dir;
   GeanyProject *project = geany->app->project;
 	if(project) {
 		project_dir = project->base_path;
 	}
 	else {
-		project_dir = geany->prefs->default_open_path;
+		project_dir = home;
 	}
 
 	gchar **env = utils_copy_environment(
@@ -133,7 +132,7 @@ void execute(Tool *tool)
 	if(g_shell_parse_argv(cmd, NULL, &argv, &error))
 	{
 		if(g_spawn_async_with_pipes(
-			home,
+			project_dir,
 			argv,
 			env,
 			0, NULL, NULL, NULL, NULL,
@@ -150,7 +149,12 @@ void execute(Tool *tool)
 				GIOChannel *out_channel = g_io_channel_unix_new(std_out);
 			#endif
 
+			g_io_channel_set_flags(out_channel, G_IO_FLAG_NONBLOCK, NULL);
+			g_io_channel_set_encoding(out_channel, NULL, NULL);
 			g_io_add_watch(out_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(0));
+
+			g_io_channel_set_flags(err_channel, G_IO_FLAG_NONBLOCK, NULL);
+			g_io_channel_set_encoding(err_channel, NULL, NULL);
 			g_io_add_watch(err_channel, G_IO_IN | G_IO_HUP, (GIOFunc)output_out, GUINT_TO_POINTER(1));
 		}
 		else {

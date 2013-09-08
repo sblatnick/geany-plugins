@@ -32,3 +32,4 @@ typedef struct
 	gboolean shortcut;
 } Tool;
 static Tool **shortcut_tools;
+static GtkWidget **menu_tools;
