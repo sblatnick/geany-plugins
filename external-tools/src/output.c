@@ -107,13 +107,13 @@ void execute(Tool *tool)
 	gint line = sci_get_current_line(doc->editor->sci);
 	snprintf(geany_line_number, 32, "%d", line + 1);
 
-	gchar *project_dir;
+	const gchar *project_dir;
   GeanyProject *project = geany->app->project;
 	if(project) {
 		project_dir = project->base_path;
 	}
 	else {
-		project_dir = geany->prefs->default_open_path;
+		project_dir = home;
 	}
 
 	gchar **env = utils_copy_environment(
@@ -132,7 +132,7 @@ void execute(Tool *tool)
 	if(g_shell_parse_argv(cmd, NULL, &argv, &error))
 	{
 		if(g_spawn_async_with_pipes(
-			home,
+			project_dir,
 			argv,
 			env,
 			0, NULL, NULL, NULL, NULL,
