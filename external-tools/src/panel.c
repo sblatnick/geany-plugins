@@ -157,7 +157,7 @@ static gboolean on_keypress(GtkWidget *widget, GdkEventKey *event, gpointer data
 		gtk_text_buffer_get_iter_at_mark(buffer, &iter, cursor);
 		gchar *link = get_link_at_iter(iter);
 		goto_link(link);
-		g_free(link);
+		//g_free(link);
 	}
 	return FALSE;
 }
