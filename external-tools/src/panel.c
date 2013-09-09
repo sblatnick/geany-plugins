@@ -2,6 +2,8 @@
 #include <gdk/gdkkeysyms.h>
 #include <string.h>
 
+#define foreach_slist_free(node, list) for (node = list, list = NULL; g_slist_free_1(list), node != NULL; list = node, node = node->next)
+
 extern GeanyPlugin *geany_plugin;
 extern GeanyData *geany_data;
 extern GeanyFunctions *geany_functions;
@@ -9,7 +11,7 @@ extern GeanyFunctions *geany_functions;
 extern gchar *tools;
 extern GRegex *name_regex, *path_regex, *match_regex;
 
-GtkWidget *panel; //All contents of the panel
+static GtkWidget *panel; //All contents of the panel
 static GtkWidget *label;
 static GtkWidget *text_view;
 static GtkWidget *scrollable_text, *scrollable_table;
@@ -20,9 +22,36 @@ static GtkTextBuffer* buffer()
 	return gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
 }
 
-static void click_link(GtkTextTag *obj, gpointer data)
+static gboolean on_click(GtkWidget *widget, GdkEventButton *event, gpointer data)
 {
-	printf("clicked!\n");
+	GtkTextIter iter;
+	gint x, y;
+	gtk_text_view_window_to_buffer_coords(GTK_TEXT_VIEW(text_view), GTK_TEXT_WINDOW_TEXT, event->x, event->y, &x, &y);
+	gtk_text_view_get_iter_at_location(GTK_TEXT_VIEW(text_view), &iter, x, y);
+	
+	GSList *list, *node;
+	list = gtk_text_iter_get_tags(&iter);
+	if(list != NULL) {
+	  foreach_slist_free(node, list) {
+			GtkTextTag *tag = node->data;
+			gchar *name;
+			g_object_get(G_OBJECT(tag), "name", &name, NULL);
+			if(strcmp(name, "link") == 0) {
+				printf("link found\n");
+				break;
+			}
+			g_free(name);
+		}
+	}
+	return FALSE;
+}
+
+static gboolean on_keypress(GtkWidget *widget, GdkEventKey *event, gpointer data)
+{
+	if(event->keyval == GDK_Return) {
+		printf("button!\n");
+	}
+	return FALSE;
 }
 
 static gboolean panel_focus_tab(GtkWidget *widget, GdkEvent *event, gpointer data)
@@ -65,6 +94,8 @@ void panel_init()
 	gtk_container_set_focus_child(GTK_CONTAINER(panel), scrollable_text);
 
 	g_signal_connect(geany->main_widgets->window, "key-release-event", G_CALLBACK(panel_focus_tab), NULL);
+	g_signal_connect(text_view, "button-press-event", G_CALLBACK(on_click), NULL);
+	//~ g_signal_connect(text_view, "key-press-event", G_CALLBACK(on_keypress), NULL);
 
 	error_tag = gtk_text_buffer_create_tag(buffer(), "error", "foreground", "#ff0000", NULL);
 	link_tag = gtk_text_buffer_create_tag(buffer(), "link", "foreground", "#0000ff", "underline", PANGO_UNDERLINE_SINGLE, NULL);
@@ -88,6 +119,7 @@ void panel_cleanup()
 void panel_prepare()
 {
 	gtk_text_buffer_set_text(buffer(), "", 0);
+	gtk_widget_hide(scrollable_table);
 }
 
 static void list_files(gchar *base, const gchar *filter)

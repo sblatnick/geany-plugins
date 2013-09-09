@@ -2,6 +2,7 @@
 #include <gdk/gdkkeysyms.h>
 #include <string.h>
 
+extern GtkWidget *scrollable_table;
 static GtkTreeStore *table;
 static GtkWidget *tree;
 static gboolean init;
@@ -18,10 +19,10 @@ void table_print(gchar *text, const gchar *tag)
 	if(init) {
 		init = FALSE;
 		
-/*		if(tree != NULL) {*/
-/*			gtk_container_remove(GTK_CONTAINER(scrollable_table), tree);*/
-/*			G_OBJECT_FREE(tree);*/
-/*		}*/
+		if(tree != NULL) {
+			gtk_container_remove(GTK_CONTAINER(scrollable_table), tree);
+			//G_OBJECT_FREE(tree);
+		}
 
 		table = gtk_tree_store_new(1, G_TYPE_STRING);
 		tree = gtk_tree_view_new_with_model(GTK_TREE_MODEL(table));

@@ -3,9 +3,9 @@
 #include <string.h>
 #include <stdlib.h>
 
-GeanyPlugin		 *geany_plugin;
-GeanyData			 *geany_data;
-GeanyFunctions	*geany_functions;
+GeanyPlugin *geany_plugin;
+GeanyData *geany_data;
+GeanyFunctions *geany_functions;
 
 static GRegex *trim_file, *trim_regex;
 static GtkWidget *entry, *panel, *label, *scrollable_table, *tree, *check_case;
@@ -27,49 +27,49 @@ enum
 
 static GtkWidget* find_entry(GtkContainer *container)
 {
-  GtkWidget *entry = NULL;
-  GList *node;
-  GList *children = gtk_container_get_children(container);
-  for(node = children; !entry && node; node = node->next) {
-    if(GTK_IS_ENTRY(node->data) && strcmp(gtk_widget_get_tooltip_text(GTK_WIDGET(node->data)), "Addressbar for example '/projects/my-project'") == 0) {
-      entry = node->data;
-    }
-    else if(GTK_IS_CONTAINER(node->data)) {
-      entry = find_entry(node->data);
-    }
-  }
-  g_list_free(children);
-  return entry;
+	GtkWidget *entry = NULL;
+	GList *node;
+	GList *children = gtk_container_get_children(container);
+	for(node = children; !entry && node; node = node->next) {
+		if(GTK_IS_ENTRY(node->data) && strcmp(gtk_widget_get_tooltip_text(GTK_WIDGET(node->data)), "Addressbar for example '/projects/my-project'") == 0) {
+			entry = node->data;
+		}
+		else if(GTK_IS_CONTAINER(node->data)) {
+			entry = find_entry(node->data);
+		}
+	}
+	g_list_free(children);
+	return entry;
 }
 
 static void get_path()
 {
-  if(first_run == 1) {
-    for(gint i = 0; i < gtk_notebook_get_n_pages(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook)); i++) {
-      GtkWidget   *page;
-      const gchar *page_name;
+	if(first_run == 1) {
+		for(gint i = 0; i < gtk_notebook_get_n_pages(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook)); i++) {
+			GtkWidget *page;
+			const gchar *page_name;
 
-      page = gtk_notebook_get_nth_page(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), i);
-      page_name = gtk_notebook_get_tab_label_text(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), page);
-      if(page_name && strcmp(page_name, "Tree Browser") == 0) {
-        treebrowser_entry = find_entry(GTK_CONTAINER(page));
-        break;
-      }
-    }
-  }
-  
-  if(treebrowser_entry == NULL) {
-    GeanyProject *project	= geany->app->project;
-	  if(project) {
-		  base_directory = project->base_path;
-	  }
-	  else {
-		  base_directory = geany->prefs->default_open_path;
-	  }  
-  }
-  else {
-    base_directory = gtk_entry_get_text(GTK_ENTRY(treebrowser_entry));
-  }
+			page = gtk_notebook_get_nth_page(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), i);
+			page_name = gtk_notebook_get_tab_label_text(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), page);
+			if(page_name && strcmp(page_name, "Tree Browser") == 0) {
+				treebrowser_entry = find_entry(GTK_CONTAINER(page));
+				break;
+			}
+		}
+	}
+	
+	if(treebrowser_entry == NULL) {
+		GeanyProject *project = geany->app->project;
+		if(project) {
+			base_directory = project->base_path;
+		}
+		else {
+			base_directory = geany->prefs->default_open_path;
+		}	
+	}
+	else {
+		base_directory = gtk_entry_get_text(GTK_ENTRY(treebrowser_entry));
+	}
 }
 
 static void cell_data(GtkTreeViewColumn *tree_column, GtkCellRenderer *render, GtkTreeModel *model, GtkTreeIter *iter, gpointer data)
@@ -129,7 +129,7 @@ static void quick_find()
 	gtk_tree_store_clear(list);
 	const gchar *text = gtk_entry_get_text(GTK_ENTRY(entry));
 	if(strcmp(text, "") == 0) {
-	  return;
+		return;
 	}
 	
 	get_path();
@@ -208,19 +208,19 @@ static void on_click(GtkButton* button, gpointer data)
 
 static void selected_row(GtkTreeSelection *selected, gpointer data)
 {
-	GtkTreeIter 		iter;
-	GtkTreeModel 		*model;	
+	GtkTreeIter iter;
+	GtkTreeModel *model;
 	if(gtk_tree_selection_get_selected(selected, &model, &iter))
-  {
-    gchar *line, *file;
-    gtk_tree_model_get(model, &iter, 1, &line, 2, &file, -1);
-    file = g_build_path(G_DIR_SEPARATOR_S, base_directory, file, NULL);
+	{
+		gchar *line, *file;
+		gtk_tree_model_get(model, &iter, 1, &line, 2, &file, -1);
+		file = g_build_path(G_DIR_SEPARATOR_S, base_directory, file, NULL);
 		GeanyDocument *doc = document_open_file(file, FALSE, NULL, NULL);
-    editor_goto_line(doc->editor, atoi(line) - 1, 0);
-    
-    g_free(line);
-    g_free(file);
-  }
+		editor_goto_line(doc->editor, atoi(line) - 1, 0);
+
+		g_free(line);
+		g_free(file);
+	}
 }
 
 void plugin_init(GeanyData *data)
@@ -283,8 +283,8 @@ void plugin_init(GeanyData *data)
 	text_column = gtk_tree_view_column_new_with_attributes("Text", render, NULL);
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), text_column);
 	//gtk_tree_view_column_pack_start(text_column, render, TRUE);
-	gtk_tree_view_column_add_attribute(text_column, render, "text", 3);	
-		
+	gtk_tree_view_column_add_attribute(text_column, render, "text", 3);
+
 	g_object_unref(GTK_TREE_MODEL(list));
 	GtkTreeSelection *select = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
 	g_signal_connect(select, "changed", G_CALLBACK(selected_row), NULL);
@@ -309,4 +309,3 @@ void plugin_cleanup(void)
 	g_regex_unref(trim_file);
 	g_regex_unref(trim_regex);
 }
-

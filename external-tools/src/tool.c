@@ -143,7 +143,7 @@ void reload_tools()
 
 int save_tool(Tool* tool)
 {
-  g_key_file_set_string(config, tool->id, "name", tool->name);
+	g_key_file_set_string(config, tool->id, "name", tool->name);
 	g_key_file_set_integer(config, tool->id, "output", tool->output);
 	g_key_file_set_boolean(config, tool->id, "save", tool->save);
 	g_key_file_set_boolean(config, tool->id, "menu", tool->menu);

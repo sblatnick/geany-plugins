@@ -1,9 +1,9 @@
 #include <geanyplugin.h>
 #include <gdk/gdkkeysyms.h>
 
-GeanyPlugin		 *geany_plugin;
-GeanyData			 *geany_data;
-GeanyFunctions	*geany_functions;
+GeanyPlugin *geany_plugin;
+GeanyData *geany_data;
+GeanyFunctions *geany_functions;
 
 static GtkWidget *dialog, *scrollable, *tree;
 static GtkTreeStore *list;
@@ -22,10 +22,10 @@ static gboolean include_path = FALSE;
 
 typedef struct
 {
-  gchar *text;
-  GtkWidget *entry;
-  const gchar *DEFAULT;
-  GRegex *regex;
+	gchar *text;
+	GtkWidget *entry;
+	const gchar *DEFAULT;
+	GRegex *regex;
 } RegexSetting;
 static RegexSetting pathRegexSetting = {NULL, NULL, "^\\.|^build$", NULL};
 static RegexSetting nameRegexSetting = {NULL, NULL, "^\\.|\\.(o|so|exe|class|pyc)$", NULL};
@@ -50,7 +50,7 @@ static void submit(
 {
 	GtkTreeSelection *selected = gtk_tree_view_get_selection(treeview);
 	GtkTreeIter iter;
-	GtkTreeModel *model;	
+	GtkTreeModel *model;
 	if(gtk_tree_selection_get_selected(selected, &model, &iter))
 	{
 		gchar *path, *name, *file;
@@ -136,7 +136,7 @@ static void quick_open()
 	GtkTreeViewColumn *path_column, *name_column;
 	GtkCellRenderer *renderLeft, *renderRight;
 
-	GeanyProject	 *project	 = geany->app->project;
+	GeanyProject *project = geany->app->project;
 	if(project) {
 		base_directory = project->base_path;
 	}
@@ -186,7 +186,7 @@ static void quick_open()
 	gtk_tree_view_column_add_attribute(path_column, renderRight, "text", 0);
 	gtk_tree_view_column_pack_start(name_column, renderLeft, TRUE);
 	gtk_tree_view_column_add_attribute(name_column, renderLeft, "text", 1);
-		
+
 	g_object_unref(list);
 	gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(tree), FALSE);
 
@@ -263,7 +263,7 @@ static void dialog_response(GtkDialog *configure, gint response, gpointer user_d
 
 static void set_default(GtkButton* button, gpointer data)
 {
-  RegexSetting *setting = data;
+	RegexSetting *setting = data;
 	gtk_entry_set_text(GTK_ENTRY(setting->entry), setting->DEFAULT);
 }
 
@@ -302,9 +302,9 @@ GtkWidget* plugin_configure(GtkDialog *configure)
 	gtk_box_pack_start(GTK_BOX(hbox_name), nameRegexSetting.entry, TRUE, TRUE, 2);
 	gtk_box_pack_start(GTK_BOX(hbox_name), button_default_name, FALSE, FALSE, 2);
 	gtk_box_pack_start(GTK_BOX(vbox), hbox_name, FALSE, FALSE, 2);
-	
+
 	gtk_widget_show_all(vbox);
-	
+
 	return vbox;
 }
 
@@ -314,7 +314,7 @@ void plugin_cleanup(void)
 	utils_write_file(conf, data);
 	g_free(data);
 	g_key_file_free(config);
-	
+
 	g_free(pathRegexSetting.text);
 	g_free(nameRegexSetting.text);
 	g_regex_unref(pathRegexSetting.regex);
