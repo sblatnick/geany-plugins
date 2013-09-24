@@ -325,7 +325,7 @@ static gboolean source_dispatch(G_GNUC_UNUSED GSource *source,
 	}
 
 	reading_pos = received->str;
- 	result = waitpid(gdb_pid, &status, WNOHANG);
+	result = waitpid(gdb_pid, &status, WNOHANG);
 
 	if (result == 0)
 	{

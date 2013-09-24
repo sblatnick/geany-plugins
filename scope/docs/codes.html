@@ -31,12 +31,12 @@
 
 <tr><td class="nowrap">&nbsp;</td><td class="tab">&nbsp;</td><td class="tab">&nbsp;</td></tr>
 
-<tr><td class="nowrap">02[01]&lt;scid&gt;-break-disable</td>
-	<td class="tab">un/check break enabled column</td>
+<tr><td class="nowrap">020&lt;scid&gt;-break-enable</td>
+	<td class="tab">check break enabled column</td>
 	<td class="tab">set breakpoint enabled column, remark breakpoint</td></tr>
 
-<tr><td class="nowrap">02[01]&lt;scid&gt;-break-disable</td>
-	<td class="tab">un/check break enabled column</td>
+<tr><td class="nowrap">021&lt;scid&gt;-break-disable</td>
+	<td class="tab">uncheck break enabled column</td>
 	<td class="tab">set breakpoint enabled column, remark breakpoint</td></tr>
 
 <tr><td class="nowrap">022&lt;id&gt;-break-after</td>
@@ -109,7 +109,7 @@
 
 <tr><td class="nowrap">02&lt;scid&gt;-var-evaluate-expression</td>
 	<td class="tab"><em>Refresh</em> inspects</td>
-	<td class="tab">update register value</td></tr>
+	<td class="tab">update inspect value</td></tr>
 
 <tr><td class="nowrap">&nbsp;</td><td class="tab">&nbsp;</td><td class="tab">&nbsp;</td></tr>
 
@@ -135,9 +135,13 @@
 	<td class="tab">views idle update</td>
 	<td class="tab">(print instruction in debug console)</td></tr>
 
-<tr><td class="nowrap">04-var-update</td>
+<tr><td class="nowrap">040-var-update</td>
 	<td class="tab">views idle update</td>
 	<td class="tab">(partial) inspects update</td></tr>
+
+<tr><td class="nowrap">041-var-update</td>
+	<td class="tab"><em>Refresh</em> inspects</td>
+	<td class="tab">(prepare gdb for -var-evaluate-expression)</td></tr>
 
 <tr><td class="nowrap">04&lt;tid&gt;-stack-list-frames</td>
 	<td class="tab">views idle update</td>

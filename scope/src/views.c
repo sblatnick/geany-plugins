@@ -114,7 +114,11 @@ void views_context_dirty(DebugState state, gboolean frame_only)
 	}
 }
 
-static ViewIndex view_current = 0;
+#ifdef G_OS_UNIX
+static ViewIndex view_current = VIEW_TERMINAL;
+#else
+static ViewIndex view_current = VIEW_THREADS;
+#endif
 
 void views_clear(void)
 {
@@ -258,8 +262,7 @@ static void on_editing_started(G_GNUC_UNUSED GtkCellRenderer *cell, GtkCellEdita
 		gtk_entry_set_cursor_hadjustment(GTK_ENTRY(editable), hadjustment);
 }
 
-static gboolean on_display_editable_map_event(GtkWidget *widget, G_GNUC_UNUSED GdkEvent *event,
-	gchar *display)
+static gboolean on_display_editable_map(GtkWidget *widget, gchar *display)
 {
 	gint position = 0;
 	GtkEditable *editable = GTK_EDITABLE(widget);
@@ -282,7 +285,7 @@ static void on_display_editing_started(G_GNUC_UNUSED GtkCellRenderer *cell,
 	scp_tree_store_get_iter_from_string(store, &iter, path_str);
 	scp_tree_store_get(store, &iter, COLUMN_VALUE, &value, COLUMN_HB_MODE, &hb_mode, -1);
 	/* scrolling editable to the proper position is left as an exercise for the reader */
-	g_signal_connect(editable, "map-event", G_CALLBACK(on_display_editable_map_event),
+	g_signal_connect(editable, "map", G_CALLBACK(on_display_editable_map),
 		parse_get_display_from_7bit(value, hb_mode, MR_EDITVC));
 }
 
@@ -605,6 +608,9 @@ static gulong switch_sidebar_page_id;
 
 void views_init(void)
 {
+	if (pref_var_update_bug)
+		views[VIEW_INSPECT].state = DS_DEBUG;
+
 	command_dialog = dialog_connect("command_dialog");
 	command_view = get_widget("command_view");
 	command_text = gtk_text_view_get_buffer(GTK_TEXT_VIEW(command_view));

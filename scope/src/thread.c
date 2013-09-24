@@ -38,7 +38,7 @@ enum
 	GROUP_PID
 };
 
-static ScpTreeStore *groups = NULL;
+static ScpTreeStore *groups;
 
 void on_thread_group_started(GArray *nodes)
 {
