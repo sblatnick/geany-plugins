@@ -8,18 +8,132 @@ extern GeanyPlugin *geany_plugin;
 extern GeanyData *geany_data;
 extern GeanyFunctions *geany_functions;
 
-extern gchar *tools;
-extern GRegex *name_regex, *path_regex, *match_regex;
+extern const gchar *tools;
 
 static GtkWidget *panel; //All contents of the panel
 static GtkWidget *label;
 static GtkWidget *text_view;
 static GtkWidget *scrollable_text, *scrollable_table;
-static GtkTextTag *error_tag, *link_tag;
 
-static GtkTextBuffer* buffer()
+typedef struct
 {
-	return gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+	const gchar *text;
+	GRegex *regex;
+} RegexSetting;
+static RegexSetting fileRegexSetting = {"[\\w./-]+\\.[\\w./-]+(:\\d+)?", NULL};
+
+static void open_path(gchar *path, gchar *line)
+{
+	GeanyDocument *doc = document_open_file(path, FALSE, NULL, NULL);
+	if(line != NULL) {
+		editor_goto_line(doc->editor, atoi(line) - 1, 0);
+	}
+}
+
+static gboolean find_files(gchar *base, const gchar *file, gchar* line, gboolean open)
+{
+	gchar *path = g_build_path(G_DIR_SEPARATOR_S, base, file, NULL);
+	if(g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
+		if(open) {
+			open_path(path, line);
+		}
+		g_free(path);
+		return TRUE;
+	}
+	g_free(path);
+	
+	GDir *dir;
+	gchar const *file_name;
+	dir = g_dir_open(base, 0, NULL);
+	
+	foreach_dir(file_name, dir)
+	{
+		gchar *path = g_build_path(G_DIR_SEPARATOR_S, base, file_name, NULL);
+		if(g_file_test(path, G_FILE_TEST_IS_DIR)) {
+			if(find_files(path, file, line, open)) {
+				g_dir_close(dir);
+				g_free(path);
+				return TRUE;
+			}
+		}
+		g_free(path);
+	}
+	g_dir_close(dir);
+	return FALSE;
+}
+
+static gboolean file_found(gchar *file_path, gboolean open)
+{
+	gchar **column = g_strsplit(file_path, ":", 2);
+	gchar *file = column[0];
+	gchar *line = column[1];
+
+	//Find in abs path
+	if(g_path_is_absolute(file) && g_file_test(file, G_FILE_TEST_IS_REGULAR)) {
+		if(open) {
+			open_path(file, line);
+		}
+		g_strfreev(column);
+		return TRUE;
+	}
+
+	//Find in current doc path:
+	GeanyDocument *doc = document_get_current();
+	gchar *current = g_path_get_dirname(doc->file_name);
+	if(find_files(current, file, line, open)) {
+		g_free(current);
+		g_strfreev(column);
+		return TRUE;
+	}
+	g_free(current);
+
+	//Find in Project Directory
+	gchar *base_directory;
+	GeanyProject *project = geany->app->project;
+	if(project) {
+		base_directory = project->base_path;
+	}
+	else {
+		base_directory = geany->prefs->default_open_path;
+	}
+	if(find_files(base_directory, file, line, open)) {
+		g_strfreev(column);
+		return TRUE;
+	}
+	g_strfreev(column);
+	return FALSE;
+}
+
+static void goto_link(gchar *url)
+{
+	if(strcmp("", url) != 0) {
+		file_found(url, TRUE);
+	}
+}
+
+static gchar* get_link_at_iter(GtkTextIter in)
+{
+	GtkTextIter iter = in;
+	gchar *text = "";
+	GSList *list, *node;
+	list = gtk_text_iter_get_tags(&iter);
+	if(list != NULL) {
+		foreach_slist_free(node, list) {
+			GtkTextTag *tag = node->data;
+			gchar *name;
+			g_object_get(G_OBJECT(tag), "name", &name, NULL);
+			if(strcmp(name, "link") == 0) {
+				GtkTextIter end = iter;
+				gtk_text_iter_backward_to_tag_toggle(&iter, tag);
+				gtk_text_iter_forward_to_tag_toggle(&end, tag);
+				text = gtk_text_iter_get_text(&iter, &end);
+				g_free(name);
+				break;
+			}
+			g_free(name);
+		}
+	}
+	return text;
 }
 
 static gboolean on_click(GtkWidget *widget, GdkEventButton *event, gpointer data)
@@ -29,27 +143,20 @@ static gboolean on_click(GtkWidget *widget, GdkEventButton *event, gpointer data
 	gtk_text_view_window_to_buffer_coords(GTK_TEXT_VIEW(text_view), GTK_TEXT_WINDOW_TEXT, event->x, event->y, &x, &y);
 	gtk_text_view_get_iter_at_location(GTK_TEXT_VIEW(text_view), &iter, x, y);
 	
-	GSList *list, *node;
-	list = gtk_text_iter_get_tags(&iter);
-	if(list != NULL) {
-	  foreach_slist_free(node, list) {
-			GtkTextTag *tag = node->data;
-			gchar *name;
-			g_object_get(G_OBJECT(tag), "name", &name, NULL);
-			if(strcmp(name, "link") == 0) {
-				printf("link found\n");
-				break;
-			}
-			g_free(name);
-		}
-	}
+	gchar *text = get_link_at_iter(iter);
+	goto_link(text);
 	return FALSE;
 }
 
 static gboolean on_keypress(GtkWidget *widget, GdkEventKey *event, gpointer data)
 {
 	if(event->keyval == GDK_Return) {
-		printf("button!\n");
+		GtkTextIter iter;
+		GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+		GtkTextMark *cursor = gtk_text_buffer_get_mark(buffer, "insert");
+		gtk_text_buffer_get_iter_at_mark(buffer, &iter, cursor);
+		gchar *link = get_link_at_iter(iter);
+		goto_link(link);
 	}
 	return FALSE;
 }
@@ -95,17 +202,13 @@ void panel_init()
 
 	g_signal_connect(geany->main_widgets->window, "key-release-event", G_CALLBACK(panel_focus_tab), NULL);
 	g_signal_connect(text_view, "button-press-event", G_CALLBACK(on_click), NULL);
-	//~ g_signal_connect(text_view, "key-press-event", G_CALLBACK(on_keypress), NULL);
+	g_signal_connect(text_view, "key-press-event", G_CALLBACK(on_keypress), NULL);
 
-	error_tag = gtk_text_buffer_create_tag(buffer(), "error", "foreground", "#ff0000", NULL);
-	link_tag = gtk_text_buffer_create_tag(buffer(), "link", "foreground", "#0000ff", "underline", PANGO_UNDERLINE_SINGLE, NULL);
-
-/*	GType param_types[1];*/
-/*	param_types[0] = G_TYPE_POINTER;*/
-/*	*/
-/*	g_signal_newv("clicked", G_TYPE(error_tag->g_class->g_type), G_SIGNAL_RUN_FIRST, NULL, NULL, NULL,*/
-/*		NULL, G_TYPE_NONE, 1, param_types);*/
-/*	g_signal_connect(link_tag, "clicked", G_CALLBACK(click_link), NULL);*/
+	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+	gtk_text_buffer_create_tag(buffer, "error", "foreground", "#ff0000", NULL);
+	gtk_text_buffer_create_tag(buffer, "link", "foreground", "#0000ff", "underline", PANGO_UNDERLINE_SINGLE, NULL);
+	
+	fileRegexSetting.regex = g_regex_new(fileRegexSetting.text, G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
 }
 
 void panel_cleanup()
@@ -114,54 +217,55 @@ void panel_cleanup()
 		GTK_NOTEBOOK(geany->main_widgets->message_window_notebook),
 		gtk_notebook_page_num(GTK_NOTEBOOK(geany->main_widgets->message_window_notebook), panel)
 	);
+
+	g_regex_unref(fileRegexSetting.regex);
 }
 
 void panel_prepare()
 {
-	gtk_text_buffer_set_text(buffer(), "", 0);
+	gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view)), "", 0);
 	gtk_widget_hide(scrollable_table);
-}
-
-static void list_files(gchar *base, const gchar *filter)
-{
-	//TODO (incomplete file searching copied from quick-opener)
-	GDir *dir;
-	gchar const *file_name;
-	gchar *path;
-	dir = g_dir_open(base, 0, NULL);
-	foreach_dir(file_name, dir)
-	{
-		path = g_build_path(G_DIR_SEPARATOR_S, base, file_name, NULL);
-
-		if(g_file_test(path, G_FILE_TEST_IS_DIR)) {
-			if(g_regex_match(path_regex, file_name, 0, NULL)) {
-				continue;
-			}
-			list_files(path, filter);
-		}
-		else {
-			if(g_regex_match(name_regex, file_name, 0, NULL)) {
-				continue;
-			}
-			GRegex *regex = g_regex_new(filter, G_REGEX_CASELESS, 0, NULL);
-			if(regex != NULL && g_regex_match(regex, file_name, 0, NULL)) {
-				//TODO
-			}
-		}
-	}
-	g_dir_close(dir);
 }
 
 void panel_print(gchar *text, const gchar *tag)
 {
-	GtkTextIter iter;
-	gtk_text_buffer_get_end_iter(buffer(), &iter);
-	gtk_text_buffer_insert_with_tags_by_name(buffer(), &iter, text, -1, tag, NULL);
+	GtkTextIter iter, start, end;
+	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+	gtk_text_buffer_get_end_iter(buffer, &iter);
+	if(tag == NULL) {
+		gtk_text_buffer_insert(buffer, &iter, text, -1);
+	}
+	else {
+		gtk_text_buffer_insert_with_tags_by_name(buffer, &iter, text, -1, tag, NULL);
+	}
+	end = iter;
+	gtk_text_iter_backward_line(&iter);
+	start = iter;
 
-	//TODO look for files for links
+	gchar *line_text = gtk_text_iter_get_text(&start, &end);
+	GMatchInfo *info;
+	if(g_regex_match(fileRegexSetting.regex, line_text, 0, &info)) {
+		while(g_match_info_matches(info))
+		{
+			gchar *file_path = g_match_info_fetch(info, 0);
+			if(file_found(file_path, FALSE)) {
+				gint start_pos, end_pos;
+				g_match_info_fetch_pos(info, 0, &start_pos, &end_pos);
+				GtkTextIter start = iter;
+				GtkTextIter end = iter;
+				gtk_text_iter_forward_chars(&start, start_pos);
+				gtk_text_iter_forward_chars(&end, end_pos);
+				gtk_text_buffer_apply_tag_by_name(buffer, "link", &start, &end);
+			}
+			g_free(file_path);
+			g_match_info_next(info, NULL);
+		}
+	}	
+	g_match_info_free(info);
+	g_free(line_text);
 
 	//Scroll to bottom:
 	GtkTextMark *mark;
-	mark = gtk_text_buffer_get_insert(buffer());
+	mark = gtk_text_buffer_get_insert(buffer);
 	gtk_text_view_scroll_to_mark(GTK_TEXT_VIEW(text_view), mark, 0.0, FALSE, 0.0, 0.0);
 }

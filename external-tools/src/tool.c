@@ -5,12 +5,10 @@ extern GeanyPlugin *geany_plugin;
 extern GeanyData *geany_data;
 extern GeanyFunctions *geany_functions;
 
-extern gchar *tools, *conf;
+extern const gchar *tools, *conf;
 static GKeyFile *config;
 static GeanyKeyGroup *key_group;
-static gint shortcutCount = 0;
-static gint menuCount = 0;
-static GtkWidget **menu_tools;
+static gint shortcutCount, menuCount;
 
 static void key_callback(G_GNUC_UNUSED guint key_id)
 {
@@ -29,9 +27,12 @@ Tool* new_tool()
 	return tool;
 }
 
-void free_tool(Tool* tool)
+void free_tool(Tool* tool, gboolean purge)
 {
-	g_key_file_remove_group(config, tool->id, NULL);
+  if(purge) {
+	  g_key_file_remove_group(config, tool->id, NULL);
+	}
+	g_free(tool->id);
 	g_free(tool->name);
 	g_slice_free(Tool, tool);
 }
@@ -79,18 +80,20 @@ void clean_tools()
 	gchar *data = g_key_file_to_data(config, NULL, NULL);
 	utils_write_file(conf, data);
 	g_free(data);
-	g_key_file_free(config);
 
 	gint i = 0;
 	while(i < menuCount) {
 		gtk_container_remove(GTK_CONTAINER(geany->main_widgets->tools_menu), menu_tools[i]);
 		i++;
 	}
+	i = 0;
+	while(i < shortcutCount) {
+		free_tool(shortcut_tools[i], FALSE);
+		i++;
+	}
 
 	shortcutCount = 0;
 	menuCount = 0;
-	g_free(shortcut_tools);
-	g_free(menu_tools);
 }
 
 Tool* load_tool(gchar *id)
@@ -128,12 +131,17 @@ void load_tools(int (*callback)(Tool*))
 
 void reload_tools()
 {
+	shortcutCount = 0;
+	menuCount = 0;
+	if(config != NULL) {
+		g_key_file_free(config);
+	}
 	config = g_key_file_new();
 	g_key_file_load_from_file(config, conf, G_KEY_FILE_NONE, NULL);
 	load_tools(count_tools);
 	key_group = plugin_set_key_group(geany_plugin, "external_tools_keyboard_shortcut", shortcutCount + 1, NULL);
-	shortcut_tools = (Tool **) g_malloc(shortcutCount);
-	menu_tools = (GtkWidget **) g_malloc(menuCount);
+	shortcut_tools = (Tool **) g_malloc(shortcutCount * sizeof(Tool*));
+	menu_tools = (GtkWidget **) g_malloc(menuCount * sizeof(GtkWidget*));
 	shortcutCount = 0;
 	menuCount = 0;
 	load_tools(setup_tools);

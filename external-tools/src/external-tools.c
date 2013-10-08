@@ -15,8 +15,7 @@ GeanyFunctions *geany_functions;
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("External Tools", "Allow external tools to be integrated into many common actions.", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
 
-gchar *path, *conf, *tools;
-const char *home;
+const gchar *path, *conf, *tools, *home;
 GRegex *name_regex, *path_regex, *match_regex;
 
 static GtkWidget *tool_menu_item = NULL;
@@ -57,8 +56,5 @@ void plugin_cleanup(void)
 	g_regex_unref(match_regex);
 	clean_tools();
 	gtk_container_remove(GTK_CONTAINER(geany->main_widgets->tools_menu), tool_menu_item);
-	g_free(path);
-	g_free(conf);
-	g_free(tools);
 	panel_cleanup();
 }
