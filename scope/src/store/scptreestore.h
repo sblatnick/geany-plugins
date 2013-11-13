@@ -120,6 +120,7 @@ gboolean scp_tree_store_iter_nth_child(ScpTreeStore *store, GtkTreeIter *iter,
 	scp_tree_store_iter_nth_child((store), (iter), NULL, 0)
 gboolean scp_tree_store_iter_parent(ScpTreeStore *store, GtkTreeIter *iter,
 	GtkTreeIter *child);
+void scp_tree_store_foreach(ScpTreeStore *store, GtkTreeModelForeachFunc func, gpointer gdata);
 
 /* DND */
 gboolean scp_tree_store_row_draggable(ScpTreeStore *store, GtkTreePath *path);
@@ -156,6 +157,7 @@ typedef gint (*ScpTreeStoreTraverseFunc)(ScpTreeStore *store, GtkTreeIter *iter,
 	gpointer gdata);
 gboolean scp_tree_store_traverse(ScpTreeStore *store, gboolean sublevels, GtkTreeIter *iter,
 	GtkTreeIter *parent, ScpTreeStoreTraverseFunc func, gpointer gdata);
+void scp_tree_store_register_dynamic(void);
 
 G_END_DECLS
 

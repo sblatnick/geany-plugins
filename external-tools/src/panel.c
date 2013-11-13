@@ -179,6 +179,7 @@ void panel_init()
 	label = gtk_label_new(_("Tools"));
 	panel = gtk_vbox_new(FALSE, 6);
 	text_view = gtk_text_view_new();
+	gtk_widget_modify_font(GTK_WIDGET(text_view), pango_font_description_from_string("Monospace"));
 	gtk_text_view_set_editable(GTK_TEXT_VIEW(text_view), FALSE);
 	scrollable_text = gtk_scrolled_window_new(NULL, NULL);
 	scrollable_table = gtk_scrolled_window_new(NULL, NULL);

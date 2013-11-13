@@ -1,3 +1,39 @@
+2013-10-26  Dimitar Zhekov  <dimitar.zhekov@gmail.com>
+
+ * src/memory.c:
+   Handle offset (albeit it seems that gdb just adds it to start).
+   Fix count for memory block with holes.
+   Use g_ascii_strtoull() instead of sscanf.
+ * src/prefs.c:
+   Removed an unused structure.
+
+
+2013-10-12  Dimitar Zhekov  <dimitar.zhekov@gmail.com>
+
+ * src/debug.c:
+   Fixed a lapsus which prevented gdb stdout resync on overflow.
+ * src/memory.c:
+   Improved re-selection of the current line.
+ * src/memory.c, src/pref.c:
+   Decreased the maximum memory block size to 15.5K and increased
+   the default gdb stdout buffer size to 32K to match each other.
+
+
+2013-09-25  Dimitar Zhekov  <dimitar.zhekov@gmail.com>
+
+ * src/scope.c:
+   Register ScpTreeStore dynamically, making Scope unloadable again.
+ * src/break.c, src/conterm.c, src/debug.c, src/inspect.c,
+   src/memory.c, src/menu.c, src/parse.c, src/program.c,
+   src/register.c, src/scope.c, src/stack.c, src/thread.c,
+   src/tooltip.c, src/tooltip.h, src/views.c:
+   Reverted the startup variable initialization from 2013-07-25.
+ * src/conterm.c, src/inspect.c, src/prefs.c, src/watch.c:
+   Small startup changes.
+ * docs/scope.html, src/scope.c:
+   Increased version to 0.93.
+
+
 2013-09-07  Dimitar Zhekov  <dimitar.zhekov@gmail.com>
 
  * data/scope.glade:
@@ -55,8 +91,8 @@
    src/memory.c, src/menu.c, src/parse.c, src/program.c,
    src/register.c, src/scope.c, src/stack.c, src/thread.c,
    src/tooltip.c, src/tooltip.h, src/views.c:
-   Explicitly initialize all sensitive global and static variables,
-   since reloading the plugin will not do that.
+   Explicitly initialize all sensitive global and static variables on
+   startup, since reactivating a resident plugin will not do that.
  * src/store/scptreestore.c:
    Fixed indentation.
  * docs/scope.html, src/scope.c:
