@@ -206,12 +206,12 @@ static GSList *find_range(ScintillaObject *sci, gint flags, struct Sci_TextToFin
 gint mark_all(GeanyDocument *doc, const gchar *search_text, gint indicator)
 {
 	scintilla_send_message(doc->editor->sci, SCI_INDICSETSTYLE, QUICK_SEARCH_INDICATOR, INDIC_ROUNDBOX);
-	scintilla_send_message(doc->editor->sci, SCI_INDICSETFORE, QUICK_SEARCH_INDICATOR, 0x66ee66); //weird: 0xBBGGRR
-	scintilla_send_message(doc->editor->sci, SCI_INDICSETALPHA, QUICK_SEARCH_INDICATOR, 100);
+	scintilla_send_message(doc->editor->sci, SCI_INDICSETFORE, QUICK_SEARCH_INDICATOR, 0x88fe88); //weird: 0xBBGGRR
+	scintilla_send_message(doc->editor->sci, SCI_INDICSETALPHA, QUICK_SEARCH_INDICATOR, 70);
 
 	scintilla_send_message(doc->editor->sci, SCI_INDICSETSTYLE, SELECTED_SEARCH_INDICATOR, INDIC_ROUNDBOX);
-	scintilla_send_message(doc->editor->sci, SCI_INDICSETFORE, SELECTED_SEARCH_INDICATOR, 0xeeee66);
-	scintilla_send_message(doc->editor->sci, SCI_INDICSETALPHA, SELECTED_SEARCH_INDICATOR, 100);
+	scintilla_send_message(doc->editor->sci, SCI_INDICSETFORE, SELECTED_SEARCH_INDICATOR, 0xfefe88);
+	scintilla_send_message(doc->editor->sci, SCI_INDICSETALPHA, SELECTED_SEARCH_INDICATOR, 70);
 
 	gint count = 0;
 	struct Sci_TextToFind ttf;
