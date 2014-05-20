@@ -3,6 +3,7 @@ AC_DEFUN([GP_CHECK_GEANYPY],
     GP_ARG_DISABLE([Geanypy], [auto])
     GP_CHECK_PLUGIN_GTK2_ONLY([Geanypy])
     GP_CHECK_PLUGIN_DEPS([Geanypy], [PYGTK], [pygtk-2.0])
+    GP_CHECK_PLUGIN_DEPS([Geanypy], [GMODULE], [gmodule-2.0])
     dnl FIXME: Checks for Python below should gracefully disable the plugin
     dnl        if they don't succeed and enable_geanypy is set to `auto`.
     dnl        However, since these macros don't seem to gracefully handle
@@ -17,6 +18,16 @@ AC_DEFUN([GP_CHECK_GEANYPY],
         AC_DEFINE_UNQUOTED([GEANYPY_PYTHON_LIBRARY],
                            ["$PYTHON_LIBRARY"],
                            [Location of Python library to dlopen()])
+
+        dnl check for C flags we wish to use
+        GEANYPY_CFLAGS=
+        for flag in -fno-strict-aliasing \
+                    -Wno-write-strings \
+                    -Wno-long-long
+        do
+            GP_CHECK_CFLAG([$flag], [GEANYPY_CFLAGS="${GEANYPY_CFLAGS} $flag"])
+        done
+        AC_SUBST([GEANYPY_CFLAGS])
     ])
     GP_COMMIT_PLUGIN_STATUS([Geanypy])
     AC_CONFIG_FILES([

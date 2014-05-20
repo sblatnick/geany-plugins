@@ -31,14 +31,14 @@ RequestExecutionLevel highest ; set execution level for Windows Vista
 ; helper defines  ;
 ;;;;;;;;;;;;;;;;;;;
 !define PRODUCT_NAME "Geany-Plugins"
-!define PRODUCT_VERSION "1.23"
-!define PRODUCT_VERSION_ID "1.23.0.0"
+!define PRODUCT_VERSION "1.25"
+!define PRODUCT_VERSION_ID "1.25.0.0"
 !define PRODUCT_PUBLISHER "The Geany developer team"
 !define PRODUCT_WEB_SITE "http://www.geany.org/"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_DIR_REGKEY "Software\Geany-Plugins"
 !define GEANY_DIR_REGKEY "Software\Geany"
-!define REQUIRED_GEANY_VERSION "1.23"
+!define REQUIRED_GEANY_VERSION "1.24"
 !define RESOURCEDIR "geany-plugins-${PRODUCT_VERSION}"
 
 ;;;;;;;;;;;;;;;;;;;;;
@@ -70,7 +70,7 @@ Var UNINSTDIR
 
 !define MUI_ABORTWARNING
 ; FIXME hard-coded path...should we add geany.ico to the geany-plugins repo?
-!define MUI_ICON "\geany_svn\icons\geany.ico"
+!define MUI_ICON "..\geany\icons\geany.ico"
 !define MUI_UNICON "${NSISDIR}\Contrib\Graphics\Icons\modern-uninstall-full.ico"
 
 ; Welcome page
@@ -149,8 +149,10 @@ Section Uninstall
 	Delete "$INSTDIR\ReadMe.Windows.txt"
 	Delete "$INSTDIR\uninst-plugins.exe"
 	Delete "$INSTDIR\lib\addons.dll"
+	Delete "$INSTDIR\lib\autoclose.dll"
 	Delete "$INSTDIR\lib\codenav.dll"
 	Delete "$INSTDIR\lib\commander.dll"
+	Delete "$INSTDIR\lib\defineformat.dll"
 	Delete "$INSTDIR\lib\geanydoc.dll"
 	Delete "$INSTDIR\lib\geanyextrasel.dll"
 	Delete "$INSTDIR\lib\geanygendoc.dll"
@@ -166,6 +168,8 @@ Section Uninstall
 	Delete "$INSTDIR\lib\geanyvc.dll"
 	Delete "$INSTDIR\lib\geniuspaste.dll"
 	Delete "$INSTDIR\lib\gproject.dll"
+	Delete "$INSTDIR\lib\pairtaghighlighter.dll"
+	Delete "$INSTDIR\lib\pohelper.dll"
 	Delete "$INSTDIR\lib\pretty-printer.dll"
 	Delete "$INSTDIR\lib\scope.dll"
 	Delete "$INSTDIR\lib\shiftcolumn.dll"
@@ -174,7 +178,6 @@ Section Uninstall
 	Delete "$INSTDIR\lib\treebrowser.dll"
 	Delete "$INSTDIR\lib\updatechecker.dll"
 	Delete "$INSTDIR\lib\xmlsnippets.dll"
-
 
 	Delete "$INSTDIR\bin\ctpl-2.dll"
 	Delete "$INSTDIR\bin\libenchant.dll"

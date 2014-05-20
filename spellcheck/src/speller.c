@@ -133,7 +133,7 @@ static gint sc_speller_check_word(GeanyDocument *doc, gint line_number, const gc
 	g_return_val_if_fail(word != NULL, 0);
 	g_return_val_if_fail(start_pos >= 0 && end_pos >= 0, 0);
 
-	if (! NZV(word))
+	if (EMPTY(word))
 		return 0;
 
 	/* ignore numbers or words starting with digits */
@@ -338,7 +338,7 @@ gchar *sc_speller_get_default_lang(void)
 	const gchar *lang = g_getenv("LANG");
 	gchar *result = NULL;
 
-	if (NZV(lang))
+	if (! EMPTY(lang))
 	{
 		if (*lang == 'C' || *lang == 'c')
 			lang = "en";
@@ -497,7 +497,7 @@ void sc_speller_reinit_enchant_dict(void)
 
 	/* Check if the stored default dictionary is (still) available, fall back to the first
 	 * one in the list if not */
-	if (! NZV(lang) || ! check_default_lang())
+	if (EMPTY(lang) || ! check_default_lang())
 	{
 		if (sc_info->dicts->len > 0)
 		{
@@ -510,7 +510,7 @@ void sc_speller_reinit_enchant_dict(void)
 	}
 
 	/* Request new dict object */
-	if (NZV(lang))
+	if (! EMPTY(lang))
 		sc_speller_dict = enchant_broker_request_dict(sc_speller_broker, lang);
 	else
 		sc_speller_dict = NULL;
@@ -845,41 +845,34 @@ gboolean sc_speller_is_text(GeanyDocument *doc, gint pos)
 				case SCE_H_SGML_DOUBLESTRING:
 				case SCE_H_SGML_SIMPLESTRING:
 				case SCE_H_SGML_1ST_PARAM_COMMENT:
-				case SCE_HJ_DEFAULT:
 				case SCE_HJ_COMMENT:
 				case SCE_HJ_COMMENTLINE:
 				case SCE_HJ_COMMENTDOC:
 				case SCE_HJ_DOUBLESTRING:
 				case SCE_HJ_SINGLESTRING:
 				case SCE_HJ_STRINGEOL:
-				case SCE_HB_DEFAULT:
 				case SCE_HB_COMMENTLINE:
 				case SCE_HB_STRING:
 				case SCE_HB_STRINGEOL:
-				case SCE_HBA_DEFAULT:
 				case SCE_HBA_COMMENTLINE:
 				case SCE_HBA_STRING:
 				case SCE_HBA_STRINGEOL:
-				case SCE_HJA_DEFAULT:
 				case SCE_HJA_COMMENT:
 				case SCE_HJA_COMMENTLINE:
 				case SCE_HJA_COMMENTDOC:
 				case SCE_HJA_DOUBLESTRING:
 				case SCE_HJA_SINGLESTRING:
 				case SCE_HJA_STRINGEOL:
-				case SCE_HP_DEFAULT:
 				case SCE_HP_COMMENTLINE:
 				case SCE_HP_STRING:
 				case SCE_HP_CHARACTER:
 				case SCE_HP_TRIPLE:
 				case SCE_HP_TRIPLEDOUBLE:
-				case SCE_HPA_DEFAULT:
 				case SCE_HPA_COMMENTLINE:
 				case SCE_HPA_STRING:
 				case SCE_HPA_CHARACTER:
 				case SCE_HPA_TRIPLE:
 				case SCE_HPA_TRIPLEDOUBLE:
-				case SCE_HPHP_DEFAULT:
 				case SCE_HPHP_SIMPLESTRING:
 				case SCE_HPHP_HSTRING:
 				case SCE_HPHP_COMMENT:

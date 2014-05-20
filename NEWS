@@ -1,3 +1,112 @@
+Geany Plugins 1.24 (2014-04-13)
+
+    Known issues
+    * If the Geanypy plugin is closed when any Python plugins are still
+      running it may cause a crash.
+    * Closing Geany having GeanyLaTeX and Devhelp-plugin active, might
+      cause a not clean shutdown of Geany
+
+    General:
+    * Depend on Geany 1.24
+    * New plugin Pohelper
+    * New plugin PairTagHighlighter
+    * New plugin Autoclose
+    * New plugin Geanypy (Python bindings)
+    * New plugin Defineformat
+    * Build system improvements
+
+    Commander:
+    * Add Gtk3 support
+
+    Debugger:
+    * Fixing a crash when re-loading plugin
+
+    GeanyGenDoc:
+    * Add Gtk3 support
+    * Fix a memory leak
+
+    GeanyExtraSel:
+    * Add "Toggle Rectangular/Stream"
+
+    GeanyInsertNum:
+    * Add Gtk3 support
+    * Increase maxlines to 250000
+
+    GeanyLipsum:
+    * Add Gtk3 support
+    * Ensure whitespace between repetitions of Lorem Ipsum text
+
+    GeanyLua:
+    * Add Gtk3 support
+    * Re-enable build with C89
+
+    GeanyMiniScript:
+    * Add Gtk3 support
+
+    GeanyPG:
+    * Improve portability and check for system requirements
+
+    GeanyVC:
+    * Add support for Subversion 1.7
+    * Limit the display of diff output to 16 KB to not freeze the UI on
+      huge commit-diffs
+    * Show line and column of the cursor in the commit
+      message text window
+
+    GProject:
+    * Add Gtk3 support
+    * Display content-type-specific icons for files in the sidebar
+    * Make toolbar buttons insensitive when no files displayed
+    * Smaller fixes and improvements
+
+    Markdown:
+    * Add Gtk3 support
+    * Fix scroll jumping behavior
+
+    Multiterm:
+    * Implement the other config VTE properties
+
+    Prettyprinter:
+    * Add Gtk3 support
+
+    Scope:
+    * Add Gtk3 support
+    * Add support for registers
+    * Various fixes and improvements
+
+    Shiftcolumn:
+    * Removed default keybindings
+
+    Spellcheck:
+    * Add Gtk3 support
+    * Fix check for default language if LANG contains UTF-8
+    * Remove check while typing idle callback when unloading the plugin
+      (closing #96)
+    * Improve stripping of whitespace and punctuation characters
+      (fixes #98)
+    * Fix crash when closing a document quickly after modifying it
+
+    Tableconvert:
+    * Add support for HTML tables in markdown files
+
+    TreeBrowser:
+    * Add Gtk3 support
+    * Don't collapse expanded child of node when node gets selected
+    * Add and improve some keybindings
+    * Add a way to open newly created files
+    * Focus editor on file open
+
+    Updatechecker:
+    * Fix comparing major versions
+
+    WebHelper:
+    * Add Gtk3 support
+
+    Internationalization:
+    * Update translations: de, es, fr, nl, ru, tr
+    * New translations: it
+
+
 Geany Plugins 1.23 (2013-03-10)
 
     * Depend on Geany 1.23
