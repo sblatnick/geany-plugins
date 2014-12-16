@@ -114,8 +114,10 @@ def configure(conf):
     setup_makefile(conf)
     conf.write_config_header('config.h')
 
+    if conf.env['CC_NAME'] == 'gcc' and '-O' not in ''.join(conf.env['CFLAGS']):
+        conf.env.append_value('CFLAGS', ['-O2'])
     # enable debug when compiling from VCS
-    if revision > 0:
+    if revision is not None:
         conf.env.append_value('CFLAGS', '-g -DDEBUG'.split())  # -DGEANY_DISABLE_DEPRECATED
 
     # summary
@@ -123,12 +125,15 @@ def configure(conf):
     conf.msg('Install Geany Plugins ' + VERSION + ' in', conf.env['G_PREFIX'])
     conf.msg('Using GTK version', gtk_version)
     conf.msg('Using Geany version', geany_version)
-    if revision > 0:
+    if revision is not None:
         conf.msg('Compiling Git revision', revision)
     conf.msg('Plugins to compile', ' '.join(enabled_plugins))
+    plugins_with_missing_dependencies =conf.env['plugins_with_missing_dependencies']
+    conf.msg('Plugins to skip due to missing dependencies', ' '.join(plugins_with_missing_dependencies))
 
 
 def configure_plugins(conf, enabled_plugins):
+    conf.env['plugins_with_missing_dependencies'] = []
     # we need to iterate over the plugin directories ourselves to be able
     # to catch plugin ConfigurationError's and remove the plugin in this case
     plugins = list(enabled_plugins)
@@ -139,6 +144,7 @@ def configure_plugins(conf, enabled_plugins):
             conf.recurse(plugin, mandatory=False)
         except ConfigurationError:
             enabled_plugins.remove(plugin)
+            conf.env['plugins_with_missing_dependencies'].append(plugin)
 
 
 def setup_configuration_env(conf):

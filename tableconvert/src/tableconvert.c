@@ -1,7 +1,7 @@
 /*
  *	  tableconvert.c
  *
- *	  Copyright 2011-2013 Frank Lanitz <frank(at)frank(dot)uvena(dot)de>
+ *	  Copyright 2011-2014 Frank Lanitz <frank(at)frank(dot)uvena(dot)de>
  *
  *	  This program is free software; you can redistribute it and/or modify
  *	  it under the terms of the GNU General Public License as published by
@@ -22,11 +22,8 @@
 	#include "config.h" /* for the gettext domain */
 #endif
 
-#include "geanyplugin.h"
-
-GeanyPlugin     *geany_plugin;
-GeanyData       *geany_data;
-GeanyFunctions  *geany_functions;
+#include "tableconvert.h"
+#include "tableconvert_ui.h"
 
 PLUGIN_VERSION_CHECK(200)
 
@@ -35,94 +32,100 @@ PLUGIN_SET_TRANSLATABLE_INFO(
     _("A little plugin to convert lists into tables"),
     VERSION, "Frank Lanitz <frank@frank.uvena.de>")
 
-enum
-{
-	KB_HTMLTABLE_CONVERT_TO_TABLE,
-	COUNT_KB
-};
-
-typedef struct {
-	const gchar *start;
-	const gchar *header_start;
-	const gchar *header_stop;
-	const gchar *body_start;
-	const gchar *body_end;
-	const gchar *columnsplit;
-	const gchar *linestart;
-	const gchar *lineend;
-	const gchar *linesplit;
-	const gchar *end;
-} TableConvertRule;
-
-enum {
-	TC_LATEX = 0,
-	TC_HTML,
-	TC_SQL
-};
+GeanyPlugin	 	*geany_plugin;
+GeanyData	   	*geany_data;
+GeanyFunctions  *geany_functions;
 
 TableConvertRule tablerules[] = {
 	/* LaTeX */
 	{
-		"\\begin{table}[h]\n\\begin{tabular}{}\n",
-		"",
-		"",
-		"",
-		"",
-		" & ",
-		"\t",
-		"\\\\",
-		"\n",
-		"\\end{tabular}\n\\end{table}"
+		N_("LaTeX"),								/* type               */
+		"\\begin{table}[h]\n\\begin{tabular}{}\n",  /* start        	  */
+		"\t",                                         /* header_start       */
+		"",                                         /* header_stop        */
+		" & ",										/* header_columnsplit */
+		"",											/* header_linestart   */
+		"\\\\ \\hline",								/* header_lineend	  */
+		"",                                         /* body_start         */
+		"",                                         /* body_end           */
+		" & ",                                      /* columnsplit        */
+		"\t",                                       /* linestart          */
+		"\\\\",                                     /* lineend            */
+		"",                                         /* linesplit          */
+		"\\end{tabular}\n\\end{table}"              /* end                */
 	},
 	/* HTML */
 	{
-		"<table>\n",
-		"<thead>\n",
-		"</thead>\n",
-		"<tbody>\n",
-		"\n</tbody>",
-		"</td>\n\t<td>",
-		"<tr>\n\t<td>",
-		"</td>\n</tr>",
-		"\n",
-		"\n</table>"
+		N_("HTML"),			/* type               */
+		"<table>\n",        /* start        	  */
+		"<thead>\n",        /* header_start       */
+		"</thead>\n",       /* header_stop        */
+		"</th>\n\t<th>",      /* header_columnsplit */
+		"<tr>\n\t<th>",		/* header_linestart   */
+		"</th>\n</tr>\n",	/* header_lineend	  */
+		"<tbody>\n",        /* body_start         */
+		"\n</tbody>",       /* body_end           */
+		"</td>\n\t<td>",    /* columnsplit        */
+		"<tr>\n\t<td>",     /* linestart          */
+		"</td>\n</tr>",     /* lineend            */
+		"",                 /* linesplit          */
+		"\n</table>"        /* end                */
 	},
 	/* SQL */
+	/* Header not yet supported, so treated as normal
+	 * "Body"-SQL. This is handled on function logic
+	 * */
 	{
-		"",
-		"",
-		"",
-		"",
-		"",
-		",",
-		"\t(",
-		")",
-		",\n",
-		";"
-	}
+		N_("SQL"), 			/* type               */
+		"",                 /* start        	  */
+		"",                 /* header_start       */
+		"",                 /* header_stop        */
+		"",                 /* header_columnsplit */
+		"",					/* header_linestart   */
+		"",					/* header_lineend	  */
+		"",                 /* body_start         */
+		"",                 /* body_end           */
+		"','",              /* columnsplit        */
+		"\t('",             /* linestart          */
+		"')",               /* lineend            */
+		",",                /* linesplit          */
+		";"                 /* end                */
+	},
+	/* DokuWiki */
+	{
+		N_("DokuWiki"),		/* type               */
+        "",                 /* start        	  */
+        "",                 /* header_start       */
+        "",                 /* header_stop        */
+        " ^ ",              /* header_columnsplit */
+        "^ ",				/* header_linestart   */
+        " ^",				/* header_lineend	  */
+        "",                 /* body_start         */
+        "",                 /* body_end           */
+        " | ",              /* columnsplit        */
+        "| ",               /* linestart          */
+        " |",               /* lineend            */
+        "",                 /* linesplit          */
+        "",                 /* end                */
+     }
 };
 
 
-static GtkWidget *main_menu_item = NULL;
-
-static gchar* convert_to_table_worker(gchar **rows, gboolean header, 
-	const TableConvertRule *rule)
+static gchar* convert_to_table_worker(gchar **rows, gboolean header,
+	gint file_type)
 {
 	guint i;
 	guint j;
 	GString *replacement_str = NULL;
+	GeanyDocument *doc = NULL;
+	TableConvertRule *rule = &tablerules[file_type];
+	doc = document_get_current();
 
 	g_return_val_if_fail(rows != NULL, NULL);
+	g_return_if_fail(rule != NULL);
 
 	/* Adding start of table to replacement */
 	replacement_str = g_string_new(rule->start);
-
-	/* Adding special header if requested
-	 * e.g. <thead> */
-	if (header == TRUE)
-	{
-		g_string_append(replacement_str, rule->header_start);
-	}
 
 	/* Iteration onto rows and building up lines of table for
 	 * replacement */
@@ -131,48 +134,82 @@ static gchar* convert_to_table_worker(gchar **rows, gboolean header,
 		gchar **columns = NULL;
 		columns = g_strsplit_set(rows[i], "\t", -1);
 
-		if (i == 1 &&
+		/* Putting in some header if needed */
+		if (i == 0 &&
 			header == TRUE)
 		{
+			/* header_start */
+			g_string_append(replacement_str, rule->header_start);
+
+			/* header_linestart */
+			g_string_append(replacement_str, rule->header_linestart);
+
+			/* header_columnsplit + columncontent */
+			for (j = 0; columns[j] != NULL; j++)
+			{
+				if (j > 0)
+				{
+					g_string_append(replacement_str, rule->header_columnsplit);
+				}
+				g_string_append(replacement_str, columns[j]);
+			}
+
+			/* header_lineend */
+			g_string_append(replacement_str, rule->header_lineend);
+
+			/* header_stop */
 			g_string_append(replacement_str, rule->header_stop);
-			/* We are assuming, that if someone inserts a head, 
-			 * only in this case we will insert some special body. 
-			 * Might needs to be discussed further */
+
+			/* Adding a new line of header assuming it's something
+			 * relevant for every typ */
+			g_string_append(replacement_str, editor_get_eol_char(doc->editor));
+
+			/* body_start */
+			/* Only insert explicit body start if there is a header */
 			g_string_append(replacement_str, rule->body_start);
 		}
-
-		g_string_append(replacement_str, rule->linestart);
-
-		for (j = 0; columns[j] != NULL; j++)
+		if (i > 0 ||
+			header == FALSE)
 		{
-			if (j > 0)
+			/* linestart */
+			g_string_append(replacement_str, rule->linestart);
+
+			/* columnsplit + column */
+			for (j = 0; columns[j] != NULL; j++)
 			{
-				g_string_append(replacement_str, rule->columnsplit);
+				if (j > 0)
+				{
+					g_string_append(replacement_str, rule->columnsplit);
+				}
+				g_string_append(replacement_str, columns[j]);
 			}
-			g_string_append(replacement_str, columns[j]);
-		}
 
-		g_string_append(replacement_str, rule->lineend);
+			/* lineend */
+			g_string_append(replacement_str, rule->lineend);
 
-		if (rows[i+1] != NULL)
-		{
-			g_string_append(replacement_str, rule->linesplit);
+			/* linesplit */
+			if (rows[i+1] != NULL && utils_str_equal(rule->linesplit, ""))
+			{
+				g_string_append(replacement_str, rule->linesplit);
+			}
+			g_string_append(replacement_str, editor_get_eol_char(doc->editor));
+			g_strfreev(columns);
 		}
-		g_strfreev(columns);
 	}
 
 	if (header == TRUE)
 	{
 		g_string_append(replacement_str, rule->body_end);
 	}
-	
+
 	/* Adding the footer of table */
 	g_string_append(replacement_str, rule->end);
 
 	return g_string_free(replacement_str, FALSE);
 }
 
-static void convert_to_table(gboolean header)
+
+void convert_to_table(gboolean header, gint file_type)
 {
 	GeanyDocument *doc = NULL;
 	doc = document_get_current();
@@ -184,50 +221,73 @@ static void convert_to_table(gboolean header)
 		gchar *selection = NULL;
 		gchar **rows = NULL;
 		gchar *replacement = NULL;
+		GString *selection_str = NULL;
 
 		/* Actually grabbing selection and splitting it into single
 		 * lines we will work on later */
 		selection = sci_get_selection_contents(doc->editor->sci);
-		rows = g_strsplit_set(selection, "\r\n", -1);
+
+		selection_str = g_string_new(selection);
+		utils_string_replace_all(selection_str, "\r\n", "\n");
+
+		g_free(selection);
+		selection = g_string_free(selection_str, FALSE);
+
+		rows = g_strsplit_set(selection, "\n", -1);
 		g_free(selection);
 
 		/* Checking whether we do have something we can work on - Returning if not */
 		if (rows != NULL)
 		{
-			switch (doc->file_type->id)
+			if (file_type == -1)
 			{
-				case GEANY_FILETYPES_NONE:
+				switch (doc->file_type->id)
 				{
-					g_strfreev(rows);
-					return;
-				}
-				case GEANY_FILETYPES_HTML:
-				case GEANY_FILETYPES_MARKDOWN:
+					case GEANY_FILETYPES_NONE:
+					{
+						g_strfreev(rows);
+						return;
+					}
+					case GEANY_FILETYPES_HTML:
+					case GEANY_FILETYPES_MARKDOWN:
+					{
+						replacement = convert_to_table_worker(rows,
+							header,
+							TC_HTML);
+						break;
+					}
+					case GEANY_FILETYPES_LATEX:
+					{
+						replacement = convert_to_table_worker(rows,
+							header,
+							TC_LATEX);
+						break;
+					}
+					case GEANY_FILETYPES_SQL:
+					{
+						/* TODO: Check for INTEGER and other datatypes on SQL */
+						replacement = convert_to_table_worker(rows,
+							FALSE,
+							TC_SQL);
+						break;
+					}
+					default:
+					{
+						/* We just don't do anything */
+					}
+				} /* filetype switch */
+			}
+			else
+			{
+				if (file_type == TC_SQL)
 				{
-					replacement = convert_to_table_worker(rows,
-						header,
-						&tablerules[TC_HTML]);
-					break;
+					header = FALSE;
 				}
-				case GEANY_FILETYPES_LATEX:
-				{
-					replacement = convert_to_table_worker(rows,
-						header,
-						&tablerules[TC_LATEX]);
-					break;
-				}
-				case GEANY_FILETYPES_SQL:
-				{
-					replacement = convert_to_table_worker(rows,
-						header,
-						&tablerules[TC_SQL]);
-					break;
-				}
-				default:
-				{
-					/* We just don't do anything */
-				}
-			} /* filetype switch */
+				replacement = convert_to_table_worker(rows,
+							header,
+							file_type);
+			}
+
 		}
 		else
 		{
@@ -256,7 +316,7 @@ static void kb_convert_to_table(G_GNUC_UNUSED guint key_id)
 {
 	g_return_if_fail(document_get_current() != NULL);
 
-	convert_to_table(TRUE);
+	convert_to_table(TRUE, -1);
 }
 
 
@@ -269,27 +329,25 @@ static void init_keybindings(void)
 		_("Convert selection to table"), NULL);
 }
 
-static void cb_table_convert(G_GNUC_UNUSED GtkMenuItem *menuitem, G_GNUC_UNUSED gpointer gdata)
+void cb_table_convert(G_GNUC_UNUSED GtkMenuItem *menuitem, G_GNUC_UNUSED gpointer gdata)
 {
-	convert_to_table(TRUE);
+	convert_to_table(TRUE, -1);
+}
+
+void cb_table_convert_type(G_GNUC_UNUSED GtkMenuItem *menuitem, G_GNUC_UNUSED gpointer gdata)
+{
+	convert_to_table(TRUE, GPOINTER_TO_INT(gdata));
 }
 
 void plugin_init(GeanyData *data)
 {
 	init_keybindings();
-
-	/* Build up menu entry */
-	main_menu_item = gtk_menu_item_new_with_mnemonic(_("_Convert to table"));
-	gtk_container_add(GTK_CONTAINER(geany->main_widgets->tools_menu), main_menu_item);
-	ui_widget_set_tooltip_text(main_menu_item,
-		_("Converts current marked list to a table."));
-	g_signal_connect(G_OBJECT(main_menu_item), "activate", G_CALLBACK(cb_table_convert), NULL);
-	gtk_widget_show_all(main_menu_item);
-	ui_add_document_sensitive(main_menu_item);
+	init_menuentries();
 }
 
 
 void plugin_cleanup(void)
 {
 	gtk_widget_destroy(main_menu_item);
+	gtk_widget_destroy(menu_tableconvert);
 }

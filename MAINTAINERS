@@ -23,6 +23,12 @@ M: Pavel Roschin <rpg89(at)post(dot)ru>
 W:
 S: Maintained
 
+automark
+P: Pavel Roschin <rpg89(at)post(dot)ru>
+M: Pavel Roschin <rpg89(at)post(dot)ru>
+W:
+S: Maintained
+
 codenav
 P: Federico Reghenzani <federico(dot)dev(at)reghe(dot)net>
 M: Federico Reghenzani <federico(dot)dev(at)reghe(dot)net>
@@ -52,6 +58,12 @@ devhelp
 P: Matthew Brush <matt@geany.org>
 M: Matthew Brush <matt@geany.org>
 W: http://plugins.geany.org/devhelp.html
+S: Maintained
+
+geanyctags
+P: Jiří Techet <techet@gmail.com>
+M: Jiří Techet <techet@gmail.com>
+W: http://plugins.geany.org/geanyctags.html
 S: Maintained
 
 geanydoc
