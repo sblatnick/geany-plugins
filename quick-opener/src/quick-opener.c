@@ -43,25 +43,34 @@ static GtkWidget *main_menu_item = NULL;
 
 static void submit(
 	GtkTreeView *treeview,
-	GtkTreePath *path,
+	GtkTreePath *p,
 	GtkTreeViewColumn *col,
 	gpointer user_data
 )
 {
-	GtkTreeSelection *selected = gtk_tree_view_get_selection(treeview);
-	GtkTreeIter iter;
 	GtkTreeModel *model;
-	if(gtk_tree_selection_get_selected(selected, &model, &iter))
+	GtkTreeSelection *selected = gtk_tree_view_get_selection(treeview);
+	GList *list = gtk_tree_selection_get_selected_rows(selected, &model);
+
+	GSList *files = NULL;
+	GList *item;
+	GtkTreeIter iter;
+
+	for(item = list; item != NULL; item = g_list_next(item))
 	{
-		gchar *path, *name, *file;
+		GtkTreePath *treepath = item->data;
+		gtk_tree_model_get_iter(model, &iter, treepath);
+		gchar *path, *name;
 		gtk_tree_model_get(model, &iter, 0, &path, 1, &name, -1);
-		file = g_build_path(G_DIR_SEPARATOR_S, base_directory, path, name, NULL);
-		document_open_file(file, FALSE, NULL, NULL);
-		gtk_dialog_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
+		gchar *file = g_build_path(G_DIR_SEPARATOR_S, base_directory, path, name, NULL);
+		files = g_slist_append(files, file);
 		g_free(path);
 		g_free(name);
-		g_free(file);
 	}
+	document_open_files(files, FALSE, NULL, NULL);
+	g_slist_foreach(files, (GFunc)g_free, NULL);	//free filenames
+	g_slist_free(files);
+	gtk_dialog_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
 }
 
 static void list_files(gchar *base, const gchar *filter, gboolean usePath)
@@ -109,7 +118,13 @@ static void list_files(gchar *base, const gchar *filter, gboolean usePath)
 
 static gboolean onkeypress(GtkEntry *entry, GdkEventKey *event, gpointer user_data)
 {
-	if(event->keyval == GDK_Down) {
+	if(event->keyval == GDK_Down && event->state & GDK_SHIFT_MASK) {
+		GtkTreeSelection *selected = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
+		//gtk_tree_selection_select_path(selected, second);
+		gtk_tree_view_set_cursor(GTK_TREE_VIEW(tree), second, NULL, FALSE);
+		gtk_tree_selection_select_path(selected, first);
+	}
+	else if(event->keyval == GDK_Down) {
 		gtk_tree_view_set_cursor(GTK_TREE_VIEW(tree), second, NULL, FALSE);
 	}
 	return FALSE;
@@ -168,6 +183,8 @@ static void quick_open()
 	
 	list = gtk_tree_store_new(2, G_TYPE_STRING, G_TYPE_STRING);
 	tree = gtk_tree_view_new_with_model(GTK_TREE_MODEL(list));
+	GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
+	gtk_tree_selection_set_mode(selection, GTK_SELECTION_MULTIPLE);
 
 	path_column = gtk_tree_view_column_new();
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), path_column);
