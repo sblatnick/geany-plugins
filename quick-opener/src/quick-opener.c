@@ -5,17 +5,17 @@ GeanyPlugin *geany_plugin;
 GeanyData *geany_data;
 GeanyFunctions *geany_functions;
 
-static GtkWidget *dialog, *scrollable, *tree;
+static GtkWidget *dialog, *scrollable, *tree, *button_folder_picker;
 static GtkTreeStore *list;
 static GtkTreeIter row;
 static gint row_pos;
-static gchar *base_directory;
+static gchar *base_directory, *opener_path;
 static const gint MAX_LIST = 20;
 static GtkAdjustment *adjustment;
 static GtkTreePath *first, *second;
 
 //Config:
-static gchar *conf;
+const gchar *conf, *home;
 static GKeyFile *config;
 static GtkWidget *check_search_path;
 static gboolean include_path = FALSE;
@@ -35,11 +35,13 @@ PLUGIN_SET_INFO("Quick Opener", "Search filenames while typing", "0.1", "Steven 
 
 enum
 {
+	KB_QUICK_OPEN_PROJECT,
 	KB_QUICK_OPEN,
 	COUNT_KB
 };
 
-static GtkWidget *main_menu_item = NULL;
+static GtkWidget *quick_open_project_menu = NULL;
+static GtkWidget *quick_open_menu = NULL;
 
 static void submit(
 	GtkTreeView *treeview,
@@ -145,19 +147,11 @@ static void onkeyrelease(GtkEntry *entry, GdkEventKey *event, gpointer user_data
 	}
 }
 
-static void quick_open()
+static void quick_opener()
 {
 	GtkWidget *entry, *label, *hbox;
 	GtkTreeViewColumn *path_column, *name_column;
 	GtkCellRenderer *renderLeft, *renderRight;
-
-	GeanyProject *project = geany->app->project;
-	if(project) {
-		base_directory = project->base_path;
-	}
-	else {
-		base_directory = geany->prefs->default_open_path;
-	}
 
 	dialog = gtk_dialog_new_with_buttons(_("Quick Open:"),
 		GTK_WINDOW(geany->main_widgets->window),
@@ -224,9 +218,38 @@ static void quick_open()
 	gtk_widget_destroy(dialog);
 }
 
+static void quick_project_open()
+{
+	GeanyProject *project = geany->app->project;
+	//TODO: check if the keypress was used for custom directory or normal
+	if(project) {
+		base_directory = project->base_path;
+	}
+	else {
+		base_directory = geany->prefs->default_open_path;
+	}
+	quick_opener();
+}
+
+static void quick_open()
+{
+	base_directory = opener_path;
+	quick_opener();
+}
+
+static void quick_open_project_menu_callback(GtkMenuItem *menuitem, gpointer gdata)
+{
+	quick_project_open();
+}
+
 static void quick_open_menu_callback(GtkMenuItem *menuitem, gpointer gdata)
 {
 	quick_open();
+}
+
+static void quick_open_project_keyboard_shortcut(G_GNUC_UNUSED guint key_id)
+{
+	quick_project_open();
 }
 
 static void quick_open_keyboard_shortcut(G_GNUC_UNUSED guint key_id)
@@ -242,23 +265,37 @@ static void setup_regex()
 
 void plugin_init(GeanyData *data)
 {
+	home = g_getenv("HOME");
+	if (!home) {
+		home = g_get_home_dir();
+	}
+
 	conf = g_build_path(G_DIR_SEPARATOR_S, geany_data->app->configdir, "plugins", "quick-opener.conf", NULL);
 	config = g_key_file_new();
 	g_key_file_load_from_file(config, conf, G_KEY_FILE_NONE, NULL);
 	pathRegexSetting.text = utils_get_setting_string(config, "main", "path-regex", pathRegexSetting.DEFAULT);
 	nameRegexSetting.text = utils_get_setting_string(config, "main", "name-regex", nameRegexSetting.DEFAULT);
+	opener_path = utils_get_setting_string(config, "main", "path", home);
+	printf("opener_path init: %s\n", opener_path);
 
 	setup_regex();
 
 	GeanyKeyGroup *key_group;
 	key_group = plugin_set_key_group(geany_plugin, "quick_open_keyboard_shortcut", COUNT_KB, NULL);
-	keybindings_set_item( key_group, KB_QUICK_OPEN, quick_open_keyboard_shortcut, 0, 0,
+	keybindings_set_item(key_group, KB_QUICK_OPEN_PROJECT, quick_open_project_keyboard_shortcut, 0, 0,
+		"quick_open_project_keyboard_shortcut", _("Quick Open Project..."), NULL);
+	keybindings_set_item(key_group, KB_QUICK_OPEN, quick_open_keyboard_shortcut, 0, 0,
 		"quick_open_keyboard_shortcut", _("Quick Open..."), NULL);
 
-	main_menu_item = gtk_menu_item_new_with_mnemonic("Quick Open...");
-	gtk_widget_show(main_menu_item);
-	gtk_container_add(GTK_CONTAINER(geany->main_widgets->tools_menu), main_menu_item);
-	g_signal_connect(main_menu_item, "activate", G_CALLBACK(quick_open_menu_callback), NULL);
+	quick_open_project_menu = gtk_menu_item_new_with_mnemonic("Quick Open Project...");
+	gtk_widget_show(quick_open_project_menu);
+	gtk_container_add(GTK_CONTAINER(geany->main_widgets->tools_menu), quick_open_project_menu);
+	g_signal_connect(quick_open_project_menu, "activate", G_CALLBACK(quick_open_project_menu_callback), NULL);
+
+	quick_open_menu = gtk_menu_item_new_with_mnemonic("Quick Open...");
+	gtk_widget_show(quick_open_menu);
+	gtk_container_add(GTK_CONTAINER(geany->main_widgets->tools_menu), quick_open_menu);
+	g_signal_connect(quick_open_menu, "activate", G_CALLBACK(quick_open_menu_callback), NULL);
 }
 
 static void dialog_response(GtkDialog *configure, gint response, gpointer user_data)
@@ -269,8 +306,11 @@ static void dialog_response(GtkDialog *configure, gint response, gpointer user_d
 		g_free(nameRegexSetting.text);
 		pathRegexSetting.text = g_strdup(gtk_entry_get_text(GTK_ENTRY(pathRegexSetting.entry)));
 		nameRegexSetting.text = g_strdup(gtk_entry_get_text(GTK_ENTRY(nameRegexSetting.entry)));
+		opener_path = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(button_folder_picker));
 		g_key_file_set_string(config, "main", "path-regex", pathRegexSetting.text);
 		g_key_file_set_string(config, "main", "name-regex", nameRegexSetting.text);
+		g_key_file_set_string(config, "main", "path", opener_path);
+		printf("opener_path store: %s\n", opener_path);
 		
 		g_regex_unref(pathRegexSetting.regex);
 		g_regex_unref(nameRegexSetting.regex);
@@ -320,6 +360,14 @@ GtkWidget* plugin_configure(GtkDialog *configure)
 	gtk_box_pack_start(GTK_BOX(hbox_name), button_default_name, FALSE, FALSE, 2);
 	gtk_box_pack_start(GTK_BOX(vbox), hbox_name, FALSE, FALSE, 2);
 
+	GtkWidget *label_default = gtk_label_new(_("Select a based directory for the non-project opener:"));
+	gtk_misc_set_alignment(GTK_MISC(label_default), 0, 0);
+	gtk_box_pack_start(GTK_BOX(vbox), label_default, FALSE, FALSE, 2);
+	button_folder_picker = gtk_file_chooser_button_new(
+		_("Choose a path"), GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
+  gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(button_folder_picker), opener_path);
+  gtk_box_pack_start(GTK_BOX(vbox), button_folder_picker, FALSE, FALSE, 2);
+
 	gtk_widget_show_all(vbox);
 
 	return vbox;
@@ -337,5 +385,6 @@ void plugin_cleanup(void)
 	g_regex_unref(pathRegexSetting.regex);
 	g_regex_unref(nameRegexSetting.regex);
 
-	gtk_widget_destroy(main_menu_item);
+	gtk_widget_destroy(quick_open_project_menu);
+	gtk_widget_destroy(quick_open_menu);
 }
