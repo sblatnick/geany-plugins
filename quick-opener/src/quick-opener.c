@@ -73,7 +73,7 @@ static void submit(
 	gtk_dialog_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
 }
 
-static void list_files(gchar *base, const gchar *filter, gboolean usePath)
+static void list_files(gchar *base, const gchar *filter)
 {
 	GDir *dir;
 	gchar const *file_name;
@@ -96,14 +96,14 @@ static void list_files(gchar *base, const gchar *filter, gboolean usePath)
 				g_free(path);
 				continue;
 			}
-			list_files(path, filter, usePath);
+			list_files(path, filter);
 		}
 		else {
 			if(g_regex_match(nameRegexSetting.regex, file_name, 0, NULL)) {
 				g_free(path);
 				continue;
 			}
-			if(regex != NULL && g_regex_match(regex, usePath ? path : file_name, 0, NULL)) {
+			if(regex != NULL && g_regex_match(regex, include_path ? path : file_name, 0, NULL)) {
 				gtk_tree_store_append(list, &row, NULL);
 				gtk_tree_store_set(list, &row, 0, g_display_base->str, 1, file_name, -1);
 				row_pos++;
@@ -138,7 +138,7 @@ static void onkeyrelease(GtkEntry *entry, GdkEventKey *event, gpointer user_data
 	else {
 		row_pos = 0;
 		gtk_tree_store_clear(list);
-		list_files(base_directory, gtk_entry_get_text(entry), include_path);
+		list_files(base_directory, gtk_entry_get_text(entry));
 		gtk_adjustment_set_value(adjustment, gtk_adjustment_get_upper(adjustment));
 
 		gtk_tree_view_set_cursor(GTK_TREE_VIEW(tree), first, NULL, FALSE);
