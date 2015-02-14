@@ -43,15 +43,10 @@ enum
 static GtkWidget *quick_open_project_menu = NULL;
 static GtkWidget *quick_open_menu = NULL;
 
-static void submit(
-	GtkTreeView *treeview,
-	GtkTreePath *p,
-	GtkTreeViewColumn *col,
-	gpointer user_data
-)
+static void submit()
 {
 	GtkTreeModel *model;
-	GtkTreeSelection *selected = gtk_tree_view_get_selection(treeview);
+	GtkTreeSelection *selected = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
 	GList *list = gtk_tree_selection_get_selected_rows(selected, &model);
 
 	GSList *files = NULL;
@@ -135,7 +130,7 @@ static gboolean onkeypress(GtkEntry *entry, GdkEventKey *event, gpointer user_da
 static void onkeyrelease(GtkEntry *entry, GdkEventKey *event, gpointer user_data)
 {
 	if(event->keyval == GDK_Return) {
-		submit(GTK_TREE_VIEW(tree), NULL, NULL, NULL);
+		submit();
 	}
 	else if(event->keyval == GDK_Down || event->keyval == GDK_Up || event->keyval == GDK_Left || event->keyval == GDK_Right) {
 		//Ignore keypresses that don't modify the text.
@@ -152,6 +147,9 @@ static void onkeyrelease(GtkEntry *entry, GdkEventKey *event, gpointer user_data
 
 static gboolean tree_keypress(GtkTreeView *t, GdkEventKey *event, GtkWidget *entry)
 {
+	if(event->keyval == GDK_Return) {
+		submit();
+	}
 	if(event->keyval == GDK_Up) {
 		GtkTreePath  *current;
 		gtk_tree_view_get_cursor(t, &current, NULL);
@@ -220,7 +218,6 @@ static void quick_opener()
 	scrollable = gtk_scrolled_window_new(NULL, NULL);
 	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrollable), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 	gtk_container_add(GTK_CONTAINER(scrollable), tree);
-	g_signal_connect(tree, "row-activated", G_CALLBACK(submit), NULL);
 	g_signal_connect(tree, "key-press-event", G_CALLBACK(tree_keypress), entry);
 
 	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), scrollable, TRUE, TRUE, 10);
