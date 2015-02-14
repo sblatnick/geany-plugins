@@ -67,7 +67,6 @@ static void submit()
 	document_open_files(files, FALSE, NULL, NULL);
 	g_slist_foreach(files, (GFunc)g_free, NULL);	//free filenames
 	g_slist_free(files);
-	gtk_dialog_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
 }
 
 static void list_files(gchar *base, const gchar *filter)
@@ -130,7 +129,7 @@ static gboolean onkeypress(GtkEntry *entry, GdkEventKey *event, gpointer user_da
 static void onkeyrelease(GtkEntry *entry, GdkEventKey *event, gpointer user_data)
 {
 	if(event->keyval == GDK_Return) {
-		submit();
+		gtk_dialog_response(GTK_DIALOG(dialog), GTK_RESPONSE_APPLY);
 	}
 	else if(event->keyval == GDK_Down || event->keyval == GDK_Up || event->keyval == GDK_Left || event->keyval == GDK_Right) {
 		//Ignore keypresses that don't modify the text.
@@ -149,6 +148,7 @@ static gboolean tree_keypress(GtkTreeView *t, GdkEventKey *event, GtkWidget *ent
 {
 	if(event->keyval == GDK_Return) {
 		submit();
+		gtk_dialog_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
 	}
 	if(event->keyval == GDK_Up) {
 		GtkTreePath  *current;
@@ -171,7 +171,7 @@ static void quick_opener()
 		GTK_DIALOG_DESTROY_WITH_PARENT,NULL);
 	gtk_window_set_default_size(GTK_WINDOW(dialog), 500, 250);
 
-	gtk_dialog_add_button(GTK_DIALOG(dialog),_("_Open"), GTK_RESPONSE_OK);
+	gtk_dialog_add_button(GTK_DIALOG(dialog),_("_Open"), GTK_RESPONSE_APPLY);
 	gtk_dialog_add_button(GTK_DIALOG(dialog),_("_Cancel"), GTK_RESPONSE_CANCEL);
 	
 	hbox=gtk_hbox_new(FALSE, 0);
@@ -228,6 +228,9 @@ static void quick_opener()
 	second = gtk_tree_path_new_from_string("1");
 
 	gint response = gtk_dialog_run(GTK_DIALOG(dialog));
+	if(response == GTK_RESPONSE_APPLY) {
+		submit();
+	}
 	gtk_widget_destroy(dialog);
 }
 
