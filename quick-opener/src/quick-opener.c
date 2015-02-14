@@ -122,9 +122,9 @@ static gboolean onkeypress(GtkEntry *entry, GdkEventKey *event, gpointer user_da
 {
 	if(event->keyval == GDK_Down && event->state & GDK_SHIFT_MASK) {
 		GtkTreeSelection *selected = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
-		//gtk_tree_selection_select_path(selected, second);
 		gtk_tree_view_set_cursor(GTK_TREE_VIEW(tree), second, NULL, FALSE);
 		gtk_tree_selection_select_path(selected, first);
+		gtk_widget_grab_focus(tree);
 	}
 	else if(event->keyval == GDK_Down) {
 		gtk_tree_view_set_cursor(GTK_TREE_VIEW(tree), second, NULL, FALSE);
@@ -137,6 +137,9 @@ static void onkeyrelease(GtkEntry *entry, GdkEventKey *event, gpointer user_data
 	if(event->keyval == GDK_Return) {
 		submit(GTK_TREE_VIEW(tree), NULL, NULL, NULL);
 	}
+	else if(event->keyval == GDK_Down || event->keyval == GDK_Up || event->keyval == GDK_Left || event->keyval == GDK_Right) {
+		//Ignore keypresses that don't modify the text.
+	}
 	else {
 		row_pos = 0;
 		gtk_tree_store_clear(list);
@@ -145,6 +148,18 @@ static void onkeyrelease(GtkEntry *entry, GdkEventKey *event, gpointer user_data
 
 		gtk_tree_view_set_cursor(GTK_TREE_VIEW(tree), first, NULL, FALSE);
 	}
+}
+
+static gboolean tree_keypress(GtkTreeView *t, GdkEventKey *event, GtkWidget *entry)
+{
+	if(event->keyval == GDK_Up) {
+		GtkTreePath  *current;
+		gtk_tree_view_get_cursor(t, &current, NULL);
+		if(gtk_tree_path_compare(current,first) == 0) {
+			gtk_widget_grab_focus(entry);
+		}
+	}
+	return FALSE;
 }
 
 static void quick_opener()
@@ -206,6 +221,7 @@ static void quick_opener()
 	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrollable), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 	gtk_container_add(GTK_CONTAINER(scrollable), tree);
 	g_signal_connect(tree, "row-activated", G_CALLBACK(submit), NULL);
+	g_signal_connect(tree, "key-press-event", G_CALLBACK(tree_keypress), entry);
 
 	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), scrollable, TRUE, TRUE, 10);
 	gtk_widget_show_all(dialog);
@@ -276,18 +292,17 @@ void plugin_init(GeanyData *data)
 	pathRegexSetting.text = utils_get_setting_string(config, "main", "path-regex", pathRegexSetting.DEFAULT);
 	nameRegexSetting.text = utils_get_setting_string(config, "main", "name-regex", nameRegexSetting.DEFAULT);
 	opener_path = utils_get_setting_string(config, "main", "path", home);
-	printf("opener_path init: %s\n", opener_path);
 
 	setup_regex();
 
 	GeanyKeyGroup *key_group;
 	key_group = plugin_set_key_group(geany_plugin, "quick_open_keyboard_shortcut", COUNT_KB, NULL);
 	keybindings_set_item(key_group, KB_QUICK_OPEN_PROJECT, quick_open_project_keyboard_shortcut, 0, 0,
-		"quick_open_project_keyboard_shortcut", _("Quick Open Project..."), NULL);
+		"quick_open_project_keyboard_shortcut", _("Quick Open Project Files..."), NULL);
 	keybindings_set_item(key_group, KB_QUICK_OPEN, quick_open_keyboard_shortcut, 0, 0,
 		"quick_open_keyboard_shortcut", _("Quick Open..."), NULL);
 
-	quick_open_project_menu = gtk_menu_item_new_with_mnemonic("Quick Open Project...");
+	quick_open_project_menu = gtk_menu_item_new_with_mnemonic("Quick Open Project Files...");
 	gtk_widget_show(quick_open_project_menu);
 	gtk_container_add(GTK_CONTAINER(geany->main_widgets->tools_menu), quick_open_project_menu);
 	g_signal_connect(quick_open_project_menu, "activate", G_CALLBACK(quick_open_project_menu_callback), NULL);
@@ -310,7 +325,6 @@ static void dialog_response(GtkDialog *configure, gint response, gpointer user_d
 		g_key_file_set_string(config, "main", "path-regex", pathRegexSetting.text);
 		g_key_file_set_string(config, "main", "name-regex", nameRegexSetting.text);
 		g_key_file_set_string(config, "main", "path", opener_path);
-		printf("opener_path store: %s\n", opener_path);
 		
 		g_regex_unref(pathRegexSetting.regex);
 		g_regex_unref(nameRegexSetting.regex);
