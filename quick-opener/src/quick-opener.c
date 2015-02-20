@@ -289,6 +289,7 @@ void plugin_init(GeanyData *data)
 	conf = g_build_path(G_DIR_SEPARATOR_S, geany_data->app->configdir, "plugins", "quick-opener.conf", NULL);
 	config = g_key_file_new();
 	g_key_file_load_from_file(config, conf, G_KEY_FILE_NONE, NULL);
+	include_path = utils_get_setting_boolean(config, "main", "include-path", include_path);
 	pathRegexSetting.text = utils_get_setting_string(config, "main", "path-regex", pathRegexSetting.DEFAULT);
 	nameRegexSetting.text = utils_get_setting_string(config, "main", "name-regex", nameRegexSetting.DEFAULT);
 	opener_path = utils_get_setting_string(config, "main", "path", home);
@@ -322,6 +323,7 @@ static void dialog_response(GtkDialog *configure, gint response, gpointer user_d
 		pathRegexSetting.text = g_strdup(gtk_entry_get_text(GTK_ENTRY(pathRegexSetting.entry)));
 		nameRegexSetting.text = g_strdup(gtk_entry_get_text(GTK_ENTRY(nameRegexSetting.entry)));
 		opener_path = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(button_folder_picker));
+		g_key_file_set_boolean(config, "main", "include-path", include_path);
 		g_key_file_set_string(config, "main", "path-regex", pathRegexSetting.text);
 		g_key_file_set_string(config, "main", "name-regex", nameRegexSetting.text);
 		g_key_file_set_string(config, "main", "path", opener_path);
