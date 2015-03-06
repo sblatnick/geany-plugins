@@ -16,15 +16,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#ifndef __GPROJECT_UTILS_H__
-#define __GPROJECT_UTILS_H__
+#ifndef __PRJORG_MENU_H__
+#define __PRJORG_MENU_H__
 
-gchar *get_file_relative_path(const gchar *origin_dir, const gchar *dest_file);
-
-gboolean patterns_match(GSList *patterns, const gchar *str);
-GSList *get_precompiled_patterns(gchar **patterns);
-
-void open_file(gchar *utf8_name);
-gchar *get_selection(void);
+void prjorg_menu_init(void);
+void prjorg_menu_activate_menu_items(gboolean activate);
+void prjorg_menu_cleanup(void);
 
 #endif

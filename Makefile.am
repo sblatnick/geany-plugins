@@ -103,8 +103,8 @@ if ENABLE_GENIUSPASTE
 SUBDIRS += geniuspaste
 endif
 
-if ENABLE_GPROJECT
-SUBDIRS += gproject
+if ENABLE_GITCHANGEBAR
+SUBDIRS += git-changebar
 endif
 
 if ENABLE_MARKDOWN
@@ -125,6 +125,10 @@ endif
 
 if ENABLE_PRETTY_PRINTER
 SUBDIRS += pretty-printer
+endif
+
+if ENABLE_PROJECTORGANIZER
+SUBDIRS += projectorganizer
 endif
 
 if ENABLE_SCOPE

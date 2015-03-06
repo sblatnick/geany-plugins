@@ -158,6 +158,7 @@ Section Uninstall
 	Delete "$INSTDIR\lib\commander.dll"
 	Delete "$INSTDIR\lib\defineformat.dll"
 	Delete "$INSTDIR\lib\geanydoc.dll"
+	Delete "$INSTDIR\lib\geanyctags.dll"
 	Delete "$INSTDIR\lib\geanyextrasel.dll"
 	Delete "$INSTDIR\lib\geanygendoc.dll"
 	Delete "$INSTDIR\lib\geanyinsertnum.dll"
@@ -171,10 +172,10 @@ Section Uninstall
 	Delete "$INSTDIR\lib\geanysendmail.dll"
 	Delete "$INSTDIR\lib\geanyvc.dll"
 	Delete "$INSTDIR\lib\geniuspaste.dll"
-	Delete "$INSTDIR\lib\gproject.dll"
 	Delete "$INSTDIR\lib\pairtaghighlighter.dll"
 	Delete "$INSTDIR\lib\pohelper.dll"
 	Delete "$INSTDIR\lib\pretty-printer.dll"
+	Delete "$INSTDIR\lib\projectorganizer.dll"
 	Delete "$INSTDIR\lib\scope.dll"
 	Delete "$INSTDIR\lib\shiftcolumn.dll"
 	Delete "$INSTDIR\lib\spellcheck.dll"
@@ -189,7 +190,7 @@ Section Uninstall
 	Delete "$INSTDIR\bin\libxml2-2.dll"
 	Delete "$INSTDIR\bin\lua5.1.dll"
 
-	Delete "$INSTDIR\share\icons\hicolor\16x16\apps\gproject-*.png"
+	Delete "$INSTDIR\share\icons\hicolor\16x16\apps\prjorg-*.png"
 
 	RMDir /r "$INSTDIR\doc\plugins"
 	RMDir /r "$INSTDIR\lib\geany-plugins"

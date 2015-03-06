@@ -162,10 +162,10 @@ M: Enrico Trotta <enrico.trt@gmail.com>
 W:
 S: Maintained
 
-gproject
-P: Jiří Techet <techet@gmail.com>
-M: Jiří Techet <techet@gmail.com>
-W: http://plugins.geany.org/gproject.html
+git-changebar
+P: Colomban Wendling <ban@herbesfolles.org>
+M: Colomban Wendling <ban@herbesfolles.org>
+W: http://plugins.geany.org/git-changebar.html
 S: Maintained
 
 markdown
@@ -191,6 +191,12 @@ P:
 M:
 W:
 S: Orphaned
+
+projectorganizer
+P: Jiří Techet <techet@gmail.com>
+M: Jiří Techet <techet@gmail.com>
+W: http://plugins.geany.org/projectorganizer.html
+S: Maintained
 
 pohelper
 P: Colomban Wendling <ban@herbesfolles.org>

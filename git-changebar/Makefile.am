@@ -1,4 +1,4 @@
 include $(top_srcdir)/build/vars.auxfiles.mk
+plugin = git-changebar
 
-SUBDIRS = src icons
-plugin = gproject
+SUBDIRS = data src

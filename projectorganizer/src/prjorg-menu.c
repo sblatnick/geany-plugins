@@ -25,10 +25,10 @@
 #endif
 #include <geanyplugin.h>
 
-#include "gproject-menu.h"
-#include "gproject-project.h"
-#include "gproject-utils.h"
-#include "gproject-sidebar.h"
+#include "prjorg-menu.h"
+#include "prjorg-project.h"
+#include "prjorg-utils.h"
+#include "prjorg-sidebar.h"
 
 #include <string.h>
 
@@ -53,7 +53,6 @@ static GtkWidget *s_fif_item, *s_ff_item, *s_ft_item, *s_shs_item, *s_sep_item, 
 static gboolean try_swap_header_source(gchar *file_name, gboolean is_header, GSList *file_list, GSList *header_patterns, GSList *source_patterns)
 {
 	gchar *name_pattern;
-	gchar *base_name = NULL;
 	GSList *elem;
 	GPatternSpec *pattern;
 	gboolean found = FALSE;
@@ -67,22 +66,23 @@ static gboolean try_swap_header_source(gchar *file_name, gboolean is_header, GSL
 	foreach_slist (elem, file_list)
 	{
 		gchar *full_name = elem->data;
-		base_name = g_path_get_basename(full_name);
+		gchar *base_name = g_path_get_basename(full_name);
 
 		if (g_pattern_match_string(pattern, base_name) &&
-		    gprj_project_is_in_project(full_name))
+		    prjorg_project_is_in_project(full_name))
 		{
 			if ((is_header && patterns_match(source_patterns, base_name)) ||
 				(!is_header && patterns_match(header_patterns, base_name)))
 			{
 				open_file(full_name);
 				found = TRUE;
+				g_free(base_name);
 				break;
 			}
 		}
+		g_free(base_name);
 	}
 
-	g_free(base_name);
 	g_pattern_spec_free(pattern);
 	return found;
 }
@@ -97,11 +97,11 @@ static void on_swap_header_source(G_GNUC_UNUSED GtkMenuItem * menuitem, G_GNUC_U
 	gchar *doc_basename;
 	doc = document_get_current();
 
-	if (!g_prj || !geany_data->app->project || !doc || !doc->file_name)
+	if (!prj_org || !geany_data->app->project || !doc || !doc->file_name)
 		return;
 
-	header_patterns = get_precompiled_patterns(g_prj->header_patterns);
-	source_patterns = get_precompiled_patterns(g_prj->source_patterns);
+	header_patterns = get_precompiled_patterns(prj_org->header_patterns);
+	source_patterns = get_precompiled_patterns(prj_org->source_patterns);
 
 	doc_basename = g_path_get_basename(doc->file_name);
 
@@ -123,7 +123,7 @@ static void on_swap_header_source(G_GNUC_UNUSED GtkMenuItem * menuitem, G_GNUC_U
 			gchar *filename;
 
 			filename = document_index(i)->file_name;
-			if (gprj_project_is_in_project(filename))
+			if (prjorg_project_is_in_project(filename))
 				list = g_slist_prepend(list, filename);
 		}
 		swapped = try_swap_header_source(doc->file_name, is_header, list, header_patterns, source_patterns);
@@ -155,11 +155,11 @@ static void on_swap_header_source(G_GNUC_UNUSED GtkMenuItem * menuitem, G_GNUC_U
 
 		if (!swapped)
 		{
-			foreach_slist(elem, g_prj->roots)
+			foreach_slist(elem, prj_org->roots)
 			{
 				GHashTableIter iter;
 				gpointer key, value;
-				GPrjRoot *root = elem->data;
+				PrjOrgRoot *root = elem->data;
 				
 				list = NULL;
 				g_hash_table_iter_init(&iter, root->file_table);
@@ -192,14 +192,14 @@ static void on_find_in_project(G_GNUC_UNUSED GtkMenuItem * menuitem, G_GNUC_UNUS
 static void on_find_file(G_GNUC_UNUSED GtkMenuItem * menuitem, G_GNUC_UNUSED gpointer user_data)
 {
 	if (geany_data->app->project)
-		gprj_sidebar_find_file_in_active();
+		prjorg_sidebar_find_file_in_active();
 }
 
 
 static void on_find_tag(G_GNUC_UNUSED GtkMenuItem * menuitem, G_GNUC_UNUSED gpointer user_data)
 {
 	if (geany_data->app->project)
-		gprj_sidebar_find_tag_in_active();
+		prjorg_sidebar_find_tag_in_active();
 }
 
 
@@ -291,9 +291,9 @@ static void on_open_selected_file(GtkMenuItem *menuitem, gpointer user_data)
 			GSList *elem;
 			gchar *found_path = NULL;
 
-			foreach_slist (elem, g_prj->roots)
+			foreach_slist (elem, prj_org->roots)
 			{
-				GPrjRoot *root = elem->data;
+				PrjOrgRoot *root = elem->data;
 				gpointer key, value;
 				GHashTableIter iter;
 				
@@ -358,10 +358,10 @@ static void on_open_selected_file(GtkMenuItem *menuitem, gpointer user_data)
 }
 
 
-void gprj_menu_init(void)
+void prjorg_menu_init(void)
 {
 	GtkWidget *image;
-	GeanyKeyGroup *key_group = plugin_set_key_group(geany_plugin, "GProject", KB_COUNT, kb_callback);
+	GeanyKeyGroup *key_group = plugin_set_key_group(geany_plugin, "ProjectOrganizer", KB_COUNT, kb_callback);
 
 	s_sep_item = gtk_separator_menu_item_new();
 	gtk_widget_show(s_sep_item);
@@ -408,16 +408,16 @@ void gprj_menu_init(void)
 	gtk_widget_show(s_context_sep_item);
 	gtk_menu_shell_prepend(GTK_MENU_SHELL(geany->main_widgets->editor_menu), s_context_sep_item);
 
-	s_context_osf_item = gtk_menu_item_new_with_mnemonic(_("Open Selected File (gproject)"));
+	s_context_osf_item = gtk_menu_item_new_with_mnemonic(_("Open Selected File (Project Organizer)"));
 	gtk_widget_show(s_context_osf_item);
 	gtk_menu_shell_prepend(GTK_MENU_SHELL(geany->main_widgets->editor_menu), s_context_osf_item);
 	g_signal_connect((gpointer) s_context_osf_item, "activate", G_CALLBACK(on_open_selected_file), NULL);
 
-	gprj_menu_activate_menu_items(FALSE);
+	prjorg_menu_activate_menu_items(FALSE);
 }
 
 
-void gprj_menu_activate_menu_items(gboolean activate)
+void prjorg_menu_activate_menu_items(gboolean activate)
 {
 	gtk_widget_set_sensitive(s_context_osf_item, activate);
 	gtk_widget_set_sensitive(s_shs_item, activate);
@@ -427,7 +427,7 @@ void gprj_menu_activate_menu_items(gboolean activate)
 }
 
 
-void gprj_menu_cleanup(void)
+void prjorg_menu_cleanup(void)
 {
 	gtk_widget_destroy(s_fif_item);
 	gtk_widget_destroy(s_ff_item);

@@ -16,11 +16,19 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#ifndef __GPROJECT_MENU_H__
-#define __GPROJECT_MENU_H__
+#ifndef __PRJORG_SIDEBAR_H__
+#define __PRJORG_SIDEBAR_H__
 
-void gprj_menu_init(void);
-void gprj_menu_activate_menu_items(gboolean activate);
-void gprj_menu_cleanup(void);
+
+void prjorg_sidebar_init(void);
+void prjorg_sidebar_cleanup(void);
+void prjorg_sidebar_activate(gboolean activate);
+
+void prjorg_sidebar_find_file_in_active(void);
+void prjorg_sidebar_find_tag_in_active(void);
+
+void prjorg_sidebar_update(gboolean reload);
+
+
 
 #endif
