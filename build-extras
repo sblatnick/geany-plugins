@@ -1,0 +1,20 @@
+#!/bin/bash
+plugins="external-tools
+hide-menu
+quick-find
+quick-line
+quick-opener
+quick-search
+tab-utils
+"
+
+IFS='
+'
+
+for plugin in $plugins
+do
+	echo -e "\033[34m$plugin\033[0m"
+  cd $plugin/src
+  make >/dev/null && make install >/dev/null
+  cd - >/dev/null
+done
