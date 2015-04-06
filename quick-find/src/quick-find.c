@@ -275,26 +275,26 @@ void plugin_init(GeanyData *data)
 	render = gtk_cell_renderer_text_new();
 	number_column = gtk_tree_view_column_new_with_attributes("#", render, NULL);
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), number_column);
-	//gtk_tree_view_column_pack_start(number_column, render, TRUE);
+	gtk_tree_view_column_set_alignment(number_column, 1.0);
+	gtk_cell_renderer_set_alignment(render, 1.0, 0.0);
 	gtk_tree_view_column_add_attribute(number_column, render, "text", 0);
 	
 	render = gtk_cell_renderer_text_new();
 	line_column = gtk_tree_view_column_new_with_attributes("Line", render, NULL);
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), line_column);
-	//gtk_tree_view_column_pack_start(line_column, render, TRUE);
+	gtk_tree_view_column_set_alignment(line_column, 1.0);
+	gtk_cell_renderer_set_alignment(render, 1.0, 0.0);
 	gtk_tree_view_column_add_attribute(line_column, render, "text", 1);
 	
 	render = gtk_cell_renderer_text_new();
 	file_column = gtk_tree_view_column_new_with_attributes("File", render, NULL);
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), file_column);
-	//gtk_tree_view_column_pack_start(file_column, render, TRUE);
 	gtk_tree_view_column_add_attribute(file_column, render, "text", 2);
 	gtk_tree_view_column_set_cell_data_func(file_column, render, (GtkTreeCellDataFunc)cell_data, NULL, NULL);
 	
 	render = gtk_cell_renderer_text_new();
 	text_column = gtk_tree_view_column_new_with_attributes("Text", render, NULL);
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), text_column);
-	//gtk_tree_view_column_pack_start(text_column, render, TRUE);
 	gtk_tree_view_column_add_attribute(text_column, render, "text", 3);
 
 	g_object_unref(GTK_TREE_MODEL(list));
