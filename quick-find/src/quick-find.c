@@ -357,6 +357,11 @@ GtkWidget* plugin_configure(GtkDialog *configure)
 
 void plugin_cleanup(void)
 {
+	gchar *data = g_key_file_to_data(config, NULL, NULL);
+	utils_write_file(conf, data);
+	g_free(data);
+	g_key_file_free(config);
+
 	gtk_notebook_remove_page(
 		GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook),
 		gtk_notebook_page_num(GTK_NOTEBOOK(geany->main_widgets->sidebar_notebook), panel)
