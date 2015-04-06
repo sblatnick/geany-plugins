@@ -119,7 +119,7 @@ static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type
 		column[2] = g_regex_replace(trim_regex, column[2], -1, 0, "", 0, NULL);
 		g_free(code);
 		gtk_tree_store_append(list, &row, NULL);
-		gtk_tree_store_set(list, &row, 0, row_pos, 1, column[1], 2, column[0], 3, column[2], -1);
+		gtk_tree_store_set(list, &row, 0, row_pos, 1, column[1], 2, column[0], 3, g_strstrip(column[2]), -1);
 		g_strfreev(column);
 		row_pos++;
 	}
