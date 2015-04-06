@@ -16,6 +16,12 @@ static gint first_run = 1;
 static const gchar *base_directory;
 static GtkWidget *treebrowser_entry = NULL;
 
+const gchar *conf;
+gchar *executable;
+static GKeyFile *config;
+const gchar *DEFAULT_EXECUTABLE = "/usr/bin/ack-grep";
+GtkWidget *executable_entry;
+
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Find", "Quickly search documents based on the treebrowser root or project root using ack-grep.", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
 
@@ -139,7 +145,7 @@ static void quick_find()
 	gint std_out, std_err;
 
 	gchar **cmd;
-	gchar *command = g_strconcat("/usr/bin/ack-grep ", case_sensitive ? "" : "-i ", g_shell_quote(text), NULL);
+	gchar *command = g_strconcat(executable, " ", case_sensitive ? "" : "-i ", g_shell_quote(text), NULL);
 	if(!g_shell_parse_argv(command, NULL, &cmd, &error)) {
 		ui_set_statusbar(TRUE, _("quick-find failed: %s (%s)"), error->message, command);
 		g_error_free(error);
@@ -226,6 +232,11 @@ static void selected_row(GtkTreeSelection *selected, gpointer data)
 
 void plugin_init(GeanyData *data)
 {
+	conf = g_build_path(G_DIR_SEPARATOR_S, geany_data->app->configdir, "plugins", "quick-find.conf", NULL);
+	config = g_key_file_new();
+	g_key_file_load_from_file(config, conf, G_KEY_FILE_NONE, NULL);
+	executable = utils_get_setting_string(config, "main", "executable", DEFAULT_EXECUTABLE);
+
 	trim_file = g_regex_new(g_strconcat("^.*", G_DIR_SEPARATOR_S, NULL), G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
 	trim_regex = g_regex_new("\n$", G_REGEX_OPTIMIZE | G_REGEX_CASELESS, 0, NULL);
 	
@@ -299,6 +310,49 @@ void plugin_init(GeanyData *data)
 	GeanyKeyGroup *key_group;
 	key_group = plugin_set_key_group(geany_plugin, "quick_find_keyboard_shortcut", KB_GROUP, NULL);
 	keybindings_set_item(key_group, KB_QUICK_FIND, entry_focus, 0, 0, "quick_find", _("Quick Find..."), NULL);
+}
+
+static void dialog_response(GtkDialog *configure, gint response, gpointer user_data)
+{
+	if(response == GTK_RESPONSE_OK || response == GTK_RESPONSE_APPLY) {
+		g_free(executable);
+		executable = g_strdup(gtk_entry_get_text(GTK_ENTRY(executable_entry)));
+		g_key_file_set_string(config, "main", "executable", executable);
+	}
+}
+
+static void set_text(GtkButton* button, gchar* text)
+{
+	gtk_entry_set_text(GTK_ENTRY(executable_entry), text);
+}
+
+GtkWidget* plugin_configure(GtkDialog *configure)
+{
+	g_signal_connect(configure, "response", G_CALLBACK(dialog_response), NULL);
+	GtkWidget *vbox = gtk_vbox_new(FALSE, 6);
+	
+	GtkWidget *label = gtk_label_new(_("Command line program for searching:"));
+	gtk_misc_set_alignment(GTK_MISC(label), 0, 0);
+	gtk_box_pack_start(GTK_BOX(vbox), label, FALSE, FALSE, 2);
+
+	executable_entry = gtk_entry_new();
+	gtk_entry_set_text(GTK_ENTRY(executable_entry), executable);
+	GtkWidget *hbox = gtk_hbox_new(FALSE, 6);
+	GtkWidget *button_grep = gtk_button_new_with_label(_("grep (Good)"));
+	GtkWidget *button_ack = gtk_button_new_with_label(_("ack-grep (Better)"));
+	GtkWidget *button_ag = gtk_button_new_with_label(_("silversearcher-ag (Best)"));
+	g_signal_connect(button_grep, "clicked", G_CALLBACK(set_text), "/bin/grep");
+	g_signal_connect(button_ack, "clicked", G_CALLBACK(set_text), "/usr/bin/ack-grep");
+	g_signal_connect(button_ag, "clicked", G_CALLBACK(set_text), "/usr/bin/ag");
+	gtk_box_pack_start(GTK_BOX(vbox), executable_entry, FALSE, FALSE, 2);
+	gtk_box_pack_start(GTK_BOX(hbox), button_grep, FALSE, FALSE, 2);
+	gtk_box_pack_start(GTK_BOX(hbox), button_ack, FALSE, FALSE, 2);
+	gtk_box_pack_start(GTK_BOX(hbox), button_ag, FALSE, FALSE, 2);
+	gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 2);
+
+	gtk_widget_show_all(vbox);
+
+	return vbox;
 }
 
 void plugin_cleanup(void)
