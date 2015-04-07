@@ -341,7 +341,7 @@ GtkWidget* plugin_configure(GtkDialog *configure)
 	GtkWidget *button_grep = gtk_button_new_with_label(_("grep (Good)"));
 	GtkWidget *button_ack = gtk_button_new_with_label(_("ack-grep (Better)"));
 	GtkWidget *button_ag = gtk_button_new_with_label(_("silversearcher-ag (Best)"));
-	g_signal_connect(button_grep, "clicked", G_CALLBACK(set_text), "/bin/grep");
+	g_signal_connect(button_grep, "clicked", G_CALLBACK(set_text), "/bin/grep -Rn");
 	g_signal_connect(button_ack, "clicked", G_CALLBACK(set_text), "/usr/bin/ack-grep");
 	g_signal_connect(button_ag, "clicked", G_CALLBACK(set_text), "/usr/bin/ag");
 	gtk_box_pack_start(GTK_BOX(vbox), executable_entry, FALSE, FALSE, 2);
