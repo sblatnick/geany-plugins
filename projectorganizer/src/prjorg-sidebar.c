@@ -102,7 +102,7 @@ static struct
 } s_popup_menu;
 
 
-static gint show_dialog_find_file(gchar *path, gchar **pattern, gboolean *case_sensitive, gboolean *full_path)
+static gint show_dialog_find_file(gchar *utf8_path, gchar **pattern, gboolean *case_sensitive, gboolean *is_full_path)
 {
 	gint res;
 	GtkWidget *entry;
@@ -164,8 +164,8 @@ static gint show_dialog_find_file(gchar *path, gchar **pattern, gboolean *case_s
 		gtk_widget_show_all(vbox);
 	}
 
-	if (path)
-		gtk_label_set_text(GTK_LABEL(s_fif_dialog.dir_label), path);
+	if (utf8_path)
+		gtk_label_set_text(GTK_LABEL(s_fif_dialog.dir_label), utf8_path);
 	else
 		gtk_label_set_text(GTK_LABEL(s_fif_dialog.dir_label), _("project or external directory"));
 	entry = gtk_bin_get_child(GTK_BIN(s_fif_dialog.combo));
@@ -184,7 +184,7 @@ static gint show_dialog_find_file(gchar *path, gchar **pattern, gboolean *case_s
 		str = gtk_entry_get_text(GTK_ENTRY(entry));
 		*pattern = g_strconcat("*", str, "*", NULL);
 		*case_sensitive = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(s_fif_dialog.case_sensitive));
-		*full_path = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(s_fif_dialog.full_path));
+		*is_full_path = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(s_fif_dialog.full_path));
 		ui_combo_box_add_to_history(GTK_COMBO_BOX_TEXT(s_fif_dialog.combo), str, 0);
 	}
 
@@ -198,10 +198,10 @@ static gboolean topmost_selected(GtkTreeModel *model, GtkTreeIter *iter, gboolea
 {
 	GtkTreePath *path, *first_path;
 	gboolean ret, is_first;
-	
+
 	first_path = gtk_tree_path_new_first();
 	path = gtk_tree_model_get_path(model, iter);
-	
+
 	is_first = gtk_tree_path_compare(first_path, path) == 0;
 	ret = gtk_tree_path_get_depth(path) == 1 && ((is_first && first) || (!is_first && !first));
 	gtk_tree_path_free(first_path);
@@ -210,6 +210,7 @@ static gboolean topmost_selected(GtkTreeModel *model, GtkTreeIter *iter, gboolea
 }
 
 
+/* utf8 */
 static gchar *build_path(GtkTreeIter *iter)
 {
 	GtkTreeIter node;
@@ -219,7 +220,7 @@ static gchar *build_path(GtkTreeIter *iter)
 	gchar *name;
 
 	if (!iter)
-		return g_strdup(geany_data->app->project->base_path);
+		return get_project_base_path();
 
 	node = *iter;
 	model = GTK_TREE_MODEL(s_file_store);
@@ -237,7 +238,12 @@ static gchar *build_path(GtkTreeIter *iter)
 	}
 
 	if (topmost_selected(model, &node, TRUE))
-		SETPTR(path, g_build_filename(geany_data->app->project->base_path, path, NULL));
+	{
+		gchar *utf8_base_path = get_project_base_path();
+
+		SETPTR(path, g_build_filename(utf8_base_path, path, NULL));
+		g_free(utf8_base_path);
+	}
 	else
 	{
 		gtk_tree_model_get(model, &node, FILEVIEW_COLUMN_NAME, &name, -1);
@@ -259,9 +265,9 @@ static void collapse(void)
 	GtkTreeIter iter;
 	GtkTreePath *tree_path;
 	GtkTreeModel *model = GTK_TREE_MODEL(s_file_store);
-	
+
 	gtk_tree_view_collapse_all(GTK_TREE_VIEW(s_file_view));
-	
+
 	/* expand the project folder */
 	gtk_tree_model_iter_children(model, &iter, NULL);
 	tree_path = gtk_tree_model_get_path (model, &iter);
@@ -285,25 +291,33 @@ static void on_follow_active(GtkToggleToolButton *button, G_GNUC_UNUSED gpointer
 
 static void on_add_external(G_GNUC_UNUSED GtkMenuItem * menuitem, G_GNUC_UNUSED gpointer user_data)
 {
+	gchar *utf8_base_path = get_project_base_path();
+	gchar *locale_path = utils_get_locale_from_utf8(utf8_base_path);
 	GtkWidget *dialog;
 
 	dialog = gtk_file_chooser_dialog_new(_("Add External Directory"),
 		GTK_WINDOW(geany->main_widgets->window), GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER,
 		_("_Cancel"), GTK_RESPONSE_CANCEL,
 		_("Add"), GTK_RESPONSE_ACCEPT, NULL);
+	gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), locale_path);
 
 	if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
 	{
-		gchar *filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
-		
-		prjorg_project_add_external_dir(filename);
+		gchar *locale_filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
+		gchar *utf8_filename = utils_get_utf8_from_locale(locale_filename);
+
+		prjorg_project_add_external_dir(utf8_filename);
 		prjorg_sidebar_update(TRUE);
 		project_write_config();
-		
-		g_free (filename);
+
+		g_free(utf8_filename);
+		g_free(locale_filename);
 	}
 
 	gtk_widget_destroy(dialog);
+
+	g_free(utf8_base_path);
+	g_free(locale_path);
 }
 
 
@@ -313,19 +327,19 @@ static void on_remove_external_dir(G_GNUC_UNUSED GtkMenuItem *menuitem, G_GNUC_U
 	GtkTreeModel *model;
 	GtkTreeIter iter, parent;
 	gchar *name;
-	
+
 	treesel = gtk_tree_view_get_selection(GTK_TREE_VIEW(s_file_view));
 	if (!gtk_tree_selection_get_selected(treesel, &model, &iter))
 		return;
 
 	if (gtk_tree_model_iter_parent(model, &parent, &iter))
 		return;
-		
+
 	gtk_tree_model_get(model, &iter, FILEVIEW_COLUMN_NAME, &name, -1);
 	prjorg_project_remove_external_dir(name);
 	prjorg_sidebar_update(TRUE);
 	project_write_config();
-	
+
 	g_free(name);
 }
 
@@ -347,37 +361,41 @@ static void find_file_recursive(GtkTreeIter *iter, gboolean case_sensitive, gboo
 	}
 	else
 	{
-		gchar *name;
+		gchar *utf8_name;
 
 		if (iter == NULL)
 			return;
 
 		if (full_path)
 		{
-			gchar *path;
+			gchar *utf8_path, *utf8_base_path;
 
-			path = build_path(iter);
-			name = get_file_relative_path(geany_data->app->project->base_path, path);
-			g_free(path);
+			utf8_path = build_path(iter);
+			utf8_base_path = get_project_base_path();
+			utf8_name = get_relative_path(utf8_base_path, utf8_path);
+			g_free(utf8_path);
+			g_free(utf8_base_path);
 		}
 		else
-			gtk_tree_model_get(GTK_TREE_MODEL(model), iter, FILEVIEW_COLUMN_NAME, &name, -1);
+			gtk_tree_model_get(GTK_TREE_MODEL(model), iter, FILEVIEW_COLUMN_NAME, &utf8_name, -1);
 
 		if (!case_sensitive)
-			SETPTR(name, g_utf8_strdown(name, -1));
+			SETPTR(utf8_name, g_utf8_strdown(utf8_name, -1));
 
-		if (g_pattern_match_string(pattern, name))
+		if (g_pattern_match_string(pattern, utf8_name))
 		{
-			gchar *path, *rel_path;
+			gchar *utf8_base_path = get_project_base_path();
+			gchar *utf8_path, *rel_path;
 
-			path = build_path(iter);
-			rel_path = get_file_relative_path(geany_data->app->project->base_path, path);
-			msgwin_msg_add(COLOR_BLACK, -1, NULL, "%s", rel_path ? rel_path : path);
-			g_free(path);
+			utf8_path = build_path(iter);
+			rel_path = get_relative_path(utf8_base_path, utf8_path);
+			msgwin_msg_add(COLOR_BLACK, -1, NULL, "%s", rel_path ? rel_path : utf8_path);
+			g_free(utf8_path);
 			g_free(rel_path);
+			g_free(utf8_base_path);
 		}
 
-		g_free(name);
+		g_free(utf8_name);
 	}
 }
 
@@ -385,13 +403,13 @@ static void find_file_recursive(GtkTreeIter *iter, gboolean case_sensitive, gboo
 static void find_file(GtkTreeIter *iter)
 {
 	gchar *pattern_str = NULL;
-	gboolean case_sensitive, full_path;
-	gchar *path;
+	gboolean case_sensitive, is_full_path;
+	gchar *utf8_path = build_path(iter);
 
-	path = build_path(iter);
-
-	if (show_dialog_find_file(iter ? path : NULL, &pattern_str, &case_sensitive, &full_path) == GTK_RESPONSE_ACCEPT)
+	if (show_dialog_find_file(iter ? utf8_path : NULL, &pattern_str, &case_sensitive, &is_full_path) == GTK_RESPONSE_ACCEPT)
 	{
+		gchar *utf8_base_path = get_project_base_path();
+		gchar *locale_base_path = utils_get_locale_from_utf8(utf8_base_path);
 		GPatternSpec *pattern;
 
 		if (!case_sensitive)
@@ -400,13 +418,16 @@ static void find_file(GtkTreeIter *iter)
 		pattern = g_pattern_spec_new(pattern_str);
 
 		msgwin_clear_tab(MSG_MESSAGE);
-		msgwin_set_messages_dir(geany_data->app->project->base_path);
-		find_file_recursive(iter, case_sensitive, full_path, pattern);
+		msgwin_set_messages_dir(locale_base_path);
+		find_file_recursive(iter, case_sensitive, is_full_path, pattern);
 		msgwin_switch_tab(MSG_MESSAGE, TRUE);
+		g_free(utf8_base_path);
+		g_free(locale_base_path);
+		g_pattern_spec_free(pattern);
 	}
 
 	g_free(pattern_str);
-	g_free(path);
+	g_free(utf8_path);
 }
 
 
@@ -453,9 +474,9 @@ static void create_dialog_find_tag(void)
 	gtk_size_group_add_widget(size_group, label);
 
 	s_ft_dialog.combo_match = gtk_combo_box_text_new();
-	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(s_ft_dialog.combo_match), "exact");
-	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(s_ft_dialog.combo_match), "prefix");
-	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(s_ft_dialog.combo_match), "pattern");
+	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(s_ft_dialog.combo_match), _("exact"));
+	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(s_ft_dialog.combo_match), _("prefix"));
+	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(s_ft_dialog.combo_match), _("pattern"));
 	gtk_combo_box_set_active(GTK_COMBO_BOX(s_ft_dialog.combo_match), 1);
 	gtk_label_set_mnemonic_widget(GTK_LABEL(label), s_ft_dialog.combo_match);
 
@@ -519,20 +540,20 @@ static const char *tm_tag_type_name(const TMTag *tag)
 }
 
 
-static gboolean match(TMTag *tag, const gchar *name, gboolean declaration, gboolean case_sensitive, 
-	MatchType match_type, GPatternSpec *pspec, gchar *path)
+static gboolean match(TMTag *tag, const gchar *name, gboolean declaration, gboolean case_sensitive,
+	MatchType match_type, GPatternSpec *pspec, gchar *utf8_path)
 {
 	const gint forward_types = tm_tag_prototype_t | tm_tag_externvar_t;
 	gboolean matches = FALSE;
 	gint type;
-	
+
 	type = declaration ? forward_types : tm_tag_max_t - forward_types;
 	matches = tag->type & type;
-	
+
 	if (matches)
 	{
 		gchar *name_case;
-		
+
 		if (case_sensitive)
 			name_case = g_strdup(tag->name);
 		else
@@ -540,7 +561,7 @@ static gboolean match(TMTag *tag, const gchar *name, gboolean declaration, gbool
 
 		switch (match_type)
 		{
-			case MATCH_FULL: 
+			case MATCH_FULL:
 				matches = g_strcmp0(name_case, name) == 0;
 				break;
 			case MATCH_PATTERN:
@@ -552,72 +573,81 @@ static gboolean match(TMTag *tag, const gchar *name, gboolean declaration, gbool
 		}
 		g_free(name_case);
 	}
-		
-	if (matches && path)
+
+	if (matches && utf8_path)
 	{
+		gchar *utf8_file_name = utils_get_utf8_from_locale(tag->file->file_name);
 		gchar *relpath;
-		
-		relpath = get_file_relative_path(path, tag->file->file_name);
-		matches = relpath && !g_str_has_prefix(relpath, "..");
+
+		relpath = get_relative_path(utf8_path, utf8_file_name);
+		matches = relpath != NULL;
 		g_free(relpath);
+		g_free(utf8_file_name);
 	}
-	
+
 	return matches;
 }
 
 
-static void find_tags(const gchar *name, gboolean declaration, gboolean case_sensitive, MatchType match_type, gchar *path)
+static void find_tags(const gchar *name, gboolean declaration, gboolean case_sensitive, MatchType match_type, gchar *utf8_path)
 {
+	gchar *utf8_base_path = get_project_base_path();
+	gchar *locale_base_path = utils_get_locale_from_utf8(utf8_base_path);
 	GPtrArray *tags_array = geany_data->app->tm_workspace->tags_array;
 	guint i;
 	gchar *name_case;
 	GPatternSpec *pspec;
-	
+
 	if (case_sensitive)
 		name_case = g_strdup(name);
 	else
 		name_case = g_utf8_strdown(name, -1);
-		
+
 	pspec = g_pattern_spec_new(name_case);
 
-	msgwin_set_messages_dir(geany_data->app->project->base_path);
+	msgwin_set_messages_dir(locale_base_path);
 	msgwin_clear_tab(MSG_MESSAGE);
 	for (i = 0; i < tags_array->len; i++) /* TODO: binary search */
 	{
 		TMTag *tag = tags_array->pdata[i];
 
-		if (match(tag, name_case, declaration, case_sensitive, match_type, pspec, path))
+		if (match(tag, name_case, declaration, case_sensitive, match_type, pspec, utf8_path))
 		{
 			gchar *scopestr = tag->scope ? g_strconcat(tag->scope, "::", NULL) : g_strdup("");
+			gchar *utf8_fname = utils_get_utf8_from_locale(tag->file->file_name);
 			gchar *relpath;
-			
-			relpath = get_file_relative_path(geany_data->app->project->base_path, tag->file->file_name);
-			msgwin_msg_add(COLOR_BLACK, -1, NULL, "%s:%lu:\n\t[%s]\t %s%s%s", relpath,
-				tag->line, tm_tag_type_name(tag), scopestr, tag->name, tag->arglist ? tag->arglist : "");
+
+			relpath = get_relative_path(utf8_base_path, utf8_fname);
+			if (relpath)
+				msgwin_msg_add(COLOR_BLACK, -1, NULL, "%s:%lu:\n\t[%s]\t %s%s%s", relpath,
+					tag->line, tm_tag_type_name(tag), scopestr, tag->name, tag->arglist ? tag->arglist : "");
 			g_free(scopestr);
 			g_free(relpath);
+			g_free(utf8_fname);
 		}
 	}
 	msgwin_switch_tab(MSG_MESSAGE, TRUE);
-	
+
 	g_free(name_case);
-	g_free(pspec);
+	g_pattern_spec_free(pspec);
+	g_free(utf8_base_path);
+	g_free(locale_base_path);
 }
 
 
 static void find_tag(GtkTreeIter *iter)
 {
 	gchar *selection;
-	gchar *path;
+	gchar *utf8_path;
 	GtkWidget *entry;
 
 	create_dialog_find_tag();
 
 	entry = gtk_bin_get_child(GTK_BIN(s_ft_dialog.combo));
 
-	path = build_path(iter);
+	utf8_path = build_path(iter);
 	if (iter)
-		gtk_label_set_text(GTK_LABEL(s_ft_dialog.dir_label), path);
+		gtk_label_set_text(GTK_LABEL(s_ft_dialog.dir_label), utf8_path);
 	else
 		gtk_label_set_text(GTK_LABEL(s_ft_dialog.dir_label), _("project or external directory"));
 
@@ -641,10 +671,10 @@ static void find_tag(GtkTreeIter *iter)
 
 		ui_combo_box_add_to_history(GTK_COMBO_BOX_TEXT(s_ft_dialog.combo), name, 0);
 
-		find_tags(name, declaration, case_sensitive, match_type, iter?path:NULL);
+		find_tags(name, declaration, case_sensitive, match_type, iter ? utf8_path : NULL);
 	}
-	
-	g_free(path);
+
+	g_free(utf8_path);
 	gtk_widget_hide(s_ft_dialog.widget);
 }
 
@@ -726,7 +756,7 @@ static void on_open_clicked(void)
 		}
 		else
 		{
-			gchar *name;
+			gchar *utf8_path;
 			GIcon *icon;
 
 			gtk_tree_model_get(model, &iter, FILEVIEW_COLUMN_ICON, &icon, -1);
@@ -737,9 +767,9 @@ static void on_open_clicked(void)
 				return;
 			}
 
-			name = build_path(&iter);
-			open_file(name);
-			g_free(name);
+			utf8_path = build_path(&iter);
+			open_file(utf8_path);
+			g_free(utf8_path);
 			g_object_unref(icon);
 		}
 	}
@@ -775,7 +805,7 @@ static gboolean on_button_release(G_GNUC_UNUSED GtkWidget * widget, GdkEventButt
 static gboolean on_button_press(G_GNUC_UNUSED GtkWidget * widget, GdkEventButton * event,
 		G_GNUC_UNUSED gpointer user_data)
 {
-	if (event->button == 1 && event->type == GDK_2BUTTON_PRESS) 
+	if (event->button == 1 && event->type == GDK_2BUTTON_PRESS)
 	{
 		on_open_clicked();
 		return TRUE;
@@ -821,7 +851,7 @@ static void on_find_in_files(G_GNUC_UNUSED GtkMenuItem *menuitem, G_GNUC_UNUSED 
 	GtkTreeSelection *treesel;
 	GtkTreeIter iter, parent;
 	GtkTreeModel *model;
-	gchar *path;
+	gchar *utf8_path;
 
 	treesel = gtk_tree_view_get_selection(GTK_TREE_VIEW(s_file_view));
 
@@ -831,15 +861,15 @@ static void on_find_in_files(G_GNUC_UNUSED GtkMenuItem *menuitem, G_GNUC_UNUSED 
 	if (!gtk_tree_model_iter_has_child(model, &iter))
 	{
 		if (gtk_tree_model_iter_parent(model, &parent, &iter))
-			path = build_path(&parent);
+			utf8_path = build_path(&parent);
 		else
-			path = build_path(NULL);
+			utf8_path = build_path(NULL);
 	}
 	else
-		path = build_path(&iter);
+		utf8_path = build_path(&iter);
 
-	search_show_find_in_files_dialog(path);
-	g_free(path);
+	search_show_find_in_files_dialog(utf8_path);
+	g_free(utf8_path);
 }
 
 
@@ -858,6 +888,67 @@ static void create_branch(gint level, GSList *leaf_list, GtkTreeIter *parent,
 			dir_list = g_slist_prepend(dir_list, path_arr);
 		else
 			file_list = g_slist_prepend(file_list, path_arr);
+	}
+
+	foreach_slist (elem, file_list)
+	{
+		GtkTreeIter iter;
+		gchar **path_arr = elem->data;
+		GIcon *icon = NULL;
+		gchar *content_type = g_content_type_guess(path_arr[level], NULL, 0, NULL);
+
+		if (content_type)
+		{
+			icon = g_content_type_get_icon(content_type);
+			if (icon)
+			{
+				GtkIconInfo *icon_info;
+
+				icon_info = gtk_icon_theme_lookup_by_gicon(gtk_icon_theme_get_default(), icon, 16, 0);
+				if (!icon_info)
+				{
+					g_object_unref(icon);
+					icon = NULL;
+				}
+				else
+					gtk_icon_info_free(icon_info);
+			}
+			g_free(content_type);
+		}
+
+		if (patterns_match(header_patterns, path_arr[level]))
+		{
+			if (! icon)
+				icon = g_icon_new_for_string("prjorg-header", NULL);
+
+			gtk_tree_store_insert_with_values(s_file_store, &iter, parent, 0,
+				FILEVIEW_COLUMN_ICON, icon,
+				FILEVIEW_COLUMN_NAME, path_arr[level],
+				FILEVIEW_COLUMN_COLOR, project ? NULL : &s_external_color, -1);
+		}
+		else if (patterns_match(source_patterns, path_arr[level]))
+		{
+			if (! icon)
+				icon = g_icon_new_for_string("prjorg-source", NULL);
+
+			gtk_tree_store_insert_with_values(s_file_store, &iter, parent, 0,
+				FILEVIEW_COLUMN_ICON, icon,
+				FILEVIEW_COLUMN_NAME, path_arr[level],
+				FILEVIEW_COLUMN_COLOR, project ? NULL : &s_external_color, -1);
+		}
+		else
+		{
+			if (! icon)
+				icon = g_icon_new_for_string("prjorg-file", NULL);
+
+			gtk_tree_store_insert_with_values(s_file_store, &iter, parent, 0,
+				FILEVIEW_COLUMN_ICON, icon,
+				FILEVIEW_COLUMN_NAME, path_arr[level],
+				FILEVIEW_COLUMN_COLOR, project ? NULL : &s_external_color, -1);
+		}
+
+		if (icon)
+			g_object_unref(icon);
 	}
 
 	if (dir_list)
@@ -879,13 +970,11 @@ static void create_branch(gint level, GSList *leaf_list, GtkTreeIter *parent,
 
 			if (dir_changed)
 			{
-				gtk_tree_store_append(s_file_store, &iter, parent);
-				gtk_tree_store_set(s_file_store, &iter,
+				gtk_tree_store_insert_with_values(s_file_store, &iter, parent, 0,
 					FILEVIEW_COLUMN_ICON, icon_dir,
-					FILEVIEW_COLUMN_NAME, last_dir_name, -1);
-				if (!project)
-					gtk_tree_store_set(s_file_store, &iter, FILEVIEW_COLUMN_COLOR, &s_external_color, -1);
-				
+					FILEVIEW_COLUMN_NAME, last_dir_name,
+					FILEVIEW_COLUMN_COLOR, project ? NULL : &s_external_color, -1);
+
 				create_branch(level+1, tmp_list, &iter, header_patterns, source_patterns, project);
 
 				g_slist_free(tmp_list);
@@ -896,83 +985,16 @@ static void create_branch(gint level, GSList *leaf_list, GtkTreeIter *parent,
 			tmp_list = g_slist_prepend(tmp_list, path_arr);
 		}
 
-		gtk_tree_store_append(s_file_store, &iter, parent);
-		gtk_tree_store_set(s_file_store, &iter,
+		gtk_tree_store_insert_with_values(s_file_store, &iter, parent, 0,
 			FILEVIEW_COLUMN_ICON, icon_dir,
-			FILEVIEW_COLUMN_NAME, last_dir_name, -1);
-		if (!project)
-			gtk_tree_store_set(s_file_store, &iter, FILEVIEW_COLUMN_COLOR, &s_external_color, -1);
+			FILEVIEW_COLUMN_NAME, last_dir_name,
+			FILEVIEW_COLUMN_COLOR, project ? NULL : &s_external_color, -1);
 
 		create_branch(level+1, tmp_list, &iter, header_patterns, source_patterns, project);
 
 		g_slist_free(tmp_list);
 		g_slist_free(dir_list);
 		g_object_unref(icon_dir);
-	}
-
-	foreach_slist (elem, file_list)
-	{
-		GtkTreeIter iter;
-		gchar **path_arr = elem->data;
-		GIcon *icon = NULL;
-		gchar *content_type = g_content_type_guess(path_arr[level], NULL, 0, NULL);
-
-		if (content_type)
-		{
-			icon = g_content_type_get_icon(content_type);
-			if (icon) 
-			{
-				GtkIconInfo *icon_info;
-
-				icon_info = gtk_icon_theme_lookup_by_gicon(gtk_icon_theme_get_default(), icon, 16, 0);
-				if (!icon_info)
-				{
-					g_object_unref(icon);
-					icon = NULL;
-				}
-				else
-					gtk_icon_info_free(icon_info);
-			}
-			g_free(content_type);
-		}
-
-		gtk_tree_store_append(s_file_store, &iter, parent);
-		if (patterns_match(header_patterns, path_arr[level]))
-		{
-			if (! icon)
-				icon = g_icon_new_for_string("prjorg-header", NULL);
-
-			gtk_tree_store_set(s_file_store, &iter,
-				FILEVIEW_COLUMN_ICON, icon,
-				FILEVIEW_COLUMN_NAME, path_arr[level], -1);
-			if (!project)
-				gtk_tree_store_set(s_file_store, &iter, FILEVIEW_COLUMN_COLOR, &s_external_color, -1);
-		}
-		else if (patterns_match(source_patterns, path_arr[level]))
-		{
-			if (! icon)
-				icon = g_icon_new_for_string("prjorg-source", NULL);
-
-			gtk_tree_store_set(s_file_store, &iter,
-				FILEVIEW_COLUMN_ICON, icon,
-				FILEVIEW_COLUMN_NAME, path_arr[level], -1);
-			if (!project)
-				gtk_tree_store_set(s_file_store, &iter, FILEVIEW_COLUMN_COLOR, &s_external_color, -1);
-		}
-		else
-		{
-			if (! icon)
-				icon = g_icon_new_for_string("prjorg-file", NULL);
-
-			gtk_tree_store_set(s_file_store, &iter,
-				FILEVIEW_COLUMN_ICON, icon,
-				FILEVIEW_COLUMN_NAME, path_arr[level], -1);
-			if (!project)
-				gtk_tree_store_set(s_file_store, &iter, FILEVIEW_COLUMN_COLOR, &s_external_color, -1);
-		}
-
-		if (icon)
-			g_object_unref(icon);
 	}
 
 	g_slist_free(file_list);
@@ -983,14 +1005,19 @@ static void set_intro_message(const gchar *msg)
 {
 	GtkTreeIter iter;
 
-	gtk_tree_store_append(s_file_store, &iter, NULL);
-	gtk_tree_store_set(s_file_store, &iter,
+	gtk_tree_store_insert_with_values(s_file_store, &iter, NULL, -1,
 		FILEVIEW_COLUMN_NAME, msg, -1);
 
 	gtk_widget_set_sensitive(s_project_toolbar.expand, FALSE);
 	gtk_widget_set_sensitive(s_project_toolbar.collapse, FALSE);
 	gtk_widget_set_sensitive(s_project_toolbar.follow, FALSE);
 	gtk_widget_set_sensitive(s_project_toolbar.add, FALSE);
+}
+
+
+static int rev_strcmp(const char *str1, const char *str2)
+{
+	return strcmp(str2, str1);
 }
 
 
@@ -1005,10 +1032,12 @@ static void load_project_root(PrjOrgRoot *root, GtkTreeIter *parent, GSList *hea
 	g_hash_table_iter_init(&iter, root->file_table);
 	while (g_hash_table_iter_next(&iter, &key, &value))
 	{
-		gchar *path = get_file_relative_path(root->base_dir, key);
+		gchar *path = get_relative_path(root->base_dir, key);
 		lst = g_slist_prepend(lst, path);
 	}
-	lst = g_slist_sort(lst, (GCompareFunc) strcmp);
+	/* sort in reverse order so we can prepend nodes to the tree store -
+	 * the store behaves as a linked list and prepending is faster */
+	lst = g_slist_sort(lst, (GCompareFunc) rev_strcmp);
 
 	foreach_slist (elem, lst)
 	{
@@ -1033,7 +1062,7 @@ static void load_project_root(PrjOrgRoot *root, GtkTreeIter *parent, GSList *hea
 		else
 			set_intro_message(_("Set file patterns under Project->Properties"));
 	}
-	
+
 	g_slist_foreach(lst, (GFunc) g_free, NULL);
 	g_slist_free(lst);
 	g_slist_foreach(path_list, (GFunc) g_strfreev, NULL);
@@ -1047,7 +1076,7 @@ static void load_project(void)
 	GtkTreeIter iter;
 	gboolean first = TRUE;
 	GIcon *icon_dir;
-	
+
 	gtk_tree_store_clear(s_file_store);
 
 	if (!prj_org || !geany_data->app->project)
@@ -1057,33 +1086,31 @@ static void load_project(void)
 
 	header_patterns = get_precompiled_patterns(prj_org->header_patterns);
 	source_patterns = get_precompiled_patterns(prj_org->source_patterns);
-	
+
 	/* reload on every refresh to update the color e.g. when the theme changes */
 	s_external_color = gtk_widget_get_style(s_toolbar)->bg[GTK_STATE_NORMAL];
-	
+
 	foreach_slist (elem, prj_org->roots)
 	{
 		PrjOrgRoot *root = elem->data;
 		gchar *name;
-		
+
 		if (first)
 			name = g_strconcat("<b>", geany_data->app->project->name, "</b>", NULL);
 		else
 			name = g_strdup(root->base_dir);
 
-		gtk_tree_store_append(s_file_store, &iter, NULL);
-		gtk_tree_store_set(s_file_store, &iter,
+		gtk_tree_store_insert_with_values(s_file_store, &iter, NULL, -1,
 			FILEVIEW_COLUMN_ICON, icon_dir,
-			FILEVIEW_COLUMN_NAME, name, -1);
-		if (!first)
-			gtk_tree_store_set(s_file_store, &iter, FILEVIEW_COLUMN_COLOR, &s_external_color, -1);
+			FILEVIEW_COLUMN_NAME, name,
+			FILEVIEW_COLUMN_COLOR, first ? NULL : &s_external_color, -1);
 
 		load_project_root(root, &iter, header_patterns, source_patterns, first);
 
 		first = FALSE;
 		g_free(name);
 	}
-	
+
 	collapse();
 
 	g_slist_foreach(header_patterns, (GFunc) g_pattern_spec_free, NULL);
@@ -1134,7 +1161,7 @@ static gboolean find_in_tree(GtkTreeIter *parent, gchar **path_split, gint level
 static gboolean follow_editor_on_idle(gpointer foo)
 {
 	GtkTreeIter root_iter, found_iter;
-	gchar *path = NULL;
+	gchar *utf8_path = NULL;
 	gchar **path_split;
 	GeanyDocument *doc;
 	GSList *elem;
@@ -1150,21 +1177,21 @@ static gboolean follow_editor_on_idle(gpointer foo)
 	foreach_slist (elem, prj_org->roots)
 	{
 		PrjOrgRoot *root = elem->data;
-		
-		path = get_file_relative_path(root->base_dir, doc->file_name);
-		if (path != NULL && !g_str_has_prefix(path, ".."))
+
+		utf8_path = get_relative_path(root->base_dir, doc->file_name);
+		if (utf8_path)
 			break;
-			
-		g_free(path);
-		path = NULL;
+
+		g_free(utf8_path);
+		utf8_path = NULL;
 		if (!gtk_tree_model_iter_next(model, &root_iter))
 			break;
 	}
-	
-	if (!path)
+
+	if (!utf8_path)
 		return FALSE;
 
-	path_split = g_strsplit_set(path, "/\\", 0);
+	path_split = g_strsplit_set(utf8_path, "/\\", 0);
 
 	if (find_in_tree(&root_iter, path_split, 0, &found_iter))
 	{
@@ -1176,15 +1203,15 @@ static gboolean follow_editor_on_idle(gpointer foo)
 		gtk_tree_view_expand_to_path(GTK_TREE_VIEW(s_file_view), tree_path);
 		gtk_tree_view_scroll_to_cell(GTK_TREE_VIEW(s_file_view), tree_path,
 			NULL, FALSE, 0.0, 0.0);
-			
+
 		treesel = gtk_tree_view_get_selection(GTK_TREE_VIEW(s_file_view));
 		gtk_tree_selection_select_iter(treesel, &found_iter);
 		gtk_tree_path_free(tree_path);
 	}
-	
-	g_free(path);
+
+	g_free(utf8_path);
 	g_strfreev(path_split);
-	
+
 	return FALSE;
 }
 
@@ -1193,14 +1220,14 @@ void prjorg_sidebar_update(gboolean reload)
 {
 	if (reload)
 	{
-		/* we get color information only after the sidebar is realized - 
+		/* we get color information only after the sidebar is realized -
 		 * postpone reload if this is not the case yet */
 		if (gtk_widget_get_realized(s_toolbar))
 			load_project();
 		else
 			s_pending_reload = TRUE;
 	}
-	if (s_follow_editor) 
+	if (s_follow_editor)
 		/* perform on idle - avoids unnecessary jumps on project load */
 		plugin_idle_add(geany_plugin, (GSourceFunc)follow_editor_on_idle, NULL);
 }
@@ -1301,7 +1328,7 @@ void prjorg_sidebar_init(void)
 	gtk_tree_view_column_pack_start(column, renderer, FALSE);
 	gtk_tree_view_column_add_attribute(column, renderer, "gicon", FILEVIEW_COLUMN_ICON);
 	gtk_tree_view_column_add_attribute(column, renderer, "cell-background-gdk", FILEVIEW_COLUMN_COLOR);
-	
+
 	renderer = gtk_cell_renderer_text_new();
 	gtk_tree_view_column_pack_start(column, renderer, TRUE);
 	gtk_tree_view_column_add_attribute(column, renderer, "markup", FILEVIEW_COLUMN_NAME);
@@ -1328,7 +1355,7 @@ void prjorg_sidebar_init(void)
 	g_signal_connect(G_OBJECT(s_file_view), "key-press-event",
 			G_CALLBACK(on_key_press), NULL);
 
-	set_intro_message(_("(Re)open project to start using the plugin"));
+	set_intro_message(_("Open a project to start using the plugin"));
 	prjorg_sidebar_activate(FALSE);
 
 	/**** popup menu ****/
@@ -1401,6 +1428,7 @@ void prjorg_sidebar_init(void)
 
 	focus_chain = g_list_prepend(focus_chain, s_file_view);
 	gtk_container_set_focus_chain(GTK_CONTAINER(s_file_view_vbox), focus_chain);
+	g_list_free(focus_chain);
 	scrollwin = gtk_scrolled_window_new(NULL, NULL);
 	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrollwin),
 					   GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);

@@ -172,6 +172,8 @@ Section Uninstall
 	Delete "$INSTDIR\lib\geanysendmail.dll"
 	Delete "$INSTDIR\lib\geanyvc.dll"
 	Delete "$INSTDIR\lib\geniuspaste.dll"
+	Delete "$INSTDIR\lib\git-changebar.dll"
+	Delete "$INSTDIR\lib\overview.dll"
 	Delete "$INSTDIR\lib\pairtaghighlighter.dll"
 	Delete "$INSTDIR\lib\pohelper.dll"
 	Delete "$INSTDIR\lib\pretty-printer.dll"
@@ -186,6 +188,7 @@ Section Uninstall
 
 	Delete "$INSTDIR\bin\ctpl-2.dll"
 	Delete "$INSTDIR\bin\libenchant.dll"
+	Delete "$INSTDIR\bin\libgit2.dll"
 	Delete "$INSTDIR\bin\libsoup-2.4-1.dll"
 	Delete "$INSTDIR\bin\libxml2-2.dll"
 	Delete "$INSTDIR\bin\lua5.1.dll"
@@ -232,7 +235,7 @@ SectionEnd
 !insertmacro MUI_DESCRIPTION_TEXT ${SEC01} "Required plugin files. You cannot skip these files."
 !insertmacro MUI_DESCRIPTION_TEXT ${SEC02} "Various translations for the included plugins."
 !insertmacro MUI_DESCRIPTION_TEXT ${SEC03} "Various documentation files for the included plugins."
-!insertmacro MUI_DESCRIPTION_TEXT ${SEC04} "Dependency files for various plugins (currently libenchant for Spell Check, Lua for GeanyLua, libxml2 for PrettyPrinter, CTPL for GeanyGenDoc)."
+!insertmacro MUI_DESCRIPTION_TEXT ${SEC04} "Dependency files for various plugins (currently libenchant for Spell Check, Lua for GeanyLua, libxml2 for PrettyPrinter, CTPL for GeanyGenDoc, libgit2 for Git Change Bar)."
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 ;;;;;;;;;;;;;;;;;;;;;

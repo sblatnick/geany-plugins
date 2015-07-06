@@ -621,7 +621,7 @@ struct_semicolon(
 	gchar           *chars_right,
 	gint             filetype)
 {
-	if (filetype_c_or_cpp(filetype) && 
+	if (filetype_c_or_cpp(filetype) &&
 	   (check_struct(sci, pos, "struct") || check_struct(sci, pos, "typedef struct")))
 	{
 		chars_right[1] = ';';
@@ -1009,10 +1009,10 @@ plugin_configure(GtkDialog *dialog)
 	GtkWidget *widget, *vbox, *frame, *container, *scrollbox;
 	vbox = gtk_vbox_new(FALSE, 0);
 	scrollbox = gtk_scrolled_window_new(NULL, NULL);
-	gtk_widget_set_size_request(GTK_WIDGET(scrollbox), 350, 400);
+	gtk_widget_set_size_request(GTK_WIDGET(scrollbox), -1, 400);
 	gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scrollbox), vbox);
 	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrollbox),
-		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+		GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
 
 #define WIDGET_FRAME(description) G_STMT_START {                               \
     container = gtk_vbox_new(FALSE, 0);                                        \
@@ -1051,8 +1051,8 @@ plugin_configure(GtkDialog *dialog)
 	WIDGET_CONF_BOOL(backquote, _("Backquote ` `"),
 		_("Auto-close backquote ` -> `|`"));
 	g_signal_connect(widget, "toggled", G_CALLBACK(ac_backquote_bashonly_cb), dialog);
-	WIDGET_CONF_BOOL(backquote_bashonly, _("\tOnly for Bash"),
-		_("Auto-close backquote only in Bash"));
+	WIDGET_CONF_BOOL(backquote_bashonly, _("\tOnly for Shell-scripts (Bash)"),
+		_("Auto-close backquote only in Shell-scripts like Bash"));
 
 	WIDGET_FRAME(_("Improve curly brackets completion"));
 	WIDGET_CONF_BOOL(make_indent_for_cbracket, _("Indent when enclosing"),
@@ -1069,7 +1069,7 @@ plugin_configure(GtkDialog *dialog)
 		_("Improved auto-indent for curly brackets: type \"{\" "
 		"and then press Enter - plugin will create full indented block. "
 		"Works without \"auto-close { }\" checkbox."));
-	WIDGET_CONF_BOOL(whitesmiths_style, _("\tWhitesmiths style"),
+	WIDGET_CONF_BOOL(whitesmiths_style, _("\tWhitesmith's style"),
 		_("This style puts the brace associated with a control statement on "
 		"the next line, indented. Statements within the braces are indented "
 		"to the same level as the braces."));
@@ -1089,9 +1089,9 @@ plugin_configure(GtkDialog *dialog)
 
 	WIDGET_FRAME(_("Behaviour inside comments and strings"));
 	WIDGET_CONF_BOOL(comments_ac_enable, _("Allow auto-closing in strings and comments"),
-		_("Check if you wan to keep auto-closing inside strings and comments too."));
+		_("Check if you want to keep auto-closing inside strings and comments too."));
 	WIDGET_CONF_BOOL(comments_enclose, _("Enclose selections in strings and comments"),
-		_("Check if you wan to enclose selections inside strings and comments too."));
+		_("Check if you want to enclose selections inside strings and comments too."));
 
 	container = vbox;
 	WIDGET_CONF_BOOL(close_functions, _("Auto-complete \";\" for functions"),

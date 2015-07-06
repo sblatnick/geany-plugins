@@ -1095,7 +1095,7 @@ set_diff_buff(GtkWidget * textview, GtkTextBuffer * buffer, const gchar * txt)
 			  "the changes are too big to display here and would slow down the UI significantly."
 			  "\n\n"
 			  "To view the differences, cancel this dialog and open the differences "
-			  "in Geany directly by using the GeanyVC menu (Base Dirrectory -> Diff)."), -1);
+			  "in Geany directly by using the GeanyVC menu (Base Directory -> Diff)."), -1);
 		gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(textview), GTK_WRAP_WORD);
 		return;
 	}
@@ -2305,6 +2305,7 @@ plugin_init(G_GNUC_UNUSED GeanyData * data)
 	load_config();
 	registrate();
 
+	external_diff_viewer_init();
 
 	if (set_menubar_entry == TRUE)
 	{
@@ -2378,6 +2379,7 @@ plugin_init(G_GNUC_UNUSED GeanyData * data)
 void
 plugin_cleanup(void)
 {
+	external_diff_viewer_deinit();
 	remove_menuitems_from_editor_menu();
 	gtk_widget_destroy(menu_entry);
 	g_slist_free(VC);

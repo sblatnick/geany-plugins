@@ -39,7 +39,7 @@ typedef struct
 	gchar **ignored_dirs_patterns;
 	gchar **ignored_file_patterns;
 	PrjOrgTagPrefs generate_tag_prefs;
-	
+
 	GSList *roots;  /* list of PrjOrgRoot; the project root is always the first followed by external dirs roots */
 } PrjOrg;
 
@@ -55,12 +55,12 @@ void prjorg_project_save(GKeyFile * key_file);
 void prjorg_project_read_properties_tab(void);
 void prjorg_project_rescan(void);
 
-void prjorg_project_add_external_dir(const gchar *dirname);
-void prjorg_project_remove_external_dir(const gchar *dirname);
+void prjorg_project_add_external_dir(const gchar *utf8_dirname);
+void prjorg_project_remove_external_dir(const gchar *utf8_dirname);
 
-void prjorg_project_add_single_tm_file(gchar *filename);
-void prjorg_project_remove_single_tm_file(gchar *filename);
+void prjorg_project_add_single_tm_file(gchar *utf8_filename);
+void prjorg_project_remove_single_tm_file(gchar *utf8_filename);
 
-gboolean prjorg_project_is_in_project(const gchar * filename);
+gboolean prjorg_project_is_in_project(const gchar *utf8_filename);
 
 #endif

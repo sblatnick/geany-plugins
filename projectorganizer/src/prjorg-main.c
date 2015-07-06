@@ -29,16 +29,19 @@
 #include "prjorg-sidebar.h"
 #include "prjorg-menu.h"
 
-PLUGIN_VERSION_CHECK(214)
-PLUGIN_SET_INFO("Project Organizer",
-	_("Project file tree, project-wide indexing and search, extra navigation options"),
-	VERSION,
-	"Jiri Techet <techet@gmail.com>")
 
 GeanyPlugin *geany_plugin;
 GeanyData *geany_data;
 GeanyFunctions *geany_functions;
 
+PLUGIN_VERSION_CHECK(221)
+PLUGIN_SET_TRANSLATABLE_INFO(
+	LOCALEDIR,
+	GETTEXT_PACKAGE,
+	_("Project Organizer"),
+	_("Project file tree, project-wide indexing and search, extra navigation options (was GProject)"),
+	VERSION,
+	"Jiri Techet <techet@gmail.com>")
 
 static gint page_index = -1;
 
@@ -70,7 +73,7 @@ static void on_doc_close(G_GNUC_UNUSED GObject * obj, GeanyDocument * doc,
 	if (doc->file_name == NULL)
 		return;
 
-	/* tags of open files managed by geany - when the file gets closed, 
+	/* tags of open files managed by geany - when the file gets closed,
 	 * we should take care of it */
 	if (prjorg_project_is_in_project(doc->file_name))
 		prjorg_project_add_single_tm_file(doc->file_name);
@@ -124,10 +127,13 @@ static void on_project_dialog_close(G_GNUC_UNUSED GObject * obj, GtkWidget * not
 static void on_project_open(G_GNUC_UNUSED GObject * obj, GKeyFile * config,
 		G_GNUC_UNUSED gpointer user_data)
 {
-	prjorg_project_open(config);
-	prjorg_sidebar_update(TRUE);
-	prjorg_sidebar_activate(TRUE);
-	prjorg_menu_activate_menu_items(TRUE);
+	if (!prj_org)
+	{
+		prjorg_project_open(config);
+		prjorg_sidebar_update(TRUE);
+		prjorg_sidebar_activate(TRUE);
+		prjorg_menu_activate_menu_items(TRUE);
+	}
 }
 
 
@@ -141,12 +147,13 @@ static void on_project_close(G_GNUC_UNUSED GObject * obj, G_GNUC_UNUSED gpointer
 }
 
 
+/* May be called also after plugin_init(), see plugin_init() for more info */
 static void on_project_save(G_GNUC_UNUSED GObject * obj, GKeyFile * config,
 		G_GNUC_UNUSED gpointer user_data)
 {
 	if (!prj_org)
 	{
-		/* happens when the project is created */
+		/* happens when the project is created or the plugin is loaded */
 		prjorg_project_open(config);
 		prjorg_sidebar_update(TRUE);
 		prjorg_sidebar_activate(TRUE);
@@ -172,10 +179,29 @@ PluginCallback plugin_callbacks[] = {
 };
 
 
+static gboolean write_config_cb(gpointer user_data)
+{
+	if (geany_data->app->project && !prj_org)
+		project_write_config();
+	return FALSE;
+}
+
+
 void plugin_init(G_GNUC_UNUSED GeanyData * data)
 {
 	prjorg_menu_init();
 	prjorg_sidebar_init();
+	/* If the project is already open, we won't get the project-open signal
+	 * when the plugin is enabled in the plugin manager so the plugin won't
+	 * reload the project tree. However, we can force the call of the
+	 * project-save signal emission whose handler does a similar thing like
+	 * project-open so we get the same effect.
+	 *
+	 * For some reason this doesn't work when called directly from plugin_init()
+	 * so perform on idle instead. Also use low priority so hopefully normal
+	 * project opening happens before and we don't unnecessarily rewrite the
+	 * project file. */
+	g_idle_add_full(G_PRIORITY_LOW, write_config_cb, NULL, NULL);
 }
 
 

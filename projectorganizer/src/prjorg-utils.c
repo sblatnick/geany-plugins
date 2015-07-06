@@ -26,76 +26,29 @@
 extern GeanyData *geany_data;
 extern GeanyFunctions *geany_functions;
 
-static gchar *relpath(const gchar *origin_dir, const gchar *dest_dir)
+
+/* utf8 */
+gchar *get_relative_path(const gchar *utf8_parent, const gchar *utf8_descendant)
 {
-	gchar *origin, *dest;
-	gchar **originv, **destv;
-	gchar *ret = NULL;
-	guint i, j;
-	
-	origin = tm_get_real_path(origin_dir);
-	dest = tm_get_real_path(dest_dir);
+	GFile *gf_parent, *gf_descendant;
+	gchar *locale_parent, *locale_descendant;
+	gchar *locale_ret, *utf8_ret;
 
-	if (EMPTY(origin) || EMPTY(dest) || origin[0] != dest[0])
-	{
-		g_free(origin);
-		g_free(dest);
-		return NULL;
-	}
+	locale_parent = utils_get_locale_from_utf8(utf8_parent);
+	locale_descendant = utils_get_locale_from_utf8(utf8_descendant);
+	gf_parent = g_file_new_for_path(locale_parent);
+	gf_descendant = g_file_new_for_path(locale_descendant);
 
-	originv = g_strsplit_set(g_path_skip_root(origin), "/\\", -1);
-	destv = g_strsplit_set(g_path_skip_root(dest), "/\\", -1);
+	locale_ret = g_file_get_relative_path(gf_parent, gf_descendant);
+	utf8_ret = utils_get_utf8_from_locale(locale_ret);
 
-	for (i = 0; originv[i] != NULL && destv[i] != NULL; i++)
-		if (g_strcmp0(originv[i], destv[i]) != 0)
-			break;
+	g_object_unref(gf_parent);
+	g_object_unref(gf_descendant);
+	g_free(locale_parent);
+	g_free(locale_descendant);
+	g_free(locale_ret);
 
-	ret = g_strdup("");
-
-	for (j = i; originv[j] != NULL; j++)
-		SETPTR(ret, g_build_filename(ret, "..", NULL));
-
-	for (j = i; destv[j] != NULL; j++)
-		SETPTR(ret, g_build_filename(ret, destv[j], NULL));
-
-	if (strlen(ret) == 0)
-		SETPTR(ret, g_strdup("."G_DIR_SEPARATOR_S));
-
-	g_free(origin);
-	g_free(dest);
-	g_strfreev(originv);
-	g_strfreev(destv);
-
-	return ret;
-}
-
-
-gchar *get_file_relative_path(const gchar *origin_dir, const gchar *dest_file)
-{
-	gchar *dest_dir, *ret;
-
-	dest_dir = g_path_get_dirname(dest_file);
-	ret = relpath(origin_dir, dest_dir);
-	if (ret)
-	{
-		gchar *dest_basename;
-
-		dest_basename = g_path_get_basename(dest_file);
-
-		if (g_strcmp0(ret, "."G_DIR_SEPARATOR_S) != 0)
-		{
-			SETPTR(ret, g_build_filename(ret, dest_basename, NULL));
-		}
-		else
-		{
-			SETPTR(ret, g_strdup(dest_basename));
-		}
-
-		g_free(dest_basename);
-	}
-
-	g_free(dest_dir);
-	return ret;
+	return utf8_ret;
 }
 
 
@@ -144,7 +97,7 @@ void open_file(gchar *utf8_name)
 		gtk_notebook_set_current_page(GTK_NOTEBOOK(geany->main_widgets->notebook),
 			document_get_notebook_page(doc));
 	}
-	
+
 	if (doc)
 		gtk_widget_grab_focus(GTK_WIDGET(doc->editor->sci));
 
@@ -170,4 +123,30 @@ gchar *get_selection(void)
 		return sci_get_selection_contents(doc->editor->sci);
 	else
 		return editor_get_word_at_pos(doc->editor, -1, wc);
+}
+
+
+/* utf8 */
+gchar *get_project_base_path(void)
+{
+	GeanyProject *project = geany_data->app->project;
+
+	if (project && !EMPTY(project->base_path))
+	{
+		if (g_path_is_absolute(project->base_path))
+			return g_strdup(project->base_path);
+		else
+		{	/* build base_path out of project file name's dir and base_path */
+			gchar *path;
+			gchar *dir = g_path_get_dirname(project->file_name);
+
+			if (utils_str_equal(project->base_path, "./"))
+				return dir;
+
+			path = g_build_filename(dir, project->base_path, NULL);
+			g_free(dir);
+			return path;
+		}
+	}
+	return NULL;
 }
