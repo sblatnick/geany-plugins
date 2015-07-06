@@ -37,11 +37,23 @@ static gboolean on_out(GtkWidget *widget, GdkEventKey *event, gpointer user_data
 	return FALSE;
 }
 
+gboolean quick_goto_line(GeanyEditor *editor, gint line_no)
+{
+	gint pos;
+
+	g_return_val_if_fail(editor, FALSE);
+	if (line_no < 0 || line_no >= sci_get_line_count(editor->sci))
+		return FALSE;
+
+	pos = sci_get_position_from_line(editor->sci, line_no);
+	return editor_goto_pos(editor, pos, TRUE);
+}
+
 static gboolean on_activate(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 {
 	text = gtk_entry_get_text(GTK_ENTRY(entry));
 	GeanyDocument *doc = document_get_current();
-	editor_goto_line(doc->editor, atoi(text) - 1, 0);
+	quick_goto_line(doc->editor, atoi(text) - 1);
 	on_out(NULL, NULL, NULL);
 	return FALSE;
 }
