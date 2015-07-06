@@ -88,6 +88,7 @@ static void cell_data(GtkTreeViewColumn *tree_column, GtkCellRenderer *render, G
 	g_free(clean_file);
 }
 
+/*
 static gboolean panel_focus_tab(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
 	GeanyKeyBinding *kb = keybindings_lookup_item(GEANY_KEY_GROUP_FOCUS, GEANY_KEYS_FOCUS_SIDEBAR);
@@ -101,6 +102,7 @@ static gboolean panel_focus_tab(GtkWidget *widget, GdkEvent *event, gpointer dat
 	}
 	return FALSE;
 }
+*/
 
 static gboolean output_out(GIOChannel *channel, GIOCondition cond, gpointer type)
 {
@@ -213,6 +215,18 @@ static void on_click(GtkButton* button, gpointer data)
 	quick_find();
 }
 
+gboolean quick_goto_line(GeanyEditor *editor, gint line_no)
+{
+	gint pos;
+
+	g_return_val_if_fail(editor, FALSE);
+	if (line_no < 0 || line_no >= sci_get_line_count(editor->sci))
+		return FALSE;
+
+	pos = sci_get_position_from_line(editor->sci, line_no);
+	return editor_goto_pos(editor, pos, TRUE);
+}
+
 static void selected_row(GtkTreeSelection *selected, gpointer data)
 {
 	GtkTreeIter iter;
@@ -223,7 +237,7 @@ static void selected_row(GtkTreeSelection *selected, gpointer data)
 		gtk_tree_model_get(model, &iter, 1, &line, 2, &file, -1);
 		file = g_build_path(G_DIR_SEPARATOR_S, base_directory, file, NULL);
 		GeanyDocument *doc = document_open_file(file, FALSE, NULL, NULL);
-		editor_goto_line(doc->editor, atoi(line) - 1, 0);
+		quick_goto_line(doc->editor, atoi(line) - 1);
 
 		g_free(line);
 		g_free(file);
@@ -305,7 +319,7 @@ void plugin_init(GeanyData *data)
 	gtk_widget_show(label);
 	gtk_widget_show_all(panel);
 	
-	g_signal_connect(geany->main_widgets->window, "key-release-event", G_CALLBACK(panel_focus_tab), NULL);
+	//g_signal_connect(geany->main_widgets->window, "key-release-event", G_CALLBACK(panel_focus_tab), NULL);
 
 	GeanyKeyGroup *key_group;
 	key_group = plugin_set_key_group(geany_plugin, "quick_find_keyboard_shortcut", KB_GROUP, NULL);
