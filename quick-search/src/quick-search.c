@@ -27,6 +27,12 @@ enum
 	KB_GROUP
 };
 
+typedef struct MatchInfo
+{
+	gint start, end;
+}
+MatchInfo;
+
 static gchar* replace_all(const gchar *haystack, gchar *needle, gchar *replace)
 {
 	gchar *result;
@@ -69,8 +75,8 @@ static void quick_search(G_GNUC_UNUSED guint key_id)
 		selected = g_malloc(sci_get_selected_text_length(doc->editor->sci) + 1);
 		sci_get_selected_text(doc->editor->sci, selected);
 
-		sci_goto_pos(doc->editor->sci, sci_get_selection_start(doc->editor->sci), TRUE);
-		sci_set_search_anchor(doc->editor->sci);
+		sci_set_current_position(doc->editor->sci, sci_get_selection_start(doc->editor->sci), TRUE);
+		scintilla_send_message(doc->editor->sci, SCI_SEARCHANCHOR, 0, 0);
 
 		old = selected;
 		selected = escape(selected);
@@ -84,30 +90,31 @@ static void quick_search(G_GNUC_UNUSED guint key_id)
 static void quick_next(G_GNUC_UNUSED guint key_id)
 {
 	GeanyDocument *doc = document_get_current();
-	sci_goto_pos(doc->editor->sci, sci_get_selection_end(doc->editor->sci), TRUE);
-	sci_set_search_anchor(doc->editor->sci);
-	if(search_find_next(doc->editor->sci, text, 0, NULL) == -1) {
-		sci_goto_pos(doc->editor->sci, 0, TRUE);
-		sci_set_search_anchor(doc->editor->sci);
-		search_find_next(doc->editor->sci, text, 0, NULL);
+	sci_set_current_position(doc->editor->sci, sci_get_selection_end(doc->editor->sci), TRUE);
+	scintilla_send_message(doc->editor->sci, SCI_SEARCHANCHOR, 0, 0);
+	scintilla_send_message(doc->editor->sci, SCI_SEARCHNEXT, (uptr_t) 0, (sptr_t) text);
+	if(scintilla_send_message(doc->editor->sci, SCI_SEARCHNEXT, (uptr_t) 0, (sptr_t) text) == -1) {
+		sci_set_current_position(doc->editor->sci, 0, TRUE);
+		scintilla_send_message(doc->editor->sci, SCI_SEARCHANCHOR, 0, 0);
+		scintilla_send_message(doc->editor->sci, SCI_SEARCHNEXT, (uptr_t) 0, (sptr_t) text);
 	}
 	skip = TRUE;
-	editor_display_current_line(doc->editor, 0.3F);
+	doc->editor->scroll_percent = 0.3F;
 }
 
 static void quick_prev(G_GNUC_UNUSED guint key_id)
 {
 	GeanyDocument *doc = document_get_current();
-	sci_goto_pos(doc->editor->sci, sci_get_selection_start(doc->editor->sci), TRUE);
-	sci_set_search_anchor(doc->editor->sci);
-	sci_search_prev(doc->editor->sci, 0, text);
-	if(sci_search_prev(doc->editor->sci, 0, text) == -1) {
-		sci_goto_pos(doc->editor->sci, sci_get_length(doc->editor->sci), TRUE);
-		sci_set_search_anchor(doc->editor->sci);
-		sci_search_prev(doc->editor->sci, 0, text);
+	sci_set_current_position(doc->editor->sci, sci_get_selection_start(doc->editor->sci), TRUE);
+	scintilla_send_message(doc->editor->sci, SCI_SEARCHANCHOR, 0, 0);
+	scintilla_send_message(doc->editor->sci, SCI_SEARCHPREV, (uptr_t) 0, (sptr_t) text);
+	if(scintilla_send_message(doc->editor->sci, SCI_SEARCHPREV, (uptr_t) 0, (sptr_t) text) == -1) {
+		sci_set_current_position(doc->editor->sci, sci_get_length(doc->editor->sci), TRUE);
+		scintilla_send_message(doc->editor->sci, SCI_SEARCHANCHOR, 0, 0);
+		scintilla_send_message(doc->editor->sci, SCI_SEARCHPREV, (uptr_t) 0, (sptr_t) text);
 	}
 	skip = TRUE;
-	editor_display_current_line(doc->editor, 0.3F);
+	doc->editor->scroll_percent = 0.3F;
 }
 
 static gboolean on_out(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
@@ -141,8 +148,8 @@ static gboolean on_key(GtkWidget *widget, GdkEventKey *event, gpointer user_data
 			old = text;
 			GeanyDocument *doc = document_get_current();
 			mark_all(doc, old, QUICK_SEARCH_INDICATOR);
-			search_find_next(doc->editor->sci, old, 0, NULL);
-			editor_display_current_line(doc->editor, 0.3F);
+			scintilla_send_message(doc->editor->sci, SCI_SEARCHNEXT, (uptr_t) 0, (sptr_t) old);
+			doc->editor->scroll_percent = 0.3F;
 		}
 	}
 }
@@ -177,18 +184,34 @@ void plugin_cleanup(void)
 	gtk_widget_destroy(dialog);
 }
 
+static MatchInfo *match_info_new(gint start, gint end)
+{
+	MatchInfo *info = g_slice_alloc(sizeof *info);
+
+	info->start = start;
+	info->end = end;
+
+	return info;
+}
+
+void match_info_free(MatchInfo *info)
+{
+	g_slice_free1(sizeof *info, info);
+}
+
 static GSList *find_range(ScintillaObject *sci, gint flags, struct Sci_TextToFind *ttf)
 {
 	GSList *matches = NULL;
-	GeanyMatchInfo *info;
+	MatchInfo *info;
 
 	g_return_val_if_fail(sci != NULL && ttf->lpstrText != NULL, NULL);
 	if (! *ttf->lpstrText)
 		return NULL;
 
-	while (search_find_text(sci, flags, ttf, &info) != -1) {
+	while(sci_find_text(sci, 0, ttf) != -1) {
+		info = match_info_new(ttf->chrgText.cpMin, ttf->chrgText.cpMax);
 		if (ttf->chrgText.cpMax > ttf->chrg.cpMax) {
-			geany_match_info_free(info);
+			match_info_free(info);
 			break;
 		}
 
@@ -219,7 +242,6 @@ gint mark_all(GeanyDocument *doc, const gchar *search_text, gint indicator)
 
 	g_return_val_if_fail(doc != NULL, 0);
 
-	/* clear previous search indicators */
 	editor_indicator_clear(doc->editor, indicator);
 
 	if (G_UNLIKELY(! NZV(search_text)))
@@ -232,13 +254,13 @@ gint mark_all(GeanyDocument *doc, const gchar *search_text, gint indicator)
 	matches = find_range(doc->editor->sci, 0, &ttf);
 	foreach_slist (match, matches)
 	{
-		GeanyMatchInfo *info = match->data;
+		MatchInfo *info = match->data;
 
 		if (info->end != info->start)
 			editor_indicator_set_on_range(doc->editor, indicator, info->start, info->end);
 		count++;
 
-		geany_match_info_free(info);
+		g_slice_free1(sizeof *info, info);
 	}
 	g_slist_free(matches);
 
