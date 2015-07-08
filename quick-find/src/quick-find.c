@@ -319,7 +319,7 @@ void plugin_init(GeanyData *data)
 	gtk_widget_show(label);
 	gtk_widget_show_all(panel);
 	
-	//g_signal_connect(geany->main_widgets->window, "key-release-event", G_CALLBACK(panel_focus_tab), NULL);
+	//TODO: g_signal_connect(geany->main_widgets->window, "key-release-event", G_CALLBACK(panel_focus_tab), NULL);
 
 	GeanyKeyGroup *key_group;
 	key_group = plugin_set_key_group(geany_plugin, "quick_find_keyboard_shortcut", KB_GROUP, NULL);

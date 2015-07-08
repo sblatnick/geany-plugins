@@ -16,6 +16,22 @@ static void output_focus()
 	);
 }
 
+gint get_lines_selected(ScintillaObject *sci)
+{
+	gint start = (gint) scintilla_send_message(sci, SCI_GETSELECTIONSTART, 0, 0);
+	gint end = (gint) scintilla_send_message(sci, SCI_GETSELECTIONEND, 0, 0);
+	gint line_start;
+	gint line_end;
+
+	if (start == end)
+		return 0; /* no selection */
+
+	line_start = (gint) scintilla_send_message(sci, SCI_LINEFROMPOSITION, (uptr_t) start, 0);
+	line_end = (gint) scintilla_send_message(sci, SCI_LINEFROMPOSITION, (uptr_t) end, 0);
+
+	return line_end - line_start + 1;
+}
+
 static void output_prepare()
 {
 	GeanyDocument *doc;
@@ -23,9 +39,9 @@ static void output_prepare()
 		case TOOL_OUTPUT_REPLACE_LINE:
 			doc = document_get_current();
 			gint line = sci_get_current_line(doc->editor->sci);
-			gint length = sci_get_lines_selected(doc->editor->sci) - 1;
-			gint start = sci_get_pos_at_line_sel_start(doc->editor->sci, line);
-			gint end = sci_get_pos_at_line_sel_end(doc->editor->sci, line + length);
+			gint length = get_lines_selected(doc->editor->sci) - 1;
+			gint start = scintilla_send_message(doc->editor->sci, SCI_GETLINESELSTARTPOSITION, (uptr_t) line, 0);
+			gint end = scintilla_send_message(doc->editor->sci, SCI_GETLINESELENDPOSITION, (uptr_t) line, 0);
 			sci_set_selection_start(doc->editor->sci, start);
 			sci_set_selection_end(doc->editor->sci, end);
 			break;

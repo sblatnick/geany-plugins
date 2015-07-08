@@ -185,7 +185,7 @@ static void on_shortcut(GtkButton* button, gpointer data)
 {
 	Tool* tool = get_active_tool();
 	gtk_dialog_response(configDialog, GTK_RESPONSE_OK);
-	keybindings_dialog_show_prefs_scroll("External Tools");
+	//TODO: keybindings_dialog_show_prefs_scroll("External Tools");
 }
 
 GtkWidget* plugin_configure(GtkDialog *dialog)

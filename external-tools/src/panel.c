@@ -22,11 +22,24 @@ typedef struct
 } RegexSetting;
 static RegexSetting fileRegexSetting = {"[\\w./-]+\\.[\\w./-]+(:\\d+)?", NULL};
 
+gboolean panel_goto_line(GeanyEditor *editor, gint line_no)
+	{
+	gint pos;
+
+	g_return_val_if_fail(editor, FALSE);
+	if (line_no < 0 || line_no >= sci_get_line_count(editor->sci))
+		return FALSE;
+
+	pos = sci_get_position_from_line(editor->sci, line_no);
+	return editor_goto_pos(editor, pos, TRUE);
+}
+
+
 static void open_path(gchar *path, gchar *line)
 {
 	GeanyDocument *doc = document_open_file(path, FALSE, NULL, NULL);
 	if(line != NULL) {
-		editor_goto_line(doc->editor, atoi(line) - 1, 0);
+		panel_goto_line(doc->editor, atoi(line) - 1);
 	}
 }
 
@@ -161,6 +174,7 @@ static gboolean on_keypress(GtkWidget *widget, GdkEventKey *event, gpointer data
 	return FALSE;
 }
 
+/*
 static gboolean panel_focus_tab(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
 	GeanyKeyBinding *kb = keybindings_lookup_item(GEANY_KEY_GROUP_FOCUS, GEANY_KEYS_FOCUS_MESSAGE_WINDOW);
@@ -173,6 +187,7 @@ static gboolean panel_focus_tab(GtkWidget *widget, GdkEvent *event, gpointer dat
 	}
 	return FALSE;
 }
+*/
 
 void panel_init()
 {
@@ -201,7 +216,7 @@ void panel_init()
 	gtk_widget_show_all(scrollable_text);
 	gtk_container_set_focus_child(GTK_CONTAINER(panel), scrollable_text);
 
-	g_signal_connect(geany->main_widgets->window, "key-release-event", G_CALLBACK(panel_focus_tab), NULL);
+	//g_signal_connect(geany->main_widgets->window, "key-release-event", G_CALLBACK(panel_focus_tab), NULL);
 	g_signal_connect(text_view, "button-press-event", G_CALLBACK(on_click), NULL);
 	g_signal_connect(text_view, "key-press-event", G_CALLBACK(on_keypress), NULL);
 

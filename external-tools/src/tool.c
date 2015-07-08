@@ -146,7 +146,7 @@ void reload_tools()
 	menuCount = 0;
 	load_tools(setup_tools);
 	keybindings_set_item(key_group, shortcutCount, key_callback, 0, 0, "external_tools_keyboard_shortcut", _("External Tools..."), NULL);
-	keybindings_load_keyfile();
+	//TODO: keybindings_load_keyfile();
 }
 
 int save_tool(Tool* tool)
