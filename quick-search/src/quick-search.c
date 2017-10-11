@@ -4,7 +4,6 @@
 
 GeanyPlugin *geany_plugin;
 GeanyData *geany_data;
-GeanyFunctions *geany_functions;
 
 static gint QUICK_SEARCH_INDICATOR = 20;
 static gint SELECTED_SEARCH_INDICATOR = 21;
@@ -15,6 +14,8 @@ static gulong handler;
 static const gchar *text = "";
 static const gchar *old;
 static gboolean skip = FALSE;
+
+static gint mark_all(GeanyDocument *doc, const gchar *search_text, gint indicator);
 
 PLUGIN_VERSION_CHECK(211)
 PLUGIN_SET_INFO("Quick Search", "Do a case-insensitive search on the current document while highlighting all results.	Also highlight all selected text.", "0.1", "Steven Blatnick <steve8track@yahoo.com>");
@@ -72,8 +73,8 @@ static void quick_search(G_GNUC_UNUSED guint key_id)
 	
 	if(sci_has_selection(doc->editor->sci)) {
 		gchar *selected;
-		selected = g_malloc(sci_get_selected_text_length(doc->editor->sci) + 1);
-		sci_get_selected_text(doc->editor->sci, selected);
+		//selected = g_malloc(sci_get_selected_text_length(doc->editor->sci) + 1);
+		selected = sci_get_selection_contents(doc->editor->sci);
 
 		sci_set_current_position(doc->editor->sci, sci_get_selection_start(doc->editor->sci), TRUE);
 		scintilla_send_message(doc->editor->sci, SCI_SEARCHANCHOR, 0, 0);
@@ -152,6 +153,7 @@ static gboolean on_key(GtkWidget *widget, GdkEventKey *event, gpointer user_data
 			doc->editor->scroll_percent = 0.3F;
 		}
 	}
+  return TRUE;
 }
 
 void plugin_init(GeanyData *data)
@@ -275,8 +277,8 @@ gboolean editor_notify_cb(GObject *object, GeanyEditor *editor, SCNotification *
 			return FALSE;
 		}
 		gchar *selected;
-		selected = g_malloc(sci_get_selected_text_length(editor->sci) + 1);
-		sci_get_selected_text(editor->sci, selected);
+		//selected = g_malloc(sci_get_selected_text_length(editor->sci) + 1);
+		selected = sci_get_selection_contents(editor->sci);
 		GeanyDocument *doc = document_get_current();
 		mark_all(doc, selected, SELECTED_SEARCH_INDICATOR);
 	}
