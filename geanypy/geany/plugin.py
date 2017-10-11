@@ -30,12 +30,14 @@ basic plugin could look something like this:
 The guts of the API are exposed to plugins through the `geany` package and
 its modules.
 
-Plugins should be placed in either the system plugin directory (something
-like /usr/local/share/geany/geanypy/plugins) or in their personal plugin
-directory (something like ~/.config/geany/plugins/geanypy/plugins).  Only
-files with a `.py` extension will be loaded.
+Plugins should be placed in either the system plugin directory (something like
+/usr/local/lib/geany) or in the user plugin directory (something like
+~/.config/geany/plugins).  Only files with a `.py` extension will be loaded.
 """
 
+
+from geany.logger import PluginLogger
+import keybindings
 
 class Plugin(object):
 	"""
@@ -49,7 +51,6 @@ class Plugin(object):
 	#__plugin_version__ = None
 	#__plugin_author__ = None
 
-
 	_events = {
 		"document-open": [],
 		# TODO: add more events here
@@ -61,7 +62,7 @@ class Plugin(object):
 		When the plugin is loaded its __init__() function will be called
 		so that's a good place to put plugin initialization code.
 		"""
-
+		self.logger = PluginLogger(self.name)
 
 
 	def cleanup(self):
@@ -121,3 +122,10 @@ class Plugin(object):
 			return self.__plugin_author__
 		else:
 			return ""
+
+	def set_key_group(self, section_name, count, callback = None):
+		"""
+		Sets up a GeanyKeyGroup for this plugin. You can use that group to add keybindings
+		with group.add_key_item().
+		"""
+		return keybindings.set_key_group(self, section_name, count, callback)

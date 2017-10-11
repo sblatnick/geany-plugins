@@ -6,13 +6,13 @@
 
 #define PLUGIN_NAME _("Lua Script")
 
-#define PLUGIN_DESC _("Write and run Lua scripts for custom commands.")
+#define PLUGIN_DESC _("Write and run Lua scripts for custom commands.\nThis plugin currently has no maintainer. Would you like to help by contributing to this plugin?")
 
 #define PLUGIN_VER VERSION
 
 #define PLUGIN_AUTHOR "Jeff Pohlmeyer"
 
-#define MY_GEANY_API_VER 224
+#define MY_GEANY_API_VER 235
 
 #define LUA_MODULE_NAME "geany"
 

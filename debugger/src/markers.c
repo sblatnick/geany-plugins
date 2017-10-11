@@ -26,7 +26,6 @@
 #include <string.h>
 
 #include "geanyplugin.h"
-extern GeanyFunctions	*geany_functions;
 extern GeanyData		*geany_data;
 
 #include "markers.h"
@@ -40,15 +39,16 @@ extern GeanyData		*geany_data;
 #include "xpm/frame_current.xpm"
 
 /* markers identifiers */
-#define M_FIRST									12
-#define M_BP_ENABLED						M_FIRST
-#define M_BP_DISABLED						(M_FIRST + 1)
-#define M_BP_CONDITIONAL					(M_FIRST + 2)
-#define M_CI_BACKGROUND					(M_FIRST + 3)
-#define M_CI_ARROW							(M_FIRST + 4)
-#define M_FRAME								(M_FIRST + 5)
-
-#define MARKER_PRESENT(mask, marker) (mask && (0x01 << marker))
+#define M_FIRST			12
+enum
+{
+	M_BP_ENABLED		= M_FIRST,
+	M_BP_DISABLED,
+	M_BP_CONDITIONAL,
+	M_FRAME,
+	M_CI_BACKGROUND,
+	M_CI_ARROW
+};
 
 /* markers colors */
 #define RGB(R,G,B)	(R | (G << 8) | (B << 16))
@@ -98,7 +98,7 @@ void markers_set_for_document(ScintillaObject *sci)
 void markers_init(void)
 {
 	/* set markers in all currently opened documents */
-	int i;
+	guint i;
 	foreach_document(i)
 		markers_set_for_document(document_index(i)->editor->sci);
 }

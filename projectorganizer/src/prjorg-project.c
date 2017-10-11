@@ -30,7 +30,6 @@
 
 extern GeanyPlugin *geany_plugin;
 extern GeanyData *geany_data;
-extern GeanyFunctions *geany_functions;
 
 typedef struct
 {
@@ -70,27 +69,40 @@ static void collect_source_files(gchar *filename, TMSourceFile *sf, gpointer use
 
 
 /* path - absolute path in locale, returned list in locale */
-static GSList *get_file_list(const gchar *utf8_path, GSList *patterns, GSList *ignored_dirs_patterns, GSList *ignored_file_patterns)
+static GSList *get_file_list(const gchar *utf8_path, GSList *patterns,
+		GSList *ignored_dirs_patterns, GSList *ignored_file_patterns, GHashTable *visited_paths)
 {
 	GSList *list = NULL;
 	GDir *dir;
+	const gchar *child_name;
+	GSList *child = NULL;
+	GSList *children = NULL;
 	gchar *locale_path = utils_get_locale_from_utf8(utf8_path);
+	gchar *real_path = utils_get_real_path(locale_path);
 
 	dir = g_dir_open(locale_path, 0, NULL);
-	if (!dir)
+	if (!dir || !real_path || g_hash_table_lookup(visited_paths, real_path))
 	{
 		g_free(locale_path);
+		g_free(real_path);
+		if (dir)
+			g_dir_close(dir);
 		return NULL;
 	}
 
-	while (TRUE)
+	g_hash_table_insert(visited_paths, real_path, GINT_TO_POINTER(1));
+
+	while ((child_name = g_dir_read_name(dir)))
+		children = g_slist_prepend(children, g_strdup(child_name));
+
+	g_dir_close(dir);
+
+	foreach_slist(child, children)
 	{
 		const gchar *locale_name;
 		gchar *locale_filename, *utf8_filename, *utf8_name;
 
-		locale_name = g_dir_read_name(dir);
-		if (!locale_name)
-			break;
+		locale_name = child->data;
 
 		utf8_name = utils_get_utf8_from_locale(locale_name);
 		locale_filename = g_build_filename(locale_path, locale_name, NULL);
@@ -99,32 +111,13 @@ static GSList *get_file_list(const gchar *utf8_path, GSList *patterns, GSList *i
 		if (g_file_test(locale_filename, G_FILE_TEST_IS_DIR))
 		{
 			GSList *lst;
-			gchar *relative, *locale_parent_realpath, *locale_child_realpath,
-				*utf8_parent_realpath, *utf8_child_realpath;
 
-			/* symlink cycle avoidance - test if directory within parent directory */
-			locale_parent_realpath = tm_get_real_path(locale_path);
-			locale_child_realpath = tm_get_real_path(locale_filename);
-			utf8_parent_realpath = utils_get_utf8_from_locale(locale_parent_realpath);
-			utf8_child_realpath = utils_get_utf8_from_locale(locale_child_realpath);
-
-			relative = get_relative_path(utf8_parent_realpath, utf8_child_realpath);
-
-			g_free(locale_parent_realpath);
-			g_free(locale_child_realpath);
-			g_free(utf8_parent_realpath);
-			g_free(utf8_child_realpath);
-
-			if (relative)
+			if (!patterns_match(ignored_dirs_patterns, utf8_name))
 			{
-				g_free(relative);
-
-				if (!patterns_match(ignored_dirs_patterns, utf8_name))
-				{
-					lst = get_file_list(utf8_filename, patterns, ignored_dirs_patterns, ignored_file_patterns);
-					if (lst)
-						list = g_slist_concat(list, lst);
-				}
+				lst = get_file_list(utf8_filename, patterns, ignored_dirs_patterns,
+						ignored_file_patterns, visited_paths);
+				if (lst)
+					list = g_slist_concat(list, lst);
 			}
 		}
 		else if (g_file_test(locale_filename, G_FILE_TEST_IS_REGULAR))
@@ -138,7 +131,7 @@ static GSList *get_file_list(const gchar *utf8_path, GSList *patterns, GSList *i
 		g_free(utf8_name);
 	}
 
-	g_dir_close(dir);
+	g_slist_free_full(children, g_free);
 	g_free(locale_path);
 
 	return list;
@@ -151,8 +144,9 @@ static gint prjorg_project_rescan_root(PrjOrgRoot *root)
 	GSList *pattern_list = NULL;
 	GSList *ignored_dirs_list = NULL;
 	GSList *ignored_file_list = NULL;
+	GHashTable *visited_paths;
 	GSList *lst;
-	GSList *elem;
+	GSList *elem = NULL;
 	gint filenum = 0;
 
 	source_files = g_ptr_array_new();
@@ -173,7 +167,9 @@ static gint prjorg_project_rescan_root(PrjOrgRoot *root)
 	ignored_dirs_list = get_precompiled_patterns(prj_org->ignored_dirs_patterns);
 	ignored_file_list = get_precompiled_patterns(prj_org->ignored_file_patterns);
 
-	lst = get_file_list(root->base_dir, pattern_list, ignored_dirs_list, ignored_file_list);
+	visited_paths = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+	lst = get_file_list(root->base_dir, pattern_list, ignored_dirs_list, ignored_file_list, visited_paths);
+	g_hash_table_destroy(visited_paths);
 
 	foreach_slist(elem, lst)
 	{
@@ -358,7 +354,7 @@ static void update_project(
 void prjorg_project_save(GKeyFile * key_file)
 {
 	GPtrArray *array;
-	GSList *elem, *lst;
+	GSList *elem = NULL, *lst;
 
 	if (!prj_org)
 		return;
@@ -416,8 +412,8 @@ static gint root_comparator(PrjOrgRoot *a, PrjOrgRoot *b)
 
 	a_locale_base_dir = utils_get_locale_from_utf8(a->base_dir);
 	b_locale_base_dir = utils_get_locale_from_utf8(b->base_dir);
-	a_realpath = tm_get_real_path(a_locale_base_dir);
-	b_realpath = tm_get_real_path(b_locale_base_dir);
+	a_realpath = utils_get_real_path(a_locale_base_dir);
+	b_realpath = utils_get_real_path(b_locale_base_dir);
 
 	res = g_strcmp0(a_realpath, b_realpath);
 
@@ -468,7 +464,7 @@ void prjorg_project_open(GKeyFile * key_file)
 {
 	gchar **source_patterns, **header_patterns, **ignored_dirs_patterns, **ignored_file_patterns, **external_dirs, **dir_ptr, *last_name;
 	gint generate_tag_prefs;
-	GSList *elem, *ext_list = NULL;
+	GSList *elem = NULL, *ext_list = NULL;
 	gchar *utf8_base_path;
 
 	if (prj_org != NULL)
@@ -567,13 +563,12 @@ void prjorg_project_read_properties_tab(void)
 }
 
 
-gint prjorg_project_add_properties_tab(GtkWidget *notebook)
+GtkWidget *prjorg_project_add_properties_tab(GtkWidget *notebook)
 {
 	GtkWidget *vbox, *hbox, *hbox1;
 	GtkWidget *table;
 	GtkWidget *label;
 	gchar *str;
-	gint page_index;
 
 	e = g_new0(PropertyDialogElements, 1);
 
@@ -588,7 +583,7 @@ gint prjorg_project_add_properties_tab(GtkWidget *notebook)
 	e->source_patterns = gtk_entry_new();
 	ui_table_add_row(GTK_TABLE(table), 0, label, e->source_patterns, NULL);
 	ui_entry_add_clear_icon(GTK_ENTRY(e->source_patterns));
-	ui_widget_set_tooltip_text(e->source_patterns,
+	gtk_widget_set_tooltip_text(e->source_patterns,
 		_("Space separated list of patterns that are used to identify source files. "
 		  "Used for header/source swapping."));
 	str = g_strjoinv(" ", prj_org->source_patterns);
@@ -600,7 +595,7 @@ gint prjorg_project_add_properties_tab(GtkWidget *notebook)
 	e->header_patterns = gtk_entry_new();
 	ui_entry_add_clear_icon(GTK_ENTRY(e->header_patterns));
 	ui_table_add_row(GTK_TABLE(table), 1, label, e->header_patterns, NULL);
-	ui_widget_set_tooltip_text(e->header_patterns,
+	gtk_widget_set_tooltip_text(e->header_patterns,
 		_("Space separated list of patterns that are used to identify headers. "
 		  "Used for header/source swapping."));
 	str = g_strjoinv(" ", prj_org->header_patterns);
@@ -612,7 +607,7 @@ gint prjorg_project_add_properties_tab(GtkWidget *notebook)
 	e->ignored_file_patterns = gtk_entry_new();
 	ui_entry_add_clear_icon(GTK_ENTRY(e->ignored_file_patterns));
 	ui_table_add_row(GTK_TABLE(table), 2, label, e->ignored_file_patterns, NULL);
-	ui_widget_set_tooltip_text(e->ignored_file_patterns,
+	gtk_widget_set_tooltip_text(e->ignored_file_patterns,
 		_("Space separated list of patterns that are used to identify files "
 		  "that are not displayed in the project tree."));
 	str = g_strjoinv(" ", prj_org->ignored_file_patterns);
@@ -624,23 +619,23 @@ gint prjorg_project_add_properties_tab(GtkWidget *notebook)
 	e->ignored_dirs_patterns = gtk_entry_new();
 	ui_entry_add_clear_icon(GTK_ENTRY(e->ignored_dirs_patterns));
 	ui_table_add_row(GTK_TABLE(table), 3, label, e->ignored_dirs_patterns, NULL);
-	ui_widget_set_tooltip_text(e->ignored_dirs_patterns,
+	gtk_widget_set_tooltip_text(e->ignored_dirs_patterns,
 		_("Space separated list of patterns that are used to identify directories "
 		  "that are not scanned for source files."));
 	str = g_strjoinv(" ", prj_org->ignored_dirs_patterns);
 	gtk_entry_set_text(GTK_ENTRY(e->ignored_dirs_patterns), str);
 	g_free(str);
 
-	label = gtk_label_new(_("Generate tags for all project files:"));
+	label = gtk_label_new(_("Index all project files:"));
 	gtk_misc_set_alignment(GTK_MISC(label), 0, 0);
 	e->generate_tag_prefs = gtk_combo_box_text_new();
-	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(e->generate_tag_prefs), _("Auto (generate if less than 300 files)"));
+	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(e->generate_tag_prefs), _("Auto (index if less than 300 files)"));
 	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(e->generate_tag_prefs), _("Yes"));
 	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(e->generate_tag_prefs), _("No"));
 	gtk_combo_box_set_active(GTK_COMBO_BOX(e->generate_tag_prefs), prj_org->generate_tag_prefs);
 	ui_table_add_row(GTK_TABLE(table), 4, label, e->generate_tag_prefs, NULL);
-	ui_widget_set_tooltip_text(e->generate_tag_prefs,
-		_("Generate tag list for all project files instead of only for the currently opened files. "
+	gtk_widget_set_tooltip_text(e->generate_tag_prefs,
+		_("Generate symbol list for all project files instead of only for the currently opened files. "
 		  "Might be slow for big projects."));
 
 	gtk_box_pack_start(GTK_BOX(vbox), table, FALSE, FALSE, 6);
@@ -657,10 +652,10 @@ gint prjorg_project_add_properties_tab(GtkWidget *notebook)
 	hbox = gtk_hbox_new(FALSE, 0);
 	gtk_box_pack_start(GTK_BOX(hbox), vbox, TRUE, TRUE, 6);
 
-	page_index = gtk_notebook_append_page(GTK_NOTEBOOK(notebook), hbox, label);
+	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), hbox, label);
 	gtk_widget_show_all(notebook);
 
-	return page_index;
+	return hbox;
 }
 
 
@@ -687,7 +682,7 @@ void prjorg_project_close(void)
 
 gboolean prjorg_project_is_in_project(const gchar *utf8_filename)
 {
-	GSList *elem;
+	GSList *elem = NULL;
 
 	if (!utf8_filename || !prj_org || !geany_data->app->project || !prj_org->roots)
 		return FALSE;
@@ -705,14 +700,14 @@ gboolean prjorg_project_is_in_project(const gchar *utf8_filename)
 
 static gboolean add_tm_idle(gpointer foo)
 {
-	GSList *elem2;
+	GSList *elem2 = NULL;
 
 	if (!prj_org || !s_idle_add_funcs)
 		return FALSE;
 
 	foreach_slist (elem2, s_idle_add_funcs)
 	{
-		GSList *elem;
+		GSList *elem = NULL;
 		gchar *utf8_fname = elem2->data;
 
 		foreach_slist (elem, prj_org->roots)
@@ -752,14 +747,14 @@ void prjorg_project_add_single_tm_file(gchar *utf8_filename)
 
 static gboolean remove_tm_idle(gpointer foo)
 {
-	GSList *elem2;
+	GSList *elem2 = NULL;
 
 	if (!prj_org || !s_idle_remove_funcs)
 		return FALSE;
 
 	foreach_slist (elem2, s_idle_remove_funcs)
 	{
-		GSList *elem;
+		GSList *elem = NULL;
 		gchar *utf8_fname = elem2->data;
 
 		foreach_slist (elem, prj_org->roots)

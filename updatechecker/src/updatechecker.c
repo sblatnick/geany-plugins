@@ -1,7 +1,7 @@
 /*
  *      updatechecker.c
  *
- *      Copyright 2011, 2014 Frank Lanitz <frank(at)frank(dot)uvena(dot)de>
+ *      Copyright 2011-2015 Frank Lanitz <frank(at)frank(dot)uvena(dot)de>
  *
  *      This program is free software; you can redistribute it and/or modify
  *      it under the terms of the GNU General Public License as published by
@@ -31,15 +31,14 @@
 
 GeanyPlugin     *geany_plugin;
 GeanyData       *geany_data;
-GeanyFunctions  *geany_functions;
 
-PLUGIN_VERSION_CHECK(203)
+PLUGIN_VERSION_CHECK(224)
 
 PLUGIN_SET_TRANSLATABLE_INFO(
     LOCALEDIR,
     GETTEXT_PACKAGE,
     _("Updatechecker"),
-    _("A plugin which is checking whether there are updates for Geany available."),
+    _("Checks whether there are updates for Geany available"),
     VERSION,
     "Frank Lanitz <frank@frank.uvena.de>")
 
@@ -84,7 +83,7 @@ static void update_check(gint type)
                                      GEANY_VERSION, NULL);
 
     g_message("Checking for updates (querying URL \"%s\")", UPDATE_CHECK_URL);
-    soup = soup_session_async_new_with_options(
+    soup = soup_session_new_with_options(
             SOUP_SESSION_USER_AGENT, user_agent,
             SOUP_SESSION_TIMEOUT, 10,
             NULL);

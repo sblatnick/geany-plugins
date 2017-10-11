@@ -28,7 +28,6 @@
 #include <string.h>
 
 #include "geanyplugin.h"
-extern GeanyFunctions	*geany_functions;
 
 #include "breakpoints.h"
 #include "utils.h"
@@ -70,7 +69,7 @@ static void hash_table_foreach_call_function(gpointer key, gpointer value, gpoin
 static gboolean tree_foreach_add_to_list(gpointer key, gpointer value, gpointer data)
 {
 	GList **list = (GList**)data;
-	*list = g_list_append(*list, value);
+	*list = g_list_prepend(*list, value);
 	return FALSE;
 }
 
@@ -227,7 +226,7 @@ static void breaks_set_condition_debug(breakpoint* bp)
 	{
 		/* revert to old condition (taken from tree) */
 		gchar* oldcondition = bptree_get_condition(bp);
-		strcpy(bp->condition, oldcondition);
+		strncpy(bp->condition, oldcondition, G_N_ELEMENTS(bp->condition) - 1);
 		g_free(oldcondition);
 		/* show error message */
 		dialogs_show_msgbox(GTK_MESSAGE_ERROR, "%s", debug_error_message());
@@ -596,7 +595,7 @@ void breaks_set_condition(const char* file, int line, const char* condition)
 		return;
 	
 	/* change condition */
-	strcpy(bp->condition, condition);
+	strncpy(bp->condition, condition, G_N_ELEMENTS(bp->condition) - 1);
 	
 	/* handle setting condition instantly if debugger is idle or stopped
 	and request debug module interruption overwise */
@@ -675,7 +674,7 @@ GList* breaks_get_for_document(const char* file)
 	{
 		g_tree_foreach(tree, tree_foreach_add_to_list, &breaks);
 	}
-	return breaks;
+	return g_list_reverse(breaks);
 }
 
 /*
@@ -702,5 +701,5 @@ GList* breaks_get_all(void)
 {
 	GList *breaks  = NULL;
 	g_hash_table_foreach(files, hash_table_foreach_add_to_list, &breaks);
-	return breaks;
+	return g_list_reverse(breaks);
 }

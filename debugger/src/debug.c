@@ -56,7 +56,6 @@ int grantpt(int fd);
 	#include "config.h"
 #endif
 #include <geanyplugin.h>
-extern GeanyFunctions	*geany_functions;
 extern GeanyData		*geany_data;
 
 #include "tpage.h"
@@ -399,7 +398,7 @@ static gboolean on_watch_key_pressed_callback(GtkWidget *widget, GdkEvent  *even
 
 	/* check whether only empty row was selected */
 	if (1 != gtk_tree_selection_count_selected_rows(selection) ||
-	    gtk_tree_path_compare((GtkTreePath*)rows->data, empty_path))
+	    (rows && gtk_tree_path_compare((GtkTreePath*)rows->data, empty_path)))
 	{
 		/* path reference to select after deleteing finishes */
 		GtkTreeRowReference *reference_to_select = NULL;
@@ -418,13 +417,13 @@ static gboolean on_watch_key_pressed_callback(GtkWidget *widget, GdkEvent  *even
 
 			/* add path reference if it's not an empty row*/
 			if (gtk_tree_path_compare(path, empty_path))
-				references = g_list_append(references, gtk_tree_row_reference_new(wmodel, path));
+				references = g_list_prepend(references, gtk_tree_row_reference_new(wmodel, path));
 
 			iter = iter->next;
 		}
 
 		/* iterate through references and remove */
-		iter = references;
+		iter = g_list_reverse(references);
 		while (iter)
 		{
 			GtkTreeRowReference *reference = (GtkTreeRowReference*)iter->data;
@@ -640,7 +639,7 @@ static void on_debugger_run (void)
 	if (stack)
 	{
 		remove_stack_markers();
-		g_list_foreach(stack, (GFunc)frame_free, NULL);
+		g_list_foreach(stack, (GFunc)frame_unref, NULL);
 		g_list_free(stack);
 		stack = NULL;
 
@@ -672,7 +671,8 @@ static void on_debugger_stopped (int thread_id)
 	}
 
 	/* clear calltips cache */
-	g_hash_table_remove_all(calltips);
+	if (calltips)
+		g_hash_table_remove_all(calltips);
 
 	/* if a stop was requested for asyncronous exiting -
 	 * stop debug module and exit */
@@ -699,11 +699,7 @@ static void on_debugger_stopped (int thread_id)
 
 	/* get current stack trace and put in the tree view */
 	stack = active_module->get_stack();
-	for (iter = stack; iter; iter = iter->next)
-	{
-		frame *f = (frame*)iter->data;
-		stree_add(f);
-	}
+	stree_add (stack);
 	stree_select_first_frame(TRUE);
 
 	/* files */
@@ -798,7 +794,7 @@ static void on_debugger_exited (int code)
 	if (stack)
 	{
 		remove_stack_markers();
-		g_list_foreach(stack, (GFunc)frame_free, NULL);
+		g_list_foreach(stack, (GFunc)frame_unref, NULL);
 		g_list_free(stack);
 		stack = NULL;
 	}
@@ -841,8 +837,11 @@ static void on_debugger_exited (int code)
 	read_only_pages = NULL;
 
 	/* clear and destroy calltips cache */
-	g_hash_table_destroy(calltips);
-	calltips = NULL;
+	if (calltips)
+	{
+		g_hash_table_destroy(calltips);
+		calltips = NULL;
+	}
 
 	/* enable widgets */
 	enable_sensitive_widgets(TRUE);
@@ -930,14 +929,18 @@ dbg_callbacks callbacks = {
 static void on_select_frame(int frame_number)
 {
 	GList *autos, *watches;
-	frame *f = (frame*)g_list_nth(stack, active_module->get_active_frame())->data;
-	markers_remove_current_instruction(f->file, f->line);
-	markers_add_frame(f->file, f->line);
+	frame *f = (frame*)g_list_nth_data(stack, active_module->get_active_frame());
+	if (f)
+	{
+		markers_remove_current_instruction(f->file, f->line);
+		markers_add_frame(f->file, f->line);
+	}
 
 	active_module->set_active_frame(frame_number);
 	
 	/* clear calltips cache */
-	g_hash_table_remove_all(calltips);
+	if (calltips)
+		g_hash_table_remove_all(calltips);
 	
 	/* autos */
 	autos = active_module->get_autos();
@@ -947,9 +950,41 @@ static void on_select_frame(int frame_number)
 	watches = active_module->get_watches();
 	update_variables(GTK_TREE_VIEW(wtree), NULL, watches);
 
-	f = (frame*)g_list_nth(stack, frame_number)->data;
-	markers_remove_frame(f->file, f->line);
-	markers_add_current_instruction(f->file, f->line);
+	f = (frame*)g_list_nth_data(stack, frame_number);
+	if (f)
+	{
+		markers_remove_frame(f->file, f->line);
+		markers_add_current_instruction(f->file, f->line);
+	}
+}
+
+/*
+ * called when a thread should been selected
+ */
+static void on_select_thread(int thread_id)
+{
+	gboolean success;
+
+	if (stack)
+		remove_stack_markers();
+
+	if ((success = active_module->set_active_thread(thread_id)))
+	{
+		g_list_free_full(stack, (GDestroyNotify)frame_unref);
+		stack = active_module->get_stack();
+
+		/* update the stack tree */
+		stree_remove_frames();
+		stree_set_active_thread_id(thread_id);
+		stree_add(stack);
+		stree_select_first_frame(TRUE);
+	}
+
+	if (stack)
+		add_stack_markers();
+
+	if (success)
+		on_select_frame(0);
 }
 
 /*
@@ -995,7 +1030,7 @@ void debug_init(void)
 	gtk_container_add(GTK_CONTAINER(tab_autos), atree);
 	
 	/* create stack trace page */
-	stree = stree_init(editor_open_position, on_select_frame);
+	stree = stree_init(editor_open_position, on_select_thread, on_select_frame);
 	tab_call_stack = gtk_scrolled_window_new(
 		gtk_tree_view_get_hadjustment(GTK_TREE_VIEW(stree )),
 		gtk_tree_view_get_vadjustment(GTK_TREE_VIEW(stree ))
@@ -1070,7 +1105,7 @@ void debug_destroy(void)
 	if (stack)
 	{
 		remove_stack_markers();
-		g_list_foreach(stack, (GFunc)frame_free, NULL);
+		g_list_foreach(stack, (GFunc)frame_unref, NULL);
 		g_list_free(stack);
 		stack = NULL;
 	}
@@ -1121,11 +1156,11 @@ GList* debug_get_modules(void)
 	module_description *desc = modules;
 	while (desc->title)
 	{
-		mods = g_list_append(mods, (gpointer)desc->title);
+		mods = g_list_prepend(mods, (gpointer)desc->title);
 		desc++;
 	}
 	
-	return mods;
+	return g_list_reverse(mods);
 }
 
 /*
@@ -1336,32 +1371,34 @@ gchar* debug_get_calltip_for_expression(gchar* expression)
 		if (var)
 		{
 			calltip_str = get_calltip_line(var, TRUE);
-			if (var->has_children)
+			if (calltip_str)
 			{
-				int lines_left = MAX_CALLTIP_HEIGHT - 1;
-				GList* children = active_module->get_children(var->internal->str); 
-				GList* child = children;
-				while(child && lines_left)
+				if (var->has_children)
 				{
-					variable *varchild = (variable*)child->data;
-					GString *child_string = get_calltip_line(varchild, FALSE);
-					g_string_append_printf(calltip_str, "\n%s", child_string->str);
-					g_string_free(child_string, TRUE);
+					int lines_left = MAX_CALLTIP_HEIGHT - 1;
+					GList* children = active_module->get_children(var->internal->str);
+					GList* child = children;
+					while(child && lines_left)
+					{
+						variable *varchild = (variable*)child->data;
+						GString *child_string = get_calltip_line(varchild, FALSE);
+						g_string_append_printf(calltip_str, "\n%s", child_string->str);
+						g_string_free(child_string, TRUE);
 
-					child = child->next;
-					lines_left--;
+						child = child->next;
+						lines_left--;
+					}
+					if (!lines_left && child)
+					{
+						g_string_append(calltip_str, "\n\t\t........");
+					}
+					g_list_foreach(children, (GFunc)variable_free, NULL);
+					g_list_free(children);
 				}
-				if (!lines_left && child)
-				{
-					g_string_append(calltip_str, "\n\t\t........");
-				}
-				g_list_foreach(children, (GFunc)variable_free, NULL);
-				g_list_free(children);
+				calltip = g_string_free(calltip_str, FALSE);
 			}
 
 			active_module->remove_watch(var->internal->str);
-
-			calltip = g_string_free(calltip_str, FALSE);
 
 			if (!calltips)
 			{

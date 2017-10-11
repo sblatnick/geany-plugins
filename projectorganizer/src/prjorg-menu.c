@@ -34,7 +34,6 @@
 
 extern GeanyPlugin *geany_plugin;
 extern GeanyData *geany_data;
-extern GeanyFunctions *geany_functions;
 
 
 enum
@@ -53,7 +52,7 @@ static GtkWidget *s_fif_item, *s_ff_item, *s_ft_item, *s_shs_item, *s_sep_item, 
 static gboolean try_swap_header_source(gchar *utf8_file_name, gboolean is_header, GSList *file_list, GSList *header_patterns, GSList *source_patterns)
 {
 	gchar *name_pattern;
-	GSList *elem;
+	GSList *elem = NULL;
 	GPatternSpec *pattern;
 	gboolean found = FALSE;
 
@@ -116,7 +115,7 @@ static void on_swap_header_source(G_GNUC_UNUSED GtkMenuItem * menuitem, G_GNUC_U
 	{
 		gboolean swapped;
 		GSList *elem, *list = NULL;
-		guint i;
+		guint i = 0;
 
 		foreach_document(i)
 		{
@@ -297,7 +296,7 @@ static void on_open_selected_file(GtkMenuItem *menuitem, gpointer user_data)
 
 		if (g_strcmp0(utf8_path, "") != 0)
 		{
-			GSList *elem;
+			GSList *elem = NULL;
 			const gchar *found_path = NULL;
 
 			foreach_slist (elem, prj_org->roots)
@@ -383,7 +382,7 @@ void prjorg_menu_init(void)
 
 	image = gtk_image_new_from_stock(GTK_STOCK_FIND, GTK_ICON_SIZE_MENU);
 	gtk_widget_show(image);
-	s_fif_item = gtk_image_menu_item_new_with_mnemonic(_("Find in Project Files"));
+	s_fif_item = gtk_image_menu_item_new_with_mnemonic(_("Find in Project Files..."));
 	gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(s_fif_item), image);
 	gtk_widget_show(s_fif_item);
 	gtk_container_add(GTK_CONTAINER(geany->main_widgets->project_menu), s_fif_item);
@@ -393,7 +392,7 @@ void prjorg_menu_init(void)
 
 	image = gtk_image_new_from_stock(GTK_STOCK_FIND, GTK_ICON_SIZE_MENU);
 	gtk_widget_show(image);
-	s_ff_item = gtk_image_menu_item_new_with_mnemonic(_("Find Project File"));
+	s_ff_item = gtk_image_menu_item_new_with_mnemonic(_("Find Project File..."));
 	gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(s_ff_item), image);
 	gtk_widget_show(s_ff_item);
 	gtk_container_add(GTK_CONTAINER(geany->main_widgets->project_menu), s_ff_item);
@@ -403,13 +402,13 @@ void prjorg_menu_init(void)
 
 	image = gtk_image_new_from_stock(GTK_STOCK_FIND, GTK_ICON_SIZE_MENU);
 	gtk_widget_show(image);
-	s_ft_item = gtk_image_menu_item_new_with_mnemonic(_("Find Project Tag"));
+	s_ft_item = gtk_image_menu_item_new_with_mnemonic(_("Find Project Symbol..."));
 	gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(s_ft_item), image);
 	gtk_widget_show(s_ft_item);
 	gtk_container_add(GTK_CONTAINER(geany->main_widgets->project_menu), s_ft_item);
 	g_signal_connect((gpointer) s_ft_item, "activate", G_CALLBACK(on_find_tag), NULL);
 	keybindings_set_item(key_group, KB_FIND_TAG, NULL,
-		0, 0, "find_tag", _("Find project tag"), s_ft_item);
+		0, 0, "find_tag", _("Find project symbol"), s_ft_item);
 
 	s_shs_item = gtk_menu_item_new_with_mnemonic(_("Swap Header/Source"));
 	gtk_widget_show(s_shs_item);

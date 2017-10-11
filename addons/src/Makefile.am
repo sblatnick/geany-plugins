@@ -1,4 +1,5 @@
 include $(top_srcdir)/build/vars.build.mk
+plugin = addons
 
 geanyplugins_LTLIBRARIES = addons.la
 
@@ -13,6 +14,7 @@ addons_la_SOURCES = \
 	ao_tasks.h \
 	ao_xmltagging.h \
 	ao_wrapwords.h \
+	ao_copyfilepath.h \
 	addons.c \
 	ao_blanklines.c \
 	ao_doclist.c \
@@ -22,7 +24,11 @@ addons_la_SOURCES = \
 	ao_markword.c \
 	ao_tasks.c \
 	ao_xmltagging.c \
-	ao_wrapwords.c
+	ao_wrapwords.c \
+	ao_copyfilepath.c
+
+addons_la_CPPFLAGS = $(AM_CPPFLAGS) \
+					 -DG_LOG_DOMAIN=\"Addons\"
 
 addons_la_LIBADD = $(COMMONLIBS)
 

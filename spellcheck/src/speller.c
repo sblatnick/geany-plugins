@@ -26,9 +26,8 @@
 # include "config.h"
 #endif
 
-#include "geanyplugin.h"
-
-#include "scintilla/SciLexer.h"
+#include <geanyplugin.h>
+#include <scintilla/SciLexer.h>
 
 #include <string.h>
 #include <ctype.h>
@@ -54,7 +53,7 @@ static void dict_describe(const gchar* const lang, const gchar* const name,
 
 static gboolean is_word_sep(gunichar c)
 {
-	return (g_unichar_isspace(c) || g_unichar_ispunct(c)) && c != (gunichar)'\'';
+	return g_unichar_isspace(c) || g_unichar_ispunct(c);
 }
 
 
@@ -95,7 +94,7 @@ static gchar *strip_word(const gchar *word_to_check, gint *result_offset)
 	g_memmove(word_start, word, new_word_len);
 	word = word_start;
 	word[new_word_len] = '\0';
-	if (! NZV(word))
+	if (EMPTY(word))
 	{
 		g_free(word);
 		return NULL;
@@ -146,7 +145,7 @@ static gint sc_speller_check_word(GeanyDocument *doc, gint line_number, const gc
 
 	/* strip punctuation and white space */
 	word_to_check = strip_word(word, &offset);
-	if (! NZV(word_to_check))
+	if (EMPTY(word_to_check))
 	{
 		g_free(word_to_check);
 		return 0;
@@ -199,48 +198,83 @@ static gint sc_speller_check_word(GeanyDocument *doc, gint line_number, const gc
 }
 
 
-gint sc_speller_process_line(GeanyDocument *doc, gint line_number, const gchar *line)
+gint sc_speller_process_line(GeanyDocument *doc, gint line_number)
 {
 	gint pos_start, pos_end;
 	gint wstart, wend;
-	GString *str;
 	gint suggestions_found = 0;
+	gint wordchars_len;
+	gchar *wordchars;
+	gchar *underscore_in_wordchars = NULL;
+	gboolean wordchars_modified = FALSE;
 
 	g_return_val_if_fail(sc_speller_dict != NULL, 0);
 	g_return_val_if_fail(doc != NULL, 0);
-	g_return_val_if_fail(line != NULL, 0);
 
-	str = g_string_sized_new(256);
+	if (! DOC_VALID(doc))
+		return 0; /* current document has been closed */
 
+	/* add ' (single quote) temporarily to wordchars
+	 * to be able to check for "doesn't", "isn't" and similar */
+	wordchars_len = scintilla_send_message(doc->editor->sci, SCI_GETWORDCHARS, 0, 0);
+	wordchars = g_malloc0(wordchars_len + 2); /* 2 = temporarily added "'" and "\0" */
+	scintilla_send_message(doc->editor->sci, SCI_GETWORDCHARS, 0, (sptr_t)wordchars);
+	if (! strchr(wordchars, '\''))
+	{
+		/* temporarily add "'" to the wordchars */
+		wordchars[wordchars_len] = '\'';
+		wordchars_modified = TRUE;
+	}
+	underscore_in_wordchars = strchr(wordchars, '_');
+	if (underscore_in_wordchars != NULL)
+	{
+		/* Temporarily remove underscore from the wordchars to treat
+		 * it as a word seperator. Replace it by a "'" which we added already above. */
+		*underscore_in_wordchars = '\'';
+		wordchars_modified = TRUE;
+	}
+	if (wordchars_modified)
+	{
+		/* apply previously changed WORDCHARS setting */
+		scintilla_send_message(doc->editor->sci, SCI_SETWORDCHARS, 0, (sptr_t)wordchars);
+	}
 	pos_start = sci_get_position_from_line(doc->editor->sci, line_number);
 	pos_end = sci_get_position_from_line(doc->editor->sci, line_number + 1);
 
 	while (pos_start < pos_end)
 	{
+		gchar *word;
+
 		wstart = scintilla_send_message(doc->editor->sci, SCI_WORDSTARTPOSITION, pos_start, TRUE);
 		wend = scintilla_send_message(doc->editor->sci, SCI_WORDENDPOSITION, wstart, FALSE);
 		if (wstart == wend)
 			break;
 
-		/* ensure the string has enough allocated memory */
-		if (str->len < (guint)(wend - wstart))
-			g_string_set_size(str, wend - wstart);
+		word = sci_get_contents_range(doc->editor->sci, wstart, wend);
 
-		sci_get_text_range(doc->editor->sci, wstart, wend, str->str);
-
-		suggestions_found += sc_speller_check_word(doc, line_number, str->str, wstart, wend);
+		suggestions_found += sc_speller_check_word(doc, line_number, word, wstart, wend);
 
 		pos_start = wend + 1;
+
+		g_free(word);
 	}
 
-	g_string_free(str, TRUE);
+	if (wordchars_modified)
+	{
+		if (underscore_in_wordchars != NULL)
+			/* re-add underscore if we removed it above */
+			*underscore_in_wordchars = '_';
+		/* reset wordchars for the current document */
+		wordchars[wordchars_len] = '\0';
+		scintilla_send_message(doc->editor->sci, SCI_SETWORDCHARS, 0, (sptr_t)wordchars);
+	}
+	g_free(wordchars);
 	return suggestions_found;
 }
 
 
 void sc_speller_check_document(GeanyDocument *doc)
 {
-	gchar *line;
 	gint i;
 	gint first_line, last_line;
 	gchar *dict_string = NULL;
@@ -280,22 +314,21 @@ void sc_speller_check_document(GeanyDocument *doc)
 
 	if (first_line == last_line)
 	{
-		line = sci_get_selection_contents(doc->editor->sci);
-		suggestions_found += sc_speller_process_line(doc, first_line, line);
-		g_free(line);
+		suggestions_found += sc_speller_process_line(doc, first_line);
 	}
 	else
 	{
 		for (i = first_line; i < last_line; i++)
 		{
-			line = sci_get_line(doc->editor->sci, i);
-
-			suggestions_found += sc_speller_process_line(doc, i, line);
+			if (! DOC_VALID(doc))
+			{	/* current document has been closed (might happen while checking large files) */
+				ui_progress_bar_stop();
+				return;
+			}
+			suggestions_found += sc_speller_process_line(doc, i);
 
 			/* process other GTK events to keep the GUI being responsive */
 			while (g_main_context_iteration(NULL, FALSE));
-
-			g_free(line);
 		}
 	}
 	if (suggestions_found == 0 && sc_info->use_msgwin)
@@ -382,7 +415,10 @@ static void add_dict_array(const gchar* const lang_tag, const gchar* const provi
 	for (i = 0; i < sc_info->dicts->len; i++)
 	{
 		if (utils_str_equal(g_ptr_array_index(sc_info->dicts, i), result))
+		{
+			g_free(result);
 			return;
+		}
 	}
 
 	g_ptr_array_add(sc_info->dicts, result);
@@ -708,6 +744,24 @@ gboolean sc_speller_is_text(GeanyDocument *doc, gint pos)
 			}
 			break;
 		}
+		case SCLEX_COFFEESCRIPT:
+		{
+			switch (style)
+			{
+				case SCE_COFFEESCRIPT_CHARACTER:
+				case SCE_COFFEESCRIPT_COMMENTBLOCK:
+				case SCE_COFFEESCRIPT_COMMENTDOCKEYWORD:
+				case SCE_COFFEESCRIPT_COMMENTDOCKEYWORDERROR:
+				case SCE_COFFEESCRIPT_COMMENTLINEDOC:
+				case SCE_COFFEESCRIPT_STRING:
+				case SCE_COFFEESCRIPT_STRINGEOL:
+				case SCE_COFFEESCRIPT_STRINGRAW:
+					return TRUE;
+				default:
+					return FALSE;
+			}
+			break;
+		}
 		case SCLEX_CSS:
 		{
 			switch (style)
@@ -835,6 +889,7 @@ gboolean sc_speller_is_text(GeanyDocument *doc, gint pos)
 			break;
 		}
 		case SCLEX_HTML:
+		case SCLEX_PHPSCRIPT:
 		case SCLEX_XML:
 		{
 			switch (style)
@@ -1085,6 +1140,26 @@ gboolean sc_speller_is_text(GeanyDocument *doc, gint pos)
 				case SCE_RB_STRING:
 				case SCE_RB_CHARACTER:
 				case SCE_RB_POD:
+					return TRUE;
+				default:
+					return FALSE;
+			}
+			break;
+		}
+		case SCLEX_RUST:
+		{
+			switch (style)
+			{
+				case SCE_RUST_DEFAULT:
+				case SCE_RUST_COMMENTBLOCK:
+				case SCE_RUST_COMMENTBLOCKDOC:
+				case SCE_RUST_COMMENTLINE:
+				case SCE_RUST_COMMENTLINEDOC:
+				case SCE_RUST_STRING:
+				case SCE_RUST_STRINGR:
+				case SCE_RUST_BYTESTRING:
+				case SCE_RUST_BYTESTRINGR:
+				case SCE_RUST_LEXERROR:
 					return TRUE;
 				default:
 					return FALSE;

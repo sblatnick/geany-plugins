@@ -41,7 +41,6 @@ M: Colomban Wendling <ban@herbesfolles.org>
 W:
 S: Maintained
 
-
 debugger
 P: Alexander Petukhov <devel@apetukhov.ru>
 M: Alexander Petukhov <devel@apetukhov.ru>
@@ -73,10 +72,10 @@ W: http://plugins.geany.org/geanydoc.html
 S: Odd Fixes
 
 geanyextrasel
-P: Dimitar Zhekov <dimitar.zhekov@gmail.com>
-M: Dimitar Zhekov <dimitar.zhekov@gmail.com>
+P:
+M:
 W: http://plugins.geany.org/geanyextrasel.html
-S: Maintained
+S: Orphaned
 
 geanygendoc
 P: Colomban Wendling <ban@herbesfolles.org>
@@ -85,10 +84,10 @@ W: http://plugins.geany.org/geanygendoc.html
 S: Maintained
 
 geanyinsertnum
-P: Dimitar Zhekov <dimitar.zhekov@gmail.com>
-M: Dimitar Zhekov <dimitar.zhekov@gmail.com>
+P:
+M:
 W: http://plugins.geany.org/geanyinsertnum.html
-S: Maintained
+S: Orphaned
 
 geanylatex
 P: Frank Lanitz <frank@frank.uvena.de>
@@ -96,11 +95,6 @@ M: Frank Lanitz <frank@frank.uvena.de>
 W: http://frank.uvena.de/en/Geany/geanylatex/
 S: Maintained
 
-geanylipsum
-P: Frank Lanitz <frank@frank.uvena.de>
-M: Frank Lanitz <frank@frank.uvena.de>
-W: http://plugins.geany.org/geanylipsum.html
-S: Maintained
 
 geanylua
 P:
@@ -133,16 +127,16 @@ W: http://plugins.geany.org/geanypg.html
 S: Odd Fixes
 
 geanyprj
-P: Yura Siamashka <yurand2@gmail.com>
-M: Yura Siamashka <yurand2@gmail.com>
+P: Donjan Rodic <bryonak@freenet.de>
+M: Donjan Rodic <bryonak@freenet.de>
 W: http://plugins.geany.org/geanyprj.html
 S: Odd Fixes
 
 geanypy
-P: Lex Trotman <elextr@gmail.com>
-M: Lex Trotman <elextr@gmail.com>
+P: Thomas Martitz <kugel@rockbox.org>
+M: Thomas Martitz <kugel@rockbox.org>
 W: http://plugins.geany.org/geanypy.html
-S: Maintained
+S: Currently diverged from upstream
 
 geanysendmail
 P: Frank Lanitz <frank@frank.uvena.de>
@@ -166,6 +160,24 @@ git-changebar
 P: Colomban Wendling <ban@herbesfolles.org>
 M: Colomban Wendling <ban@herbesfolles.org>
 W: http://plugins.geany.org/git-changebar.html
+S: Maintained
+
+keyrecord
+P: Artur Riazanov <tunyash@gmail.com>
+M: Artur Riazanov <tunyash@gmail.com>
+W: 
+S: Maintained
+
+lineoperations
+P: Sylvan Mostert <smostert.dev@gmail.com>
+M: Sylvan Mostert <smostert.dev@gmail.com>
+W:
+S: Maintained
+
+lipsum
+P: Frank Lanitz <frank@frank.uvena.de>
+M: Frank Lanitz <frank@frank.uvena.de>
+W: http://plugins.geany.org/lipsum.html
 S: Maintained
 
 markdown
@@ -211,10 +223,10 @@ W: http://plugins.geany.org/pohelper.html
 S: Maintained
 
 scope
-P: Dimitar Zhekov <dimitar.zhekov@gmail.com>
-M: Dimitar Zhekov <dimitar.zhekov@gmail.com>
+P:
+M:
 W: http://plugins.geany.org/scope.html
-S: Maintained
+S: Orphaned
 
 shiftcolumn
 P:

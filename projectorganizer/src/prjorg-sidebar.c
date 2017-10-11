@@ -32,7 +32,6 @@
 
 extern GeanyPlugin *geany_plugin;
 extern GeanyData *geany_data;
-extern GeanyFunctions *geany_functions;
 
 enum
 {
@@ -48,6 +47,13 @@ typedef enum
 	MATCH_PREFIX,
 	MATCH_PATTERN
 } MatchType;
+
+typedef struct
+{
+	GeanyProject *project;
+	GPtrArray *expanded_paths;
+} ExpandData;
+
 
 static GdkColor s_external_color;
 static GtkWidget *s_toolbar = NULL;
@@ -440,7 +446,7 @@ static void create_dialog_find_tag(void)
 		return;
 
 	s_ft_dialog.widget = gtk_dialog_new_with_buttons(
-		_("Find Tag"), GTK_WINDOW(geany->main_widgets->window),
+		_("Find Symbol"), GTK_WINDOW(geany->main_widgets->window),
 		GTK_DIALOG_DESTROY_WITH_PARENT,
 		GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL, NULL);
 	gtk_dialog_add_button(GTK_DIALOG(s_ft_dialog.widget), "gtk-find", GTK_RESPONSE_ACCEPT);
@@ -618,9 +624,8 @@ static void find_tags(const gchar *name, gboolean declaration, gboolean case_sen
 			gchar *relpath;
 
 			relpath = get_relative_path(utf8_base_path, utf8_fname);
-			if (relpath)
-				msgwin_msg_add(COLOR_BLACK, -1, NULL, "%s:%lu:\n\t[%s]\t %s%s%s", relpath,
-					tag->line, tm_tag_type_name(tag), scopestr, tag->name, tag->arglist ? tag->arglist : "");
+			msgwin_msg_add(COLOR_BLACK, -1, NULL, "%s:%lu:\n\t[%s]\t %s%s%s", relpath ? relpath : utf8_fname,
+				tag->line, tm_tag_type_name(tag), scopestr, tag->name, tag->arglist ? tag->arglist : "");
 			g_free(scopestr);
 			g_free(relpath);
 			g_free(utf8_fname);
@@ -878,7 +883,7 @@ static void create_branch(gint level, GSList *leaf_list, GtkTreeIter *parent,
 {
 	GSList *dir_list = NULL;
 	GSList *file_list = NULL;
-	GSList *elem;
+	GSList *elem = NULL;
 
 	foreach_slist (elem, leaf_list)
 	{
@@ -1025,7 +1030,7 @@ static void load_project_root(PrjOrgRoot *root, GtkTreeIter *parent, GSList *hea
 {
 	GSList *lst = NULL;
 	GSList *path_list = NULL;
-	GSList *elem;
+	GSList *elem = NULL;
 	GHashTableIter iter;
 	gpointer key, value;
 
@@ -1072,7 +1077,7 @@ static void load_project_root(PrjOrgRoot *root, GtkTreeIter *parent, GSList *hea
 
 static void load_project(void)
 {
-	GSList *elem, *header_patterns, *source_patterns;
+	GSList *elem = NULL, *header_patterns, *source_patterns;
 	GtkTreeIter iter;
 	gboolean first = TRUE;
 	GIcon *icon_dir;
@@ -1141,8 +1146,7 @@ static gboolean find_in_tree(GtkTreeIter *parent, gchar **path_split, gint level
 		g_free(name);
 		if (cmpres == 0)
 		{
-			GtkTreeIter foo;
-			if (path_split[level+1] == NULL && !gtk_tree_model_iter_children (model, &foo, &iter))
+			if (path_split[level+1] == NULL)
 			{
 				*ret = iter;
 				return TRUE;
@@ -1158,19 +1162,13 @@ static gboolean find_in_tree(GtkTreeIter *parent, gchar **path_split, gint level
 }
 
 
-static gboolean follow_editor_on_idle(gpointer foo)
+static gboolean expand_path(gchar *utf8_expanded_path, gboolean select)
 {
 	GtkTreeIter root_iter, found_iter;
 	gchar *utf8_path = NULL;
 	gchar **path_split;
-	GeanyDocument *doc;
-	GSList *elem;
+	GSList *elem = NULL;
 	GtkTreeModel *model;
-
-	doc = document_get_current();
-
-	if (!doc || !doc->file_name || !geany_data->app->project || !prj_org)
-		return FALSE;
 
 	model = GTK_TREE_MODEL(s_file_store);
 	gtk_tree_model_iter_children(model, &root_iter, NULL);
@@ -1178,7 +1176,7 @@ static gboolean follow_editor_on_idle(gpointer foo)
 	{
 		PrjOrgRoot *root = elem->data;
 
-		utf8_path = get_relative_path(root->base_dir, doc->file_name);
+		utf8_path = get_relative_path(root->base_dir, utf8_expanded_path);
 		if (utf8_path)
 			break;
 
@@ -1199,14 +1197,17 @@ static gboolean follow_editor_on_idle(gpointer foo)
 		GtkTreeSelection *treesel;
 
 		tree_path = gtk_tree_model_get_path (model, &found_iter);
-
 		gtk_tree_view_expand_to_path(GTK_TREE_VIEW(s_file_view), tree_path);
-		gtk_tree_view_scroll_to_cell(GTK_TREE_VIEW(s_file_view), tree_path,
-			NULL, FALSE, 0.0, 0.0);
 
-		treesel = gtk_tree_view_get_selection(GTK_TREE_VIEW(s_file_view));
-		gtk_tree_selection_select_iter(treesel, &found_iter);
-		gtk_tree_path_free(tree_path);
+		if (select)
+		{
+			gtk_tree_view_scroll_to_cell(GTK_TREE_VIEW(s_file_view), tree_path,
+				NULL, FALSE, 0.0, 0.0);
+
+			treesel = gtk_tree_view_get_selection(GTK_TREE_VIEW(s_file_view));
+			gtk_tree_selection_select_iter(treesel, &found_iter);
+			gtk_tree_path_free(tree_path);
+		}
 	}
 
 	g_free(utf8_path);
@@ -1216,20 +1217,99 @@ static gboolean follow_editor_on_idle(gpointer foo)
 }
 
 
+static gboolean expand_on_idle(ExpandData *expand_data)
+{
+	GeanyDocument *doc = document_get_current();
+
+	if (!prj_org)
+		return FALSE;
+
+	if (geany_data->app->project == expand_data->project &&
+		expand_data->expanded_paths)
+	{
+		gchar *item;
+		guint i;
+
+		foreach_ptr_array(item, i, expand_data->expanded_paths)
+			expand_path(item, FALSE);
+		g_ptr_array_free(expand_data->expanded_paths, TRUE);
+	}
+
+	g_free(expand_data);
+
+	if (!s_follow_editor || !doc || !doc->file_name)
+		return FALSE;
+
+	expand_path(doc->file_name, TRUE);
+
+	return FALSE;
+}
+
+
+static void on_map_expanded(GtkTreeView *tree_view, GtkTreePath *tree_path, GPtrArray *path_arr)
+{
+	GtkTreeIter iter;
+
+	if (gtk_tree_model_get_iter(GTK_TREE_MODEL(s_file_store), &iter, tree_path))
+	{
+		gchar *utf8_path = build_path(&iter);
+		gboolean replaced = FALSE;
+
+		if (path_arr->len > 0)
+		{
+			gchar *previous = path_arr->pdata[path_arr->len-1];
+			gchar *rel_path = get_relative_path(previous, utf8_path);
+
+			/* Filter-out redundant parent paths. gtk_tree_view_map_expanded_rows()
+			 * returns first parent paths and then nested paths so we can just
+			 * check if the last stored path is a parent of current path and
+			 * if so, replace it with curent path. */
+			if (rel_path)
+			{
+				g_free(previous);
+				path_arr->pdata[path_arr->len-1] = utf8_path;
+				replaced = TRUE;
+			}
+
+			g_free(rel_path);
+		}
+
+		if (!replaced)
+			g_ptr_array_add(path_arr, utf8_path);
+	}
+}
+
+
+static GPtrArray *get_expanded_paths(void)
+{
+	GPtrArray *expanded_paths = g_ptr_array_new_with_free_func(g_free);
+
+	gtk_tree_view_map_expanded_rows(GTK_TREE_VIEW(s_file_view),
+		(GtkTreeViewMappingFunc)on_map_expanded, expanded_paths);
+
+	return expanded_paths;
+}
+
+
 void prjorg_sidebar_update(gboolean reload)
 {
+	ExpandData *expand_data = g_new0(ExpandData, 1);
+
+	expand_data->project = geany_data->app->project;
+
 	if (reload)
 	{
+		expand_data->expanded_paths = get_expanded_paths();
+
+		load_project();
 		/* we get color information only after the sidebar is realized -
-		 * postpone reload if this is not the case yet */
-		if (gtk_widget_get_realized(s_toolbar))
-			load_project();
-		else
+		 * perform reload later if this is not the case yet */
+		if (!gtk_widget_get_realized(s_toolbar))
 			s_pending_reload = TRUE;
 	}
-	if (s_follow_editor)
-		/* perform on idle - avoids unnecessary jumps on project load */
-		plugin_idle_add(geany_plugin, (GSourceFunc)follow_editor_on_idle, NULL);
+
+	/* perform on idle - avoids unnecessary jumps on project load */
+	plugin_idle_add(geany_plugin, (GSourceFunc)expand_on_idle, expand_data);
 }
 
 
@@ -1272,7 +1352,7 @@ void prjorg_sidebar_init(void)
 
 	item = GTK_WIDGET(gtk_tool_button_new(NULL, NULL));
 	gtk_tool_button_set_icon_name (GTK_TOOL_BUTTON(item), "prjorg-refresh");
-	ui_widget_set_tooltip_text(item, _("Reload all"));
+	gtk_widget_set_tooltip_text(item, _("Reload all"));
 	g_signal_connect(item, "clicked", G_CALLBACK(on_reload_project), NULL);
 	gtk_container_add(GTK_CONTAINER(s_toolbar), item);
 
@@ -1281,7 +1361,7 @@ void prjorg_sidebar_init(void)
 
 	item = GTK_WIDGET(gtk_tool_button_new(NULL, NULL));
 	gtk_tool_button_set_icon_name (GTK_TOOL_BUTTON(item), "prjorg-add-external");
-	ui_widget_set_tooltip_text(item, _("Add external directory"));
+	gtk_widget_set_tooltip_text(item, _("Add external directory"));
 	g_signal_connect(item, "clicked", G_CALLBACK(on_add_external), NULL);
 	gtk_container_add(GTK_CONTAINER(s_toolbar), item);
 	s_project_toolbar.add = item;
@@ -1291,14 +1371,14 @@ void prjorg_sidebar_init(void)
 
 	item = GTK_WIDGET(gtk_tool_button_new(NULL, NULL));
 	gtk_tool_button_set_icon_name (GTK_TOOL_BUTTON(item), "prjorg-expand");
-	ui_widget_set_tooltip_text(item, _("Expand all"));
+	gtk_widget_set_tooltip_text(item, _("Expand all"));
 	g_signal_connect(item, "clicked", G_CALLBACK(on_expand_all), NULL);
 	gtk_container_add(GTK_CONTAINER(s_toolbar), item);
 	s_project_toolbar.expand = item;
 
 	item = GTK_WIDGET(gtk_tool_button_new(NULL, NULL));
 	gtk_tool_button_set_icon_name (GTK_TOOL_BUTTON(item), "prjorg-collapse");
-	ui_widget_set_tooltip_text(item, _("Collapse to project root"));
+	gtk_widget_set_tooltip_text(item, _("Collapse to project root"));
 	g_signal_connect(item, "clicked", G_CALLBACK(on_collapse_all), NULL);
 	gtk_container_add(GTK_CONTAINER(s_toolbar), item);
 	s_project_toolbar.collapse = item;
@@ -1309,7 +1389,7 @@ void prjorg_sidebar_init(void)
 	item = GTK_WIDGET(gtk_toggle_tool_button_new());
 	gtk_toggle_tool_button_set_active(GTK_TOGGLE_TOOL_BUTTON(item), TRUE);
 	gtk_tool_button_set_icon_name (GTK_TOOL_BUTTON(item), "prjorg-follow");
-	ui_widget_set_tooltip_text(item, _("Follow active editor"));
+	gtk_widget_set_tooltip_text(item, _("Follow active editor"));
 	g_signal_connect(item, "clicked", G_CALLBACK(on_follow_active), NULL);
 	gtk_container_add(GTK_CONTAINER(s_toolbar), item);
 	s_project_toolbar.follow = item;
@@ -1373,7 +1453,7 @@ void prjorg_sidebar_init(void)
 
 	image = gtk_image_new_from_stock(GTK_STOCK_FIND, GTK_ICON_SIZE_MENU);
 	gtk_widget_show(image);
-	item = gtk_image_menu_item_new_with_mnemonic(_("Find in Files"));
+	item = gtk_image_menu_item_new_with_mnemonic(_("Find in Files..."));
 	gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(item), image);
 	gtk_widget_show(item);
 	gtk_container_add(GTK_CONTAINER(s_popup_menu.widget), item);
@@ -1382,7 +1462,7 @@ void prjorg_sidebar_init(void)
 
 	image = gtk_image_new_from_stock(GTK_STOCK_FIND, GTK_ICON_SIZE_MENU);
 	gtk_widget_show(image);
-	item = gtk_image_menu_item_new_with_mnemonic(_("Find File"));
+	item = gtk_image_menu_item_new_with_mnemonic(_("Find File..."));
 	gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(item), image);
 	gtk_widget_show(item);
 	gtk_container_add(GTK_CONTAINER(s_popup_menu.widget), item);
@@ -1391,7 +1471,7 @@ void prjorg_sidebar_init(void)
 
 	image = gtk_image_new_from_stock(GTK_STOCK_FIND, GTK_ICON_SIZE_MENU);
 	gtk_widget_show(image);
-	item = gtk_image_menu_item_new_with_mnemonic(_("Find Tag"));
+	item = gtk_image_menu_item_new_with_mnemonic(_("Find Symbol..."));
 	gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(item), image);
 	gtk_widget_show(item);
 	gtk_container_add(GTK_CONTAINER(s_popup_menu.widget), item);

@@ -192,21 +192,42 @@ overview_prefs_panel_load_prefs (OverviewPrefsPanel *self)
   g_signal_emit_by_name (self, "prefs-loaded", self->prefs);
 }
 
+static gchar *
+get_data_dir_path (const gchar *filename)
+{
+    gchar *prefix = NULL;
+    gchar *path;
+
+#ifdef G_OS_WIN32
+    prefix = g_win32_get_package_installation_directory_of_module (NULL);
+#elif defined(__APPLE__)
+    if (g_getenv ("GEANY_PLUGINS_SHARE_PATH"))
+        return g_build_filename (g_getenv ("GEANY_PLUGINS_SHARE_PATH"), 
+                                 PLUGIN, filename, NULL);
+#endif
+    path = g_build_filename (prefix ? prefix : "", PLUGINDATADIR, filename, NULL);
+    g_free (prefix);
+    return path;
+}
+
 static void
 overview_prefs_panel_init (OverviewPrefsPanel *self)
 {
   GtkBuilder *builder;
   GError     *error = NULL;
   GtkWidget  *overlay_frame;
+  gchar      *ui_file_path = get_data_dir_path ("prefs.ui");
 
   builder = gtk_builder_new ();
-  if (! gtk_builder_add_from_file (builder, OVERVIEW_PREFS_UI_FILE, &error))
+  if (! gtk_builder_add_from_file (builder, ui_file_path, &error))
     {
-      g_critical ("failed to open UI file '%s': %s", OVERVIEW_PREFS_UI_FILE, error->message);
+      g_critical ("failed to open UI file '%s': %s", ui_file_path, error->message);
       g_error_free (error);
       g_object_unref (builder);
       return;
     }
+
+  g_free (ui_file_path);
 
   self->prefs_table    = builder_get_widget (builder, "prefs-table");
   self->width_spin     = builder_get_widget (builder, "width-spin");

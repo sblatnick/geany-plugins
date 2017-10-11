@@ -1,4 +1,5 @@
 include $(top_srcdir)/build/vars.build.mk
+plugin = geanyprj
 
 geanyplugins_LTLIBRARIES = geanyprj.la
 
@@ -11,6 +12,7 @@ geanyprj_la_SOURCES = geanyprj.c \
 	xproject.c
 
 geanyprj_la_CFLAGS = $(AM_CFLAGS)
+geanyprj_la_CPPFLAGS = $(AM_CPPFLAGS) -DG_LOG_DOMAIN=\"GeanyPrj\"
 geanyprj_la_LIBADD = $(COMMONLIBS)
 
 if UNITTESTS

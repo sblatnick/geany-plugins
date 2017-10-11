@@ -24,7 +24,6 @@
 #include "prjorg-utils.h"
 
 extern GeanyData *geany_data;
-extern GeanyFunctions *geany_functions;
 
 
 /* utf8 */
@@ -71,7 +70,7 @@ GSList *get_precompiled_patterns(gchar **patterns)
 
 gboolean patterns_match(GSList *patterns, const gchar *str)
 {
-	GSList *elem;
+	GSList *elem = NULL;
 	foreach_slist (elem, patterns)
 	{
 		GPatternSpec *pattern = elem->data;

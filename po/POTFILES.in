@@ -10,6 +10,7 @@ addons/src/ao_xmltagging.c
 addons/src/ao_openuri.c
 addons/src/ao_wrapwords.c
 addons/src/ao_doclist.c
+addons/src/ao_copyfilepath.c
 addons/src/addons.c
 
 # Autoclose
@@ -147,9 +148,6 @@ geanylatex/src/latexencodings.c
 geanylatex/src/latexstructure.c
 geanylatex/src/reftex.c
 
-# geanylipsum
-geanylipsum/src/geanylipsum.c
-
 # geanyLua
 geanylua/glspi.h
 geanylua/glspi_ver.h
@@ -199,9 +197,6 @@ geanyprj/src/xproject.c
 # Geanypy
 geanypy/src/geanypy-plugin.c
 
-# geanysendmail
-geanysendmail/src/geanysendmail.c
-
 # geanyvc
 geanyvc/src/geanyvc.c
 geanyvc/src/geanyvc.h
@@ -220,9 +215,27 @@ geniuspaste/src/geniuspaste.c
 [type: gettext/glade]git-changebar/data/prefs.ui
 git-changebar/src/gcb-plugin.c
 
+# Keyrecord
+keyrecord/src/keyrecord.c
+
+# LineOperations
+lineoperations/src/lineoperations.c
+
+# lipsum
+lipsum/src/lipsum.c
+
 # Markdown
 markdown/src/conf.c
 markdown/src/plugin.c
+
+# Multiterm
+multiterm/src/config.vala
+multiterm/src/context-menu.vala
+multiterm/src/notebook.vala
+multiterm/src/plugin.vala
+multiterm/src/shell-config.vala
+multiterm/src/tab-label.vala
+multiterm/src/terminal.vala
 
 # Overview
 overview/overview/overviewcolor.c
@@ -270,6 +283,9 @@ scope/src/utils.c
 scope/src/views.c
 scope/src/store/scptreestore.c
 
+# sendmail
+sendmail/src/sendmail.c
+
 # Spell Check
 spellcheck/src/speller.c
 spellcheck/src/scplugin.c
@@ -295,6 +311,17 @@ webhelper/src/gwh-settings.c
 webhelper/src/gwh-utils.c
 webhelper/src/gwh-browser.c
 webhelper/src/gwh-plugin.c
+
+# workbench
+workbench/src/dialogs.c
+workbench/src/menu.c
+workbench/src/plugin_main.c
+workbench/src/popup_menu.c
+workbench/src/sidebar.c
+workbench/src/utils.c
+workbench/src/wb_globals.c
+workbench/src/wb_project.c
+workbench/src/workbench.c
 
 # XMLSnippets
 xmlsnippets/src/plugin.c

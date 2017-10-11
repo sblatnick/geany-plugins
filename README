@@ -2,10 +2,16 @@
 Geany-Plugins
 ===============
 
+Status
+------
+
+.. image:: https://travis-ci.org/geany/geany-plugins.svg?branch=master
+    :target: https://travis-ci.org/geany/geany-plugins
+
 Installation
 ------------
 
-You can build the plugins using either Autotools or Waf.
+You can build the plugins using Autotools.
 
 Building with Autotools
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -18,15 +24,19 @@ Usage::
   make
   sudo make install
 
-This will configure, build and install most of the Geany plugins.
+autogen.sh will call configure in background and is only available if
+you are using Geany plugins from git repository. It is not included in
+release packages.
+
+However, this will configure, build and install most of the Geany plugins.
 There is some auto-detection in place which automagically disables
 some of the plugins if there are insufficient build dependencies.
 The following arguments can tweak the behaviour of the configure
-script:
+script.
 
 Options
 =======
-A full listing of all supported options can be found in ``./configure --help.``
+A full listing of all supported options can be found in ``./configure --help``.
 
 Enable/Disable Features
 =======================
@@ -56,7 +66,6 @@ Available plugins are:
 * ``geanygendoc`` -- the GeanyGenDoc plugin
 * ``geanyinsertnum`` -- the GeanyInsertNum plugin
 * ``geanylatex`` -- the GeanyLaTeX plugin
-* ``geanylipsum`` -- the GeanyLipsum plugin
 * ``geanylua`` -- the GeanyLua plugin
 * ``geanymacro`` -- the GeanyMacro plugin
 * ``geanyminiscript`` -- the GeanyMiniScript plugin
@@ -64,11 +73,12 @@ Available plugins are:
 * ``geanypg`` -- the geanypg plugin
 * ``geanyprj`` -- the GeanyPrj plugin
 * ``geanypy`` -- the Geanypy plugin
-* ``geanysendmail`` -- the GeanySendmail plugin
 * ``geanyvc`` -- the GeanyVC plugin
 * ``geniuspaste`` -- the paste to a pastebin plugin
 * ``gitchangebar`` -- the GitChangeBar plugin
 * ``gtkspell`` -- GeanyVC's spell-check support
+* ``lineoperations`` -- simple line functions that can be applied to an open file
+* ``lipsum`` -- the Lipsum plugin
 * ``markdown`` -- the Markdown plugin
 * ``multiterm`` -- the multiterm plugin
 * ``overview``-- the overview plugin
@@ -78,6 +88,7 @@ Available plugins are:
 * ``pretty_printer`` -- the pretty-printer plugin
 * ``projectorganizer`` -- the ProjectOrganizer plugin
 * ``scope`` -- the Scope plugin
+* ``sendmail`` -- the GeanySendmail plugin
 * ``shiftcolumn`` -- the ShiftColumn plugin
 * ``spellcheck`` -- the spellcheck plugin
 * ``treebrowser`` -- the Treebrowser plugin
@@ -92,7 +103,7 @@ Example::
 
   ./configure --enable-geanylua --enable-spellcheck
 
-This will force force both geanylua and spellcheck plugins to be enabled even
+This will force both geanylua and spellcheck plugins to be enabled even
 if some dependencies are missing.
 
 You can also use the special option ``all-plugins`` to change the default for all
@@ -122,12 +133,3 @@ which means that after running ``./configure``, you may compile each
 individual plugin by cd-ing into the respective plugin directory
 and running make inside it.
 
-Building with Waf
-^^^^^^^^^^^^^^^^^
-
-Geany-Plugins can also being build using Python based build system Waf.
-For doing this you have similar to building with Autotools run three steps::
-
-  ./waf configure [arguments]
-  ./waf build
-  ./waf install

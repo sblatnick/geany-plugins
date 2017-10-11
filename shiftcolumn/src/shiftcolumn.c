@@ -23,19 +23,11 @@
 # include "config.h"
 #endif
 
-#include "geany.h"
-#include "support.h"
+#include <geanyplugin.h>
 
 #ifdef HAVE_LOCALE_H
 # include <locale.h>
 #endif
-
-#include "ui_utils.h"
-
-#include "document.h"
-#include "keybindings.h"
-#include "plugindata.h"
-#include "geanyfunctions.h"
 
 #include <glib.h>
 #include <glib/gprintf.h>
@@ -43,12 +35,14 @@
 
 GeanyPlugin     *geany_plugin;
 GeanyData       *geany_data;
-GeanyFunctions  *geany_functions;
 
-PLUGIN_VERSION_CHECK(130)
-PLUGIN_SET_INFO(_("Shift Column"),
-                _("Shift a selection left and right"),
-                VERSION, "Andrew L Janke <a.janke@gmail.com>")
+PLUGIN_VERSION_CHECK(224)
+PLUGIN_SET_TRANSLATABLE_INFO(LOCALEDIR, GETTEXT_PACKAGE,
+    _("Shift Column"),
+    _("Shift a selection left and right."
+      "\nThis plugin currently has no maintainer. Would you like to help "
+      "by contributing to this plugin?"),
+    VERSION, "Andrew L Janke <a.janke@gmail.com>")
 
 
 static GtkWidget *menu_item_shift_left = NULL;
@@ -60,7 +54,6 @@ enum{
    KB_SHIFT_RIGHT,
    KB_COUNT
    };
-PLUGIN_KEY_GROUP(shiftcolumn, KB_COUNT)
 
 
 static void shift_left_cb(G_GNUC_UNUSED GtkMenuItem *menuitem,
@@ -68,7 +61,6 @@ static void shift_left_cb(G_GNUC_UNUSED GtkMenuItem *menuitem,
    gchar *txt;
    gchar *txt_i;
    gchar char_before;
-   gint txt_len;
 
    gint startpos;
    gint endpos;
@@ -113,21 +105,19 @@ static void shift_left_cb(G_GNUC_UNUSED GtkMenuItem *menuitem,
       if(startline == endline){
 
          /* get the text in question */
-         txt_len = endpos - startpos;
-         txt_i = g_malloc(txt_len + 1);
-         txt = g_malloc(txt_len + 2);
-         sci_get_selected_text(sci, txt_i);
+         txt_i = sci_get_selection_contents(sci);
 
          char_before = sci_get_char_at(sci, startpos - 1);
 
          /* set up new text buf */
-         (void) g_sprintf(txt, "%s%c", txt_i, char_before);
+         txt = g_strdup_printf("%s%c", txt_i, char_before);
 
          /* start undo */
          sci_start_undo_action(sci);
 
          /* put the new text in */
          sci_set_selection_start(sci, startpos - 1);
+         sci_set_selection_end(sci, endpos);
          sci_replace_sel(sci, txt);
 
          /* select the right bit again */
@@ -182,15 +172,11 @@ static void shift_left_cb(G_GNUC_UNUSED GtkMenuItem *menuitem,
                sci_set_selection_start(sci, linepos + startcol);
                sci_set_selection_end(sci, linepos + endcol);
 
-               txt_len = sci_get_selected_text_length(sci);
-               txt_i = g_malloc(txt_len + 1);
-               txt = g_malloc(txt_len + 2);
-
-               sci_get_selected_text(sci, txt_i);
+               txt_i = sci_get_selection_contents(sci);
                char_before = sci_get_char_at(sci, linepos + startcol - 1);
 
                /* set up new text buf */
-               (void) g_sprintf(txt, "%s%c", txt_i, char_before);
+               txt = g_strdup_printf("%s%c", txt_i, char_before);
 
                /* put the new text in */
                sci_set_selection_start(sci, linepos + startcol - 1);
@@ -219,7 +205,6 @@ static void shift_right_cb(G_GNUC_UNUSED GtkMenuItem *menuitem,
    gchar *txt;
    gchar *txt_i;
    gchar char_after;
-   gint txt_len;
 
    gint startpos;
    gint endpos;
@@ -260,20 +245,18 @@ static void shift_right_cb(G_GNUC_UNUSED GtkMenuItem *menuitem,
       if(startline == endline){
 
          /* get the text in question */
-         txt_len = endpos - startpos;
-         txt_i = g_malloc(txt_len + 1);
-         txt = g_malloc(txt_len + 2);
-         sci_get_selected_text(sci, txt_i);
+         txt_i = sci_get_selection_contents(sci);
 
          char_after = sci_get_char_at(sci, endpos);
 
          /* set up new text buf */
-         (void) g_sprintf(txt, "%c%s", char_after, txt_i);
+         txt = g_strdup_printf("%c%s", char_after, txt_i);
 
          /* start undo */
          sci_start_undo_action(sci);
 
          /* put the new text in */
+         sci_set_selection_start(sci, startpos);
          sci_set_selection_end(sci, endpos + 1);
          sci_replace_sel(sci, txt);
 
@@ -319,15 +302,11 @@ static void shift_right_cb(G_GNUC_UNUSED GtkMenuItem *menuitem,
                   sci_set_selection_start(sci, linepos + startcol);
                   sci_set_selection_end(sci, linepos + endcol);
 
-                  txt_len = sci_get_selected_text_length(sci);
-                  txt_i = g_malloc(txt_len + 1);
-                  txt = g_malloc(txt_len + 2);
-
-                  sci_get_selected_text(sci, txt_i);
+                  txt_i = sci_get_selection_contents(sci);
                   char_after = sci_get_char_at(sci, linepos + endcol);
 
                   /* set up new text buf */
-                  (void) g_sprintf(txt, "%c%s", char_after, txt_i);
+                  txt = g_strdup_printf("%c%s", char_after, txt_i);
 
                   /* put the new text in */
                   sci_set_selection_end(sci, linepos + endcol + 1);
@@ -373,9 +352,7 @@ static void kb_shift_right(G_GNUC_UNUSED guint key_id){
    }
 
 void plugin_init(G_GNUC_UNUSED GeanyData *data){
-
-   /* init gettext and friends */
-   main_locale_init(LOCALEDIR, GETTEXT_PACKAGE);
+   GeanyKeyGroup *key_group;
 
    menu_item_shift_left = gtk_menu_item_new_with_mnemonic(_("Shift Left"));
    gtk_widget_show(menu_item_shift_left);
@@ -396,9 +373,10 @@ void plugin_init(G_GNUC_UNUSED GeanyData *data){
    ui_add_document_sensitive(menu_item_shift_left);
 
    /* setup keybindings */
-   keybindings_set_item(plugin_key_group, KB_SHIFT_LEFT, kb_shift_left,
+   key_group = plugin_set_key_group(geany_plugin, "shiftcolumn", KB_COUNT, NULL);
+   keybindings_set_item(key_group, KB_SHIFT_LEFT, kb_shift_left,
       0, GDK_CONTROL_MASK, "shift_left", _("Shift Left"), menu_item_shift_left);
-   keybindings_set_item(plugin_key_group, KB_SHIFT_RIGHT, kb_shift_right,
+   keybindings_set_item(key_group, KB_SHIFT_RIGHT, kb_shift_right,
       0, GDK_CONTROL_MASK, "shift_right", _("Shift Right"), menu_item_shift_right);
    }
 

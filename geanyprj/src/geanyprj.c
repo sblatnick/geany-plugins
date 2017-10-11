@@ -4,7 +4,7 @@
  *  Copyright 2007 Frank Lanitz <frank(at)frank(dot)uvena(dot)de>
  *  Copyright 2007 Enrico Tröger <enrico.troeger@uvena.de>
  *  Copyright 2007 Nick Treleaven <nick.treleaven@btinternet.com>
- *  Copyright 2007,2008 Yura Siamashka <yurand2@gmail.com>
+ *  Copyright 2007, 2008 Yura Siamashka <yurand2@gmail.com>
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -34,12 +34,16 @@
 
 #include "geanyprj.h"
 
-PLUGIN_VERSION_CHECK(221)
-PLUGIN_SET_INFO("GeanyPrj", _("Alternative project support."), VERSION,
-		"Yura Siamashka <yurand2@gmail.com>")
+PLUGIN_VERSION_CHECK(224)
+PLUGIN_SET_TRANSLATABLE_INFO(LOCALEDIR, GETTEXT_PACKAGE,
+	"GeanyPrj", _("Alternative project support. \nThis plugin currently"
+		          "has no maintainer. Would you like to help by contributing "
+		          "to this plugin?"),
+	VERSION,
+	"Yura Siamashka <yurand2@gmail.com>")
 
+GeanyPlugin    *geany_plugin;
 GeanyData      *geany_data;
-GeanyFunctions *geany_functions;
 
 
 static gchar    *config_file;
@@ -52,8 +56,6 @@ enum
 	KB_FIND_IN_PROJECT,
 	KB_COUNT
 };
-
-PLUGIN_KEY_GROUP(geanyprj, KB_COUNT)
 
 
 static void reload_project(void)
@@ -210,7 +212,8 @@ static void on_configure_response(G_GNUC_UNUSED GtkDialog *dialog, G_GNUC_UNUSED
 /* Called by Geany to initialize the plugin */
 void plugin_init(G_GNUC_UNUSED GeanyData *data)
 {
-	main_locale_init(LOCALEDIR, GETTEXT_PACKAGE);
+	GeanyKeyGroup *key_group;
+
 	load_settings();
 	tools_menu_init();
 
@@ -219,7 +222,8 @@ void plugin_init(G_GNUC_UNUSED GeanyData *data)
 		create_sidebar();
 	reload_project();
 
-	keybindings_set_item(plugin_key_group, KB_FIND_IN_PROJECT,
+	key_group = plugin_set_key_group(geany_plugin, "geanyprj", KB_COUNT, NULL);
+	keybindings_set_item(key_group, KB_FIND_IN_PROJECT,
 		kb_find_in_project, 0, 0, "find_in_project",
 			_("Find a text in geanyprj's project"), NULL);
 }

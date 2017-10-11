@@ -36,9 +36,11 @@
 #include "dhp.h"
 
 
-PLUGIN_VERSION_CHECK(200)
+PLUGIN_VERSION_CHECK(224)
 
-PLUGIN_SET_INFO(
+PLUGIN_SET_TRANSLATABLE_INFO(
+	LOCALEDIR,
+	GETTEXT_PACKAGE,
 	_("Devhelp Plugin"),
 	_("Adds support for looking up documentation in Devhelp, manual pages, and "
 	  "Google Code Search in the integrated viewer."),
@@ -47,7 +49,6 @@ PLUGIN_SET_INFO(
 
 GeanyPlugin	 	*geany_plugin;
 GeanyData	   	*geany_data;
-GeanyFunctions 	*geany_functions;
 
 struct PluginData plugin;
 

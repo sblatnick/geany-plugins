@@ -59,10 +59,6 @@ if ENABLE_GEANYLATEX
 SUBDIRS += geanylatex
 endif
 
-if ENABLE_GEANYLIPSUM
-SUBDIRS += geanylipsum
-endif
-
 if ENABLE_GEANYLUA
 SUBDIRS += geanylua
 endif
@@ -91,9 +87,6 @@ if ENABLE_GEANYPY
 SUBDIRS += geanypy
 endif
 
-if ENABLE_GEANYSENDMAIL
-SUBDIRS += geanysendmail
-endif
 
 if ENABLE_GEANYVC
 SUBDIRS += geanyvc
@@ -105,6 +98,18 @@ endif
 
 if ENABLE_GITCHANGEBAR
 SUBDIRS += git-changebar
+endif
+
+if ENABLE_KEYRECORD
+SUBDIRS += keyrecord
+endif
+
+if ENABLE_LINEOPERATIONS
+SUBDIRS += lineoperations
+endif
+
+if ENABLE_LIPSUM
+SUBDIRS += lipsum
 endif
 
 if ENABLE_MARKDOWN
@@ -139,6 +144,10 @@ if ENABLE_SCOPE
 SUBDIRS += scope
 endif
 
+if ENABLE_SENDMAIL
+SUBDIRS += sendmail
+endif
+
 if ENABLE_SHIFTCOLUMN
 SUBDIRS += shiftcolumn
 endif
@@ -163,16 +172,10 @@ if ENABLE_WEBHELPER
 SUBDIRS += webhelper
 endif
 
+if ENABLE_WORKBENCH
+SUBDIRS += workbench
+endif
+
 if ENABLE_XMLSNIPPETS
 SUBDIRS += xmlsnippets
 endif
-
-
-EXTRA_DIST = \
-	build/__init__.py \
-	build/wafcache.py \
-	build/wafutils.py \
-	waf \
-	wscript \
-	README.waf \
-	README.windows

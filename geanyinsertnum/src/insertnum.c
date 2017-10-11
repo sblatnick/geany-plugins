@@ -37,11 +37,13 @@
 
 GeanyPlugin	*geany_plugin;
 GeanyData	*geany_data;
-GeanyFunctions	*geany_functions;
 
-PLUGIN_VERSION_CHECK(189)
+PLUGIN_VERSION_CHECK(224)
 
-PLUGIN_SET_INFO(_("Insert Numbers"), _("Insert/Fill columns with numbers."),
+PLUGIN_SET_TRANSLATABLE_INFO(LOCALEDIR, GETTEXT_PACKAGE,
+	_("Insert Numbers"), _("Insert/Fill columns with numbers."
+	"\nThis plugin currently has no maintainer. Would you like to help"
+	" by contributing to this plugin?"),
 	"0.2.2", "Dimitar Toshkov Zhekov <dimitar.zhekov@gmail.com>")
 
 /* Keybinding(s) */
@@ -309,7 +311,7 @@ static void set_entry(GtkWidget *entry, gint maxlen, GtkWidget *label, const gch
 	gtk_entry_set_max_length(GTK_ENTRY(entry), maxlen);
 	gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
 	gtk_label_set_mnemonic_widget(GTK_LABEL(label), entry);
-	ui_widget_set_tooltip_text(entry, tooltip);
+	gtk_widget_set_tooltip_text(entry, tooltip);
 }
 
 #if !GTK_CHECK_VERSION(3, 0, 0)
@@ -376,20 +378,20 @@ static void on_insert_numbers_activate(G_GNUC_UNUSED GtkMenuItem *menuitem, G_GN
 	gtk_table_attach(grid, GTK_WIDGET(combo), 1, 3, 1, 2, GTK_EXPAND | GTK_FILL, 0, 0, 0);
 #endif
 	label = gtk_label_new(_("Letters:"));
-	ui_widget_set_tooltip_text(label, case_tip);
+	gtk_widget_set_tooltip_text(label, case_tip);
 	gtk_grid_attach(grid, label, 3, 1, 1, 1);
 	upper = gtk_radio_button_new_with_mnemonic(NULL, _("_Upper"));
-	ui_widget_set_tooltip_text(upper, case_tip);
+	gtk_widget_set_tooltip_text(upper, case_tip);
 	gtk_grid_attach(grid, upper, 4, 1, 1, 1);
 	d.lower = gtk_radio_button_new_from_widget(GTK_RADIO_BUTTON(upper));
-	ui_widget_set_tooltip_text(label, case_tip);
+	gtk_widget_set_tooltip_text(label, case_tip);
 	label = gtk_label_new_with_mnemonic(_("_Lower"));
-	ui_widget_set_tooltip_text(label, case_tip);
+	gtk_widget_set_tooltip_text(label, case_tip);
 	gtk_container_add(GTK_CONTAINER(d.lower), label);
 	gtk_grid_attach(grid, d.lower, 5, 1, 1, 1);
 
 	d.prefix = gtk_check_button_new_with_mnemonic(_("Base _prefix"));
-	ui_widget_set_tooltip_text(d.prefix,
+	gtk_widget_set_tooltip_text(d.prefix,
 		_("0 for octal, 0x for hex, + for positive decimal"));
 	gtk_grid_attach(grid, d.prefix, 1, 2, 2, 1);
 	label = gtk_label_new(_("Padding:"));
@@ -468,7 +470,6 @@ void plugin_init(G_GNUC_UNUSED GeanyData *data)
 {
 	GeanyKeyGroup *plugin_key_group;
 
-	main_locale_init(LOCALEDIR, GETTEXT_PACKAGE);
 	plugin_key_group = plugin_set_key_group(geany_plugin, "insert_numbers", COUNT_KB, NULL);
 
 	start_value = 1;

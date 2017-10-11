@@ -27,11 +27,13 @@
 
 GeanyPlugin	*geany_plugin;
 GeanyData	*geany_data;
-GeanyFunctions	*geany_functions;
 
-PLUGIN_VERSION_CHECK(189)
+PLUGIN_VERSION_CHECK(224)
 
-PLUGIN_SET_INFO(_("Extra Selection"), _("Column mode, select to line / brace / anchor."),
+PLUGIN_SET_TRANSLATABLE_INFO(LOCALEDIR, GETTEXT_PACKAGE,
+	_("Extra Selection"), _("Column mode, select to line / brace / anchor."
+	"\nThis plugin currently has no maintainer. Would you like to help by "
+	"contributing to this plugin?"),
 	"0.52", "Dimitar Toshkov Zhekov <dimitar.zhekov@gmail.com>")
 
 /* Keybinding(s) */
@@ -102,7 +104,12 @@ static void create_selection(ScintillaObject *sci, int anchor, int anchor_space,
 
 	sci_set_anchor_space(sci, anchor_space);
 	sci_set_cursor_space(sci, cursor_space);
-	sci_send_command(sci, SCI_CANCEL);
+
+	/* SCI bug: CANCEL may reduce a rectangle selection to a single line */
+	if (rectangle)
+		sci_set_selection_mode(sci, SC_SEL_RECTANGLE);
+	else
+		sci_send_command(sci, SCI_CANCEL);
 }
 
 static void convert_selection(ScintillaObject *sci, gboolean rectangle)
@@ -135,23 +142,16 @@ static const command_key command_keys[] =
 
 static void column_mode_command(ScintillaObject *sci, int command)
 {
-	gboolean convert = !sci_rectangle_selection(sci);
-	int anchor;
-	int anchor_space;
+	/* In the current SCI versions, using the command_keys->command for
+	   rectangular selection creates various problems. So we select a
+	   stream instead, and convert it to rectangle. It's slower, but all
+	   command-s move the cursor at least a word. */
+	int anchor = sci_get_anchor(sci);
+	int anchor_space = sci_get_anchor_space(sci);
 
-	if (convert)
-	{
-		anchor = sci_get_anchor(sci);
-		anchor_space = sci_get_anchor_space(sci);
-	}
-	sci_set_selection_mode(sci, SC_SEL_RECTANGLE);
+	sci_set_selection_mode(sci, SC_SEL_STREAM);
 	sci_send_command(sci, command);
-	if (convert)
-	{
-		sci_set_anchor(sci, anchor);
-		sci_set_anchor_space(sci, anchor_space);
-	}
-	sci_send_command(sci, SCI_CANCEL);
+	create_selection(sci, anchor, anchor_space, TRUE);
 }
 
 static gboolean on_key_press_event(GtkWidget *widget, GdkEventKey *event,
@@ -496,7 +496,6 @@ void plugin_init(G_GNUC_UNUSED GeanyData *data)
 	GtkWidget *item;
 	GeanyKeyGroup *plugin_key_group;
 
-	main_locale_init(LOCALEDIR, GETTEXT_PACKAGE);
 	plugin_key_group = plugin_set_key_group(geany_plugin, "extra_select", COUNT_KB, NULL);
 
 	item = gtk_menu_item_new_with_mnemonic(_("E_xtra Selection"));
@@ -565,7 +564,7 @@ void plugin_init(G_GNUC_UNUSED GeanyData *data)
 
 void plugin_cleanup(void)
 {
-	guint i;
+	guint i = 0;
 
 	gtk_widget_destroy(main_menu_item);
 	column_mode = FALSE;

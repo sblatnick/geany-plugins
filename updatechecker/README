@@ -28,10 +28,11 @@ get in contact with the Geany-servers and figure out, whether there
 has been a new version release or not. Once there is some result,
 you will get informed by a info popup.
 
-In default configuration the plugin will not check automaticly for
-new versions. But you can change this by activating this inside
-configuration dialog.
-
+In default configuration the plugin will not check automatically for new
+versions. But you can change this by activating this in the
+configuration dialog. Once a new version of Geany is released, this
+feature will create a popup until you have updated Geany and its
+plugins. This has potential to plague you with Geany's new version.
 
 Requirements
 ------------
@@ -40,7 +41,7 @@ Updatechecker depends on a recent version of Geany (0.20 or above)
 as well as on:
 
 * GTK >= 2.12
-* libsoup 2.4 >= 2.4.0
+* libsoup 2.4 >= 2.42
 
 To compile it on your own you will need the devel packages for these.
 

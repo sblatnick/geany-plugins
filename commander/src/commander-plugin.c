@@ -34,9 +34,8 @@
 
 GeanyPlugin      *geany_plugin;
 GeanyData        *geany_data;
-GeanyFunctions   *geany_functions;
 
-PLUGIN_VERSION_CHECK(205)
+PLUGIN_VERSION_CHECK(226)
 
 PLUGIN_SET_TRANSLATABLE_INFO (
   LOCALEDIR, GETTEXT_PACKAGE,
@@ -80,6 +79,8 @@ PLUGIN_SET_TRANSLATABLE_INFO (
 
 enum {
   KB_SHOW_PANEL,
+  KB_SHOW_PANEL_COMMANDS,
+  KB_SHOW_PANEL_FILES,
   KB_COUNT
 };
 
@@ -115,7 +116,7 @@ enum {
 
 #define PATH_SEPARATOR " \342\206\222 " /* right arrow */
 
-#define SEPARATORS        " -_/\\\"'"
+#define SEPARATORS        " -_./\\\"'"
 #define IS_SEPARATOR(c)   (strchr (SEPARATORS, (c)) != NULL)
 #define next_separator(p) (strpbrk (p, SEPARATORS))
 
@@ -396,7 +397,7 @@ static void
 fill_store (GtkListStore *store)
 {
   GtkWidget  *menubar;
-  guint       i;
+  guint       i = 0;
   
   /* menu items */
   menubar = find_menubar (GTK_CONTAINER (geany_data->main_widgets->window));
@@ -681,10 +682,6 @@ create_panel (void)
   gtk_container_add (GTK_CONTAINER (frame), box);
   
   plugin_data.entry = gtk_entry_new ();
-  g_signal_connect (plugin_data.entry, "notify::text",
-                    G_CALLBACK (on_entry_text_notify), NULL);
-  g_signal_connect (plugin_data.entry, "activate",
-                    G_CALLBACK (on_entry_activate), NULL);
   gtk_box_pack_start (GTK_BOX (box), plugin_data.entry, FALSE, TRUE, 0);
   
   plugin_data.store = gtk_list_store_new (COL_COUNT,
@@ -725,13 +722,36 @@ create_panel (void)
                     G_CALLBACK (on_view_row_activated), NULL);
   gtk_container_add (GTK_CONTAINER (scroll), plugin_data.view);
   
+  /* connect entry signals after the view is created as they use it */
+  g_signal_connect (plugin_data.entry, "notify::text",
+                    G_CALLBACK (on_entry_text_notify), NULL);
+  g_signal_connect (plugin_data.entry, "activate",
+                    G_CALLBACK (on_entry_activate), NULL);
+  
   gtk_widget_show_all (frame);
 }
 
-static void
-on_kb_show_panel (guint key_id)
+static gboolean
+on_kb_show_panel (GeanyKeyBinding  *kb,
+                  guint             key_id,
+                  gpointer          data)
 {
+  const gchar *prefix = data;
+  
   gtk_widget_show (plugin_data.panel);
+  
+  if (prefix) {
+    const gchar *key = gtk_entry_get_text (GTK_ENTRY (plugin_data.entry));
+    
+    if (! g_str_has_prefix (key, prefix)) {
+      gtk_entry_set_text (GTK_ENTRY (plugin_data.entry), prefix);
+    }
+    /* select the non-prefix part */
+    gtk_editable_select_region (GTK_EDITABLE (plugin_data.entry),
+                                g_utf8_strlen (prefix, -1), -1);
+  }
+  
+  return TRUE;
 }
 
 static gboolean
@@ -748,8 +768,17 @@ plugin_init (GeanyData *data)
   GeanyKeyGroup *group;
   
   group = plugin_set_key_group (geany_plugin, "commander", KB_COUNT, NULL);
-  keybindings_set_item (group, KB_SHOW_PANEL, on_kb_show_panel,
-                        0, 0, "show_panel", _("Show Command Panel"), NULL);
+  keybindings_set_item_full (group, KB_SHOW_PANEL, 0, 0, "show_panel",
+                             _("Show Command Panel"), NULL,
+                             on_kb_show_panel, NULL, NULL);
+  keybindings_set_item_full (group, KB_SHOW_PANEL_COMMANDS, 0, 0,
+                             "show_panel_commands",
+                             _("Show Command Panel (Commands Only)"), NULL,
+                             on_kb_show_panel, (gpointer) "c:", NULL);
+  keybindings_set_item_full (group, KB_SHOW_PANEL_FILES, 0, 0,
+                             "show_panel_files",
+                             _("Show Command Panel (Files Only)"), NULL,
+                             on_kb_show_panel, (gpointer) "f:", NULL);
   
   /* delay for other plugins to have a chance to load before, so we will
    * include their items */

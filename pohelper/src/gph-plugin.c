@@ -31,10 +31,9 @@
 
 GeanyPlugin      *geany_plugin;
 GeanyData        *geany_data;
-GeanyFunctions   *geany_functions;
 
 
-PLUGIN_VERSION_CHECK (211) /* FIXME: what's the version really required? */
+PLUGIN_VERSION_CHECK (224)
 
 PLUGIN_SET_TRANSLATABLE_INFO (
   LOCALEDIR, GETTEXT_PACKAGE,
@@ -1358,18 +1357,36 @@ on_color_button_color_notify (GtkWidget  *widget,
   gtk_color_button_get_color (GTK_COLOR_BUTTON (widget), user_data);
 }
 
+static gchar *
+get_data_dir_path (const gchar *filename)
+{
+  gchar *prefix = NULL;
+  gchar *path;
+
+#ifdef G_OS_WIN32
+  prefix = g_win32_get_package_installation_directory_of_module (NULL);
+#elif defined(__APPLE__)
+  if (g_getenv ("GEANY_PLUGINS_SHARE_PATH"))
+    return g_build_filename( g_getenv ("GEANY_PLUGINS_SHARE_PATH"), 
+                             PLUGIN, filename, NULL);
+#endif
+  path = g_build_filename (prefix ? prefix : "", PLUGINDATADIR, filename, NULL);
+  g_free (prefix);
+  return path;
+}
+
 static void
 show_stats_dialog (guint  all,
                    guint  translated,
-                   guint  untranslated,
-                   guint  fuzzy)
+                   guint  fuzzy,
+                   guint  untranslated)
 {
   GError     *error = NULL;
+  gchar      *ui_filename = get_data_dir_path ("stats.ui");;
   GtkBuilder *builder = gtk_builder_new ();
   
   gtk_builder_set_translation_domain (builder, GETTEXT_PACKAGE);
-  if (! gtk_builder_add_from_file (builder, PKGDATADIR"/pohelper/stats.ui",
-                                   &error)) {
+  if (! gtk_builder_add_from_file (builder, ui_filename, &error)) {
     g_critical (_("Failed to load UI definition, please check your "
                   "installation. The error was: %s"), error->message);
     g_error_free (error);
@@ -1449,6 +1466,7 @@ show_stats_dialog (guint  all,
     gtk_dialog_run (GTK_DIALOG (dialog));
     gtk_widget_destroy (GTK_WIDGET (dialog));
   }
+  g_free (ui_filename);
   g_object_unref (builder);
 }
 
@@ -1695,14 +1713,15 @@ plugin_init (GeanyData *data)
 {
   GtkBuilder *builder;
   GError *error = NULL;
+  gchar *ui_filename;
   guint i;
   
   load_config ();
   
+  ui_filename = get_data_dir_path ("menus.ui");
   builder = gtk_builder_new ();
   gtk_builder_set_translation_domain (builder, GETTEXT_PACKAGE);
-  if (! gtk_builder_add_from_file (builder, PKGDATADIR"/pohelper/menus.ui",
-                                   &error)) {
+  if (! gtk_builder_add_from_file (builder, ui_filename, &error)) {
     g_critical (_("Failed to load UI definition, please check your "
                   "installation. The error was: %s"), error->message);
     g_error_free (error);
@@ -1722,6 +1741,7 @@ plugin_init (GeanyData *data)
     g_signal_connect (obj, "toggled",
                       G_CALLBACK (on_update_headers_upon_save_toggled), NULL);
   }
+  g_free (ui_filename);
   
   /* signal handlers */
   plugin_signal_connect (geany_plugin, NULL, "document-activate", TRUE,

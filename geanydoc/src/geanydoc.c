@@ -35,9 +35,8 @@
 #include "geanydoc.h"
 
 /* These items are set by Geany before init() is called. */
-PluginFields *plugin_fields;
+GeanyPlugin *geany_plugin;
 GeanyData *geany_data;
-GeanyFunctions *geany_functions;
 
 static GtkWidget *keyb1;
 static GtkWidget *keyb2;
@@ -45,24 +44,23 @@ static GtkWidget *keyb2;
 
 /* Check that Geany supports plugin API version 128 or later, and check
  * for binary compatibility. */
-PLUGIN_VERSION_CHECK(128)
+PLUGIN_VERSION_CHECK(224)
 /* All plugins must set name, description, version and author. */
-	PLUGIN_SET_INFO(_("Doc"), _("Call documentation viewer on current symbol."), VERSION,
-		"Yura Siamshka <yurand2@gmail.com>")
+PLUGIN_SET_TRANSLATABLE_INFO(LOCALEDIR, GETTEXT_PACKAGE,
+	_("Doc"), _("Call documentation viewer on current symbol. \nThis plugin currently has no maintainer. Would you like to help by contributing to this plugin?"), VERSION,
+	"Yura Siamshka <yurand2@gmail.com>")
 
 /* Keybinding(s) */
-     enum
-     {
-	     KB_DOCUMENT_WORD,
-	     KB_DOCUMENT_WORD_ASK,
-	     KB_COUNT
-     };
+enum
+{
+	KB_DOCUMENT_WORD,
+	KB_DOCUMENT_WORD_ASK,
+	KB_COUNT
+};
 
-PLUGIN_KEY_GROUP(doc_chars, KB_COUNT)
+GtkWidget *create_Interactive(const gchar * default_word);
 
-     GtkWidget *create_Interactive(void);
-
-     static gboolean word_check_left(gchar c)
+static gboolean word_check_left(gchar c)
 {
 	if (g_ascii_isalnum(c) || c == '_' || c == '.')
 		return TRUE;
@@ -80,24 +78,17 @@ word_check_right(gchar c)
 static gchar *
 current_word(void)
 {
-	gchar *txt;
 	GeanyDocument *doc;
 
 	gint pos;
 	gint cstart, cend;
 	gchar c;
-	gint text_len;
 
 	doc = document_get_current();
 	g_return_val_if_fail(doc != NULL && doc->file_name != NULL, NULL);
 
-	text_len = sci_get_selected_text_length(doc->editor->sci);
-	if (text_len > 1)
-	{
-		txt = g_malloc(text_len + 1);
-		sci_get_selected_text(doc->editor->sci, txt);
-		return txt;
-	}
+	if (sci_has_selection(doc->editor->sci))
+		return sci_get_selection_contents(doc->editor->sci);
 
 	pos = sci_get_current_position(doc->editor->sci);
 	if (pos > 0)
@@ -129,10 +120,8 @@ current_word(void)
 
 	if (cstart == cend)
 		return NULL;
-	txt = g_malloc0(cend - cstart + 1);
 
-	sci_get_text_range(doc->editor->sci, cstart, cend, txt);
-	return txt;
+	return sci_get_contents_range(doc->editor->sci, cstart, cend);
 }
 
 /* name should be in UTF-8, and can have a path. */
@@ -232,11 +221,12 @@ kb_doc(G_GNUC_UNUSED guint key_id)
 static void
 kb_doc_ask(G_GNUC_UNUSED guint key_id)
 {
-	gchar *word = NULL;
+	gchar *word = NULL, *default_word = current_word();
 	GtkWidget *dialog, *entry;
 
 	/* example configuration dialog */
-	dialog = create_Interactive();
+	dialog = create_Interactive(default_word);
+	g_free(default_word);
 
 	/* run the dialog and check for the response code */
 	if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
@@ -267,7 +257,7 @@ on_comboboxType_changed(GtkComboBox * combobox, G_GNUC_UNUSED gpointer user_data
 	GKeyFile *config = (GKeyFile *) g_object_get_data(G_OBJECT(combobox), "config");
 
 	from = g_object_get_data(G_OBJECT(combobox), "current");
-	to = gtk_combo_box_get_active_text(combobox);
+	to = gtk_combo_box_text_get_active_text(combobox);
 
 	if (from != NULL)
 	{
@@ -295,13 +285,13 @@ on_comboboxType_changed(GtkComboBox * combobox, G_GNUC_UNUSED gpointer user_data
 
 #define GLADE_HOOKUP_OBJECT(component,widget,name) \
   g_object_set_data_full (G_OBJECT (component), name, \
-    gtk_widget_ref (widget), (GDestroyNotify) gtk_widget_unref)
+    g_object_ref (widget), (GDestroyNotify) g_object_unref)
 
 #define GLADE_HOOKUP_OBJECT_NO_REF(component,widget,name) \
   g_object_set_data (G_OBJECT (component), name, widget)
 
 GtkWidget *
-create_Interactive(void)
+create_Interactive(const gchar * default_word)
 {
 	GtkWidget *dialog_vbox1;
 	GtkWidget *entry_word;
@@ -314,9 +304,13 @@ create_Interactive(void)
 							GTK_STOCK_CANCEL,
 							GTK_RESPONSE_REJECT,
 							NULL);
-	dialog_vbox1 = GTK_DIALOG(dialog)->vbox;
+	gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_ACCEPT);
+	dialog_vbox1 = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
 
 	entry_word = gtk_entry_new();
+	if (default_word)
+		gtk_entry_set_text(GTK_ENTRY(entry_word), default_word);
+	gtk_entry_set_activates_default(GTK_ENTRY(entry_word), TRUE);
 	gtk_widget_show(entry_word);
 	gtk_box_pack_start(GTK_BOX(dialog_vbox1), entry_word, TRUE, TRUE, 0);
 
@@ -347,7 +341,7 @@ create_Configure(void)
 	gtk_window_set_title(GTK_WINDOW(Configure), _("Doc"));
 	gtk_window_set_type_hint(GTK_WINDOW(Configure), GDK_WINDOW_TYPE_HINT_DIALOG);
 
-	dialog_vbox1 = GTK_DIALOG(Configure)->vbox;
+	dialog_vbox1 = gtk_dialog_get_content_area(GTK_DIALOG(Configure));
 	gtk_widget_show(dialog_vbox1);
 
 	vbox1 = gtk_vbox_new(FALSE, 0);
@@ -358,7 +352,7 @@ create_Configure(void)
 	gtk_widget_show(cbIntern);
 	gtk_box_pack_start(GTK_BOX(vbox1), cbIntern, FALSE, FALSE, 0);
 
-	comboboxType = gtk_combo_box_new_text();
+	comboboxType = gtk_combo_box_text_new();
 	gtk_widget_show(comboboxType);
 	gtk_box_pack_start(GTK_BOX(vbox1), comboboxType, FALSE, FALSE, 0);
 
@@ -394,19 +388,19 @@ create_Configure(void)
 	gtk_widget_show(label2);
 	gtk_box_pack_start(GTK_BOX(dialog_vbox1), label2, FALSE, FALSE, 0);
 
-	dialog_action_area1 = GTK_DIALOG(Configure)->action_area;
+	dialog_action_area1 = gtk_dialog_get_action_area(GTK_DIALOG(Configure));
 	gtk_widget_show(dialog_action_area1);
 	gtk_button_box_set_layout(GTK_BUTTON_BOX(dialog_action_area1), GTK_BUTTONBOX_END);
 
 	cancelbutton1 = gtk_button_new_from_stock("gtk-cancel");
 	gtk_widget_show(cancelbutton1);
 	gtk_dialog_add_action_widget(GTK_DIALOG(Configure), cancelbutton1, GTK_RESPONSE_CANCEL);
-	GTK_WIDGET_SET_FLAGS(cancelbutton1, GTK_CAN_DEFAULT);
+	gtk_widget_set_can_default(cancelbutton1, TRUE);
 
 	okbutton1 = gtk_button_new_from_stock("gtk-ok");
 	gtk_widget_show(okbutton1);
 	gtk_dialog_add_action_widget(GTK_DIALOG(Configure), okbutton1, GTK_RESPONSE_OK);
-	GTK_WIDGET_SET_FLAGS(okbutton1, GTK_CAN_DEFAULT);
+	gtk_widget_set_can_default(okbutton1, TRUE);
 
 	g_signal_connect_after((gpointer) comboboxType, "changed",
 			       G_CALLBACK(on_comboboxType_changed), NULL);
@@ -433,10 +427,10 @@ create_Configure(void)
 void
 plugin_init(G_GNUC_UNUSED GeanyData * data)
 {
+	GeanyKeyGroup *key_group;
 	gchar *kb_label1;
 	gchar *kb_label2;
 
-	main_locale_init(LOCALEDIR, GETTEXT_PACKAGE);
 	kb_label1 = _("Document current word");
 	kb_label2 = _("Document interactive");
 
@@ -445,9 +439,10 @@ plugin_init(G_GNUC_UNUSED GeanyData * data)
 	keyb1 = gtk_menu_item_new();
 	keyb2 = gtk_menu_item_new();
 
-	keybindings_set_item(plugin_key_group, KB_DOCUMENT_WORD, kb_doc,
+	key_group = plugin_set_key_group(geany_plugin, "doc_chars", KB_COUNT, NULL);
+	keybindings_set_item(key_group, KB_DOCUMENT_WORD, kb_doc,
 				0, 0, kb_label1, kb_label1, keyb1);
-	keybindings_set_item(plugin_key_group, KB_DOCUMENT_WORD_ASK, kb_doc_ask,
+	keybindings_set_item(key_group, KB_DOCUMENT_WORD_ASK, kb_doc_ask,
 				0, 0, kb_label2, kb_label2, keyb2);
 }
 
@@ -462,7 +457,7 @@ init_Configure(GtkWidget * dialog)
 
 	for (i = 0; i < geany->filetypes_array->len; i++)
 	{
-		gtk_combo_box_append_text(GTK_COMBO_BOX(cbTypes),
+		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(cbTypes),
 					  ((struct GeanyFiletype *) (filetypes[i]))->
 					  name);
 	}

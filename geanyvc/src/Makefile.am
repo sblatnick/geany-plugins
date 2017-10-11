@@ -1,4 +1,5 @@
 include $(top_srcdir)/build/vars.build.mk
+plugin = geanyvc
 
 geanyplugins_LTLIBRARIES = geanyvc.la
 
@@ -18,6 +19,7 @@ geanyvc_la_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(GTKSPELL_CFLAGS)
 
+geanyvc_la_CPPFLAGS = $(AM_CPPFLAGS) -DG_LOG_DOMAIN=\"GeanyVC\"
 geanyvc_la_LIBADD = \
 	$(GTKSPELL_LIBS) \
 	$(COMMONLIBS)

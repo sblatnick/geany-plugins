@@ -41,9 +41,8 @@
 
 GeanyPlugin	*geany_plugin;
 GeanyData	*geany_data;
-GeanyFunctions	*geany_functions;
 
-PLUGIN_VERSION_CHECK(218)
+PLUGIN_VERSION_CHECK(224)
 PLUGIN_SET_TRANSLATABLE_INFO(
 	LOCALEDIR,
 	GETTEXT_PACKAGE,
@@ -900,7 +899,7 @@ configure_response_cb(GtkDialog *dialog, gint response, gpointer user_data)
 void
 plugin_init(G_GNUC_UNUSED GeanyData *data)
 {
-	guint i;
+	guint i = 0;
 
 	foreach_document(i)
 	{
@@ -1121,7 +1120,7 @@ plugin_configure(GtkDialog *dialog)
 static void
 autoclose_cleanup(void)
 {
-	guint i;
+	guint i = 0;
 
 	foreach_document(i)
 	{

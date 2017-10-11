@@ -32,7 +32,7 @@
 #include "debug_module.h"
 
 /* creates new variable */
-variable *variable_new(gchar *name, variable_type vt)
+variable *variable_new(const gchar *name, variable_type vt)
 {
 	variable *var = g_malloc(sizeof(variable));
 	var->name = g_string_new(name);
@@ -47,7 +47,7 @@ variable *variable_new(gchar *name, variable_type vt)
 }
 
 /* creates new variable with internal name */
-variable *variable_new2(gchar *name, gchar *internal, variable_type vt)
+variable *variable_new2(const gchar *name, const gchar *internal, variable_type vt)
 {
 	variable *var = variable_new(name, vt);
 	g_string_assign(var->internal, internal);
@@ -79,26 +79,28 @@ void variable_reset(variable *var)
 /* creates new frame */
 frame* frame_new(void)
 {
-	frame *f = (frame*)malloc(sizeof(frame));
-	memset((void*)f, 0, sizeof(frame));
+	frame *f = g_malloc0(sizeof *f);
+	f->ref_count = 1;
 	return f;
 }
 
-/* frees a frame */
-void frame_free(frame* f)
+/* refs a frame */
+frame* frame_ref(frame* f)
 {
-	if (f->address)
+	f->ref_count++;
+	return f;
+}
+
+/* unrefs a frame */
+void frame_unref(frame* f)
+{
+	if (f->ref_count > 1)
+		f->ref_count--;
+	else
 	{
 		g_free(f->address);
-	}
-	if (f->function)
-	{
 		g_free(f->function);
-	}
-	if (f->file)
-	{
 		g_free(f->file);
+		g_free(f);
 	}
-	
-	g_free(f);
 }

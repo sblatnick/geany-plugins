@@ -1,4 +1,5 @@
 include $(top_srcdir)/build/vars.build.mk
+plugin = spellcheck
 
 geanyplugins_LTLIBRARIES = spellcheck.la
 
@@ -9,6 +10,9 @@ spellcheck_la_SOURCES = \
 	gui.c \
 	speller.c \
 	scplugin.c
+
+spellcheck_la_CPPFLAGS = $(AM_CPPFLAGS) \
+						 -DG_LOG_DOMAIN=\"SpellCheck\"
 
 spellcheck_la_CFLAGS = \
 	$(AM_CFLAGS) \

@@ -121,8 +121,8 @@ ggd_tag_sort_by_line_to_list (const GPtrArray  *tags,
                               gint              direction)
 {
   GList  *children = NULL;
-  guint   i;
-  TMTag  *el;
+  guint   i = 0;
+  TMTag  *el = NULL;
   
   g_return_val_if_fail (tags != NULL, NULL);
   g_return_val_if_fail (direction != 0, NULL);
@@ -152,8 +152,8 @@ ggd_tag_find_from_line (const GPtrArray  *tags,
                         gulong            line)
 {
   TMTag    *tag = NULL;
-  TMTag    *el;
-  guint     i;
+  TMTag    *el = NULL;
+  guint     i = 0;
   
   g_return_val_if_fail (tags != NULL, NULL);
   
@@ -203,7 +203,7 @@ ggd_tag_find_at_current_pos (GeanyDocument *doc)
  */
 TMTag *
 ggd_tag_find_parent (const GPtrArray *tags,
-                     filetype_id      geany_ft,
+                     GeanyFiletypeID  geany_ft,
                      const TMTag     *child)
 {
   TMTag *tag = NULL;
@@ -217,8 +217,8 @@ ggd_tag_find_parent (const GPtrArray *tags,
     gchar        *parent_scope = NULL;
     const gchar  *parent_name;
     const gchar  *tmp;
-    guint         i;
-    TMTag        *el;
+    guint         i = 0;
+    TMTag        *el = NULL;
     const gchar  *separator;
     gsize         separator_len;
     
@@ -358,7 +358,7 @@ ggd_tag_get_type_name (const TMTag *tag)
  */
 gchar *
 ggd_tag_resolve_type_hierarchy (const GPtrArray *tags,
-                                filetype_id      geany_ft,
+                                GeanyFiletypeID  geany_ft,
                                 const TMTag     *tag)
 {
   gchar *scope = NULL;
@@ -407,8 +407,8 @@ ggd_tag_find_from_name (const GPtrArray *tags,
                         const gchar     *name)
 {
   TMTag  *tag = NULL;
-  guint   i;
-  TMTag  *el;
+  guint   i = 0;
+  TMTag  *el = NULL;
   
   g_return_val_if_fail (tags != NULL, NULL);
   g_return_val_if_fail (name != NULL, NULL);
@@ -440,12 +440,12 @@ ggd_tag_find_from_name (const GPtrArray *tags,
 GList *
 ggd_tag_find_children_filtered (const GPtrArray *tags,
                                 const TMTag     *parent,
-                                filetype_id      geany_ft,
+                                GeanyFiletypeID  geany_ft,
                                 TMTagType        filter)
 {
   GList  *children = NULL;
-  guint   i;
-  TMTag  *el;
+  guint   i = 0;
+  TMTag  *el = NULL;
   
   g_return_val_if_fail (tags != NULL, NULL);
   g_return_val_if_fail (parent != NULL, NULL);
@@ -477,7 +477,7 @@ ggd_tag_find_children_filtered (const GPtrArray *tags,
 GList *
 ggd_tag_find_children (const GPtrArray *tags,
                        const TMTag     *parent,
-                       filetype_id      geany_ft)
+                       GeanyFiletypeID  geany_ft)
 {
   return ggd_tag_find_children_filtered (tags, parent, geany_ft, tm_tag_max_t);
 }

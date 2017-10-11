@@ -1,7 +1,7 @@
 /*
  *	  tableconvert.c
  *
- *	  Copyright 2011-2014 Frank Lanitz <frank(at)frank(dot)uvena(dot)de>
+ *	  Copyright 2011-2015 Frank Lanitz <frank(at)frank(dot)uvena(dot)de>
  *
  *	  This program is free software; you can redistribute it and/or modify
  *	  it under the terms of the GNU General Public License as published by
@@ -25,16 +25,15 @@
 #include "tableconvert.h"
 #include "tableconvert_ui.h"
 
-PLUGIN_VERSION_CHECK(200)
+PLUGIN_VERSION_CHECK(224)
 
 PLUGIN_SET_TRANSLATABLE_INFO(
     LOCALEDIR, GETTEXT_PACKAGE, _("Tableconvert"),
-    _("A little plugin to convert lists into tables"),
+    _("Converts lists into tables for different filetypes"),
     VERSION, "Frank Lanitz <frank@frank.uvena.de>")
 
 GeanyPlugin	 	*geany_plugin;
 GeanyData	   	*geany_data;
-GeanyFunctions  *geany_functions;
 
 TableConvertRule tablerules[] = {
 	/* LaTeX */
@@ -292,7 +291,7 @@ void convert_to_table(gboolean header, gint file_type)
 		else
 		{
 			/* OK. Something went not as expected.
-			 * We did have a selection but cannot parse it into rows.
+			 * We do have a selection but cannot parse it into rows.
 			 * Aborting */
 			g_warning(_("Something went wrong on parsing selection. Aborting"));
 			return;

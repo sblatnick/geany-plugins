@@ -1,4 +1,5 @@
 include $(top_srcdir)/build/vars.build.mk
+include $(top_srcdir)/build/vars.docs.mk
 plugin = geniuspaste
 
 geanyplugins_LTLIBRARIES = geniuspaste.la

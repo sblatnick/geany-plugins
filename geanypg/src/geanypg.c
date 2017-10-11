@@ -23,18 +23,19 @@
 /* These items are set by Geany before plugin_init() is called. */
 GeanyPlugin     *geany_plugin;
 GeanyData       *geany_data;
-GeanyFunctions  *geany_functions;
 
 /* Check that the running Geany supports the plugin API version used below, and check
  * for binary compatibility. */
-PLUGIN_VERSION_CHECK(201)
+PLUGIN_VERSION_CHECK(224)
 
 /* All plugins must set name, description, version and author. */
 PLUGIN_SET_TRANSLATABLE_INFO(
                 LOCALEDIR,
                 GETTEXT_PACKAGE,
                 "GeanyPG",
-                _("gpg encryption plugin for geany"),
+                _("GPG encryption plugin for geany."
+                  "\nThis plugin currently has no maintainer. Would you "
+                  "like to help by contributing to this plugin?"),
                 "0.1",
                 _("Hans Alves <alves.h88@gmail.com>"))
 
@@ -44,8 +45,7 @@ static gpgme_error_t geanypg_init_gpgme(void)
 {
     /* Initialize the locale environment. */
     setlocale(LC_ALL, "");
-    fprintf(stderr, "GeanyPG: %s %s\n", _("Using libgpgme version:"),
-            gpgme_check_version("1.1.0"));
+    g_message("%s %s", _("Using libgpgme version:"), gpgme_check_version("1.1.0"));
     gpgme_set_locale(NULL, LC_CTYPE, setlocale(LC_CTYPE, NULL));
 #ifdef LC_MESSAGES /* only necessary for portability to W32 systems */
     gpgme_set_locale(NULL, LC_MESSAGES, setlocale(LC_MESSAGES, NULL));
@@ -58,7 +58,7 @@ gpgme_error_t geanypg_show_err_msg(gpgme_error_t err)
     gchar const * msg = (gchar const *)gpgme_strerror(err);
     gchar const * src = (gchar const *)gpgme_strsource(err);
     dialogs_show_msgbox(GTK_MESSAGE_ERROR, "%s %s: %s\n", _("Error from"), src, msg);
-    fprintf(stderr, "GeanyPG: %s %s: %s\n", _("Error from"), msg, src);
+    g_warning("%s %s: %s", _("Error from"), msg, src);
     return err;
 }
 

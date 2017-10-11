@@ -46,15 +46,15 @@
 #endif
 
 
-PLUGIN_VERSION_CHECK(211)
-PLUGIN_SET_INFO("GeanyCtags",
+PLUGIN_VERSION_CHECK(226)
+PLUGIN_SET_TRANSLATABLE_INFO(LOCALEDIR, GETTEXT_PACKAGE,
+	"GeanyCtags",
 	_("Ctags generation and search plugin for geany projects"),
 	VERSION,
 	"Jiri Techet <techet@gmail.com>")
 
 GeanyPlugin *geany_plugin;
 GeanyData *geany_data;
-GeanyFunctions *geany_functions;
 
 
 static GtkWidget *s_context_fdec_item, *s_context_fdef_item, *s_context_sep_item,
@@ -112,19 +112,20 @@ PluginCallback plugin_callbacks[] = {
 
 void plugin_help (void)
 {
-	utils_open_browser (DOCDIR "/" PLUGIN "/README");
+	utils_open_browser("http://plugins.geany.org/geanyctags.html");
 }
 
 static void spawn_cmd(const gchar *cmd, const gchar *dir)
 {
 	GError *error = NULL;
-	gchar **argv;
+	gchar **argv = NULL;
 	gchar *working_dir;
 	gchar *utf8_working_dir;
 	gchar *utf8_cmd_string;
 	gchar *out;
 	gint exitcode;
 	gboolean success;
+	GString *output;
 
 #ifndef G_OS_WIN32
 	/* run within shell so we can use pipes */
@@ -133,13 +134,8 @@ static void spawn_cmd(const gchar *cmd, const gchar *dir)
 	argv[1] = g_strdup("-c");
 	argv[2] = g_strdup(cmd);
 	argv[3] = NULL;
-#else
-	/* no shell on windows */
-	argv = g_new0(gchar *, 2);
-	argv[0] = g_strdup(cmd);
-	argv[1] = NULL;
 #endif
-			
+
 	utf8_cmd_string = utils_get_utf8_from_locale(cmd);
 	utf8_working_dir = g_strdup(dir);
 	working_dir = utils_get_locale_from_utf8(utf8_working_dir);
@@ -149,14 +145,16 @@ static void spawn_cmd(const gchar *cmd, const gchar *dir)
 	msgwin_msg_add(COLOR_BLUE, -1, NULL, _("%s (in directory: %s)"), utf8_cmd_string, utf8_working_dir);
 	g_free(utf8_working_dir);
 	g_free(utf8_cmd_string);
-	
+
+	output = g_string_new(NULL);
 #ifndef G_OS_WIN32
-	success = utils_spawn_sync(working_dir, argv, NULL, G_SPAWN_SEARCH_PATH,
-			NULL, NULL, NULL, &out, &exitcode, &error);
+	success = spawn_sync(working_dir, NULL, argv, NULL,
+			NULL, NULL, output, &exitcode, &error);
 #else
-	success = utils_spawn_sync(working_dir, argv, NULL, G_SPAWN_SEARCH_PATH,
-			NULL, NULL, &out, NULL, &exitcode, &error);
+	success = spawn_sync(working_dir, cmd, NULL, NULL,
+			NULL, output, NULL, &exitcode, &error);
 #endif
+	out = g_string_free(output, FALSE);
 	if (!success || exitcode != 0)
 	{
 		if (error != NULL)
@@ -192,7 +190,7 @@ static gchar *generate_find_string(GeanyProject *prj)
 {
 	gchar *ret;
 
-	ret = g_strdup("find . -not -path '*/\\.*'");
+	ret = g_strdup("find -L . -not -path '*/\\.*'");
 
 	if (!EMPTY(prj->file_patterns))
 	{
@@ -416,6 +414,7 @@ static void find_tags(const gchar *name, gboolean declaration, gboolean case_sen
 	gchar *tag_filename = NULL;
 	tagEntry entry;
 	tagFileInfo info;
+	int last_line_number = 0;
 
 	prj = geany_data->app->project;
 	if (!prj)
@@ -448,6 +447,7 @@ static void find_tags(const gchar *name, gboolean declaration, gboolean case_sen
 			{
 				path = g_build_filename(prj->base_path, entry.file, NULL);
 				show_entry(&entry);
+				last_line_number = entry.address.lineNumber;
 				num++;
 			}
 			
@@ -458,6 +458,7 @@ static void find_tags(const gchar *name, gboolean declaration, gboolean case_sen
 					if (!path)
 						path = g_build_filename(prj->base_path, entry.file, NULL);
 					show_entry(&entry);
+					last_line_number = entry.address.lineNumber;
 					num++;
 				}
 			}
@@ -467,7 +468,7 @@ static void find_tags(const gchar *name, gboolean declaration, gboolean case_sen
 				GeanyDocument *doc = document_open_file(path, FALSE, NULL, NULL);
 				if (doc != NULL)
 				{
-					navqueue_goto_line(document_get_current(), doc, entry.address.lineNumber);
+					navqueue_goto_line(document_get_current(), doc, last_line_number);
 					gtk_widget_grab_focus(GTK_WIDGET(doc->editor->sci));
 				}
 			}
@@ -525,7 +526,7 @@ static void create_dialog_find_file(void)
 
 	size_group = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
 
-	label = gtk_label_new(_("Search for:"));
+	label = gtk_label_new_with_mnemonic(_("_Search for:"));
 	gtk_misc_set_alignment(GTK_MISC(label), 0, 0.5);
 	gtk_size_group_add_widget(size_group, label);
 
@@ -543,14 +544,14 @@ static void create_dialog_find_file(void)
 	gtk_box_pack_start(GTK_BOX(ebox), s_ft_dialog.combo, TRUE, TRUE, 0);
 	gtk_box_pack_start(GTK_BOX(vbox), ebox, TRUE, FALSE, 0);
 
-	label = gtk_label_new(_("Match type:"));
+	label = gtk_label_new_with_mnemonic(_("_Match type:"));
 	gtk_misc_set_alignment(GTK_MISC(label), 0, 0.5);
 	gtk_size_group_add_widget(size_group, label);
 
 	s_ft_dialog.combo_match = gtk_combo_box_text_new();
-	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(s_ft_dialog.combo_match), "exact");
-	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(s_ft_dialog.combo_match), "prefix");
-	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(s_ft_dialog.combo_match), "pattern");
+	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(s_ft_dialog.combo_match), _("exact"));
+	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(s_ft_dialog.combo_match), _("prefix"));
+	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(s_ft_dialog.combo_match), _("pattern"));
 	gtk_combo_box_set_active(GTK_COMBO_BOX(s_ft_dialog.combo_match), 1);
 	gtk_label_set_mnemonic_widget(GTK_LABEL(label), s_ft_dialog.combo_match);
 
@@ -650,7 +651,7 @@ void plugin_init(G_GNUC_UNUSED GeanyData * data)
 	keybindings_set_item(key_group, KB_GENERATE_TAGS, NULL,
 		0, 0, "generate_tags", _("Generate tags"), s_gt_item);
 
-	s_ft_item = gtk_menu_item_new_with_mnemonic(_("Find tag"));
+	s_ft_item = gtk_menu_item_new_with_mnemonic(_("Find tag..."));
 	gtk_widget_show(s_ft_item);
 	gtk_container_add(GTK_CONTAINER(geany->main_widgets->project_menu), s_ft_item);
 	g_signal_connect((gpointer) s_ft_item, "activate", G_CALLBACK(on_find_tag), NULL);

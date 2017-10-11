@@ -27,12 +27,13 @@
 
 GeanyPlugin *geany_plugin;
 GeanyData *geany_data;
-GeanyFunctions *geany_functions;
 
-PLUGIN_VERSION_CHECK(215)
+PLUGIN_VERSION_CHECK(224)
 
 PLUGIN_SET_TRANSLATABLE_INFO(LOCALEDIR, GETTEXT_PACKAGE, _("Scope Debugger"),
-	_("Relatively simple GDB front-end."), "0.93.2",
+	_("Relatively simple GDB front-end."
+	  "\nThis plugin currently has no maintainer. Would you like to help "
+	  "by contributing to this plugin?"), "0.94",
 	"Dimitar Toshkov Zhekov <dimitar.zhekov@gmail.com>")
 
 /* Keybinding(s) */
@@ -88,7 +89,7 @@ static void on_scope_reset_markers(G_GNUC_UNUSED const MenuItem *menu_item)
 
 static void on_scope_cleanup_files(G_GNUC_UNUSED const MenuItem *menu_item)
 {
-	guint i;
+	guint i = 0;
 
 	foreach_document(i)
 	{
@@ -152,18 +153,19 @@ typedef struct _ToolItem
 	gint index;
 	const char *icon[2];
 	GtkWidget *widget;
+	const char *tooltip_text;
 } ToolItem;
 
 static ToolItem toolbar_items[] =
 {
-	{ RUN_CONTINUE_KB, { "small_run_continue_icon", "large_run_continue_icon" }, NULL },
-	{ GOTO_CURSOR_KB,  { "small_goto_cursor_icon",  "large_goto_cursor_icon"  }, NULL },
-	{ GOTO_SOURCE_KB,  { "small_goto_source_icon",  "large_goto_source_icon"  }, NULL },
-	{ STEP_INTO_KB,    { "small_step_into_icon",    "large_step_into_icon"    }, NULL },
-	{ STEP_OVER_KB,    { "small_step_over_icon",    "large_step_over_icon"    }, NULL },
-	{ STEP_OUT_KB,     { "small_step_out_icon",     "large_step_out_icon"     }, NULL },
-	{ TERMINATE_KB,    { "small_terminate_icon",    "large_terminate_icon"    }, NULL },
-	{ BREAKPOINT_KB,   { "small_breakpoint_icon",   "large_breakpoint_icon",  }, NULL },
+	{ RUN_CONTINUE_KB, { "small_run_continue_icon", "large_run_continue_icon" }, NULL, N_("Run/continue")      },
+	{ GOTO_CURSOR_KB,  { "small_goto_cursor_icon",  "large_goto_cursor_icon"  }, NULL, N_("Run to cursor")     },
+	{ GOTO_SOURCE_KB,  { "small_goto_source_icon",  "large_goto_source_icon"  }, NULL, N_("Run to source")     },
+	{ STEP_INTO_KB,    { "small_step_into_icon",    "large_step_into_icon"    }, NULL, N_("Step into")         },
+	{ STEP_OVER_KB,    { "small_step_over_icon",    "large_step_over_icon"    }, NULL, N_("Step over")         },
+	{ STEP_OUT_KB,     { "small_step_out_icon",     "large_step_out_icon"     }, NULL, N_("Step out")          },
+	{ TERMINATE_KB,    { "small_terminate_icon",    "large_terminate_icon"    }, NULL, N_("Terminate")         },
+	{ BREAKPOINT_KB,   { "small_breakpoint_icon",   "large_breakpoint_icon",  }, NULL, N_("Toggle breakpoint") },
 	{ -1, { NULL, NULL }, NULL }
 };
 
@@ -312,11 +314,9 @@ static void on_document_open(G_GNUC_UNUSED GObject *obj, GeanyDocument *doc,
 		threads_mark(doc);
 }
 
-static guint saved_id = 0;
-
 static gboolean settings_saved(gpointer gdata)
 {
-	guint i;
+	guint i = 0;
 
 	foreach_document(i)
 	{
@@ -330,15 +330,14 @@ static gboolean settings_saved(gpointer gdata)
 		conterm_apply_config();
 	}
 
-	saved_id = 0;
 	return FALSE;
 }
 
 static void schedule_settings_saved(gboolean conterm)
 {
-	guint i;
+	guint i = 0;
 
-	saved_id = plugin_idle_add(geany_plugin, settings_saved, GINT_TO_POINTER(conterm));
+	plugin_idle_add(geany_plugin, settings_saved, GINT_TO_POINTER(conterm));
 
 	foreach_document(i)
 	{
@@ -528,10 +527,27 @@ void configure_panel(void)
 	gtk_notebook_set_tab_pos(GTK_NOTEBOOK(debug_panel), pref_panel_tab_pos);
 }
 
+static gchar *get_data_dir_path(const gchar *filename)
+{
+	gchar *prefix = NULL;
+	gchar *path;
+
+#ifdef G_OS_WIN32
+	prefix = g_win32_get_package_installation_directory_of_module(NULL);
+#elif defined(__APPLE__)
+	if (g_getenv("GEANY_PLUGINS_SHARE_PATH"))
+		return g_build_filename(g_getenv("GEANY_PLUGINS_SHARE_PATH"), 
+								PLUGIN, filename, NULL);
+#endif
+	path = g_build_filename(prefix ? prefix : "", PLUGINDATADIR, filename, NULL);
+	g_free(prefix);
+	return path;
+}
+
 void plugin_init(G_GNUC_UNUSED GeanyData *gdata)
 {
 	GeanyKeyGroup *scope_key_group;
-	char *gladefile = g_build_filename(PLUGINDATADIR, "scope.glade", NULL);
+	char *gladefile = get_data_dir_path("scope.glade");
 	GError *gerror = NULL;
 	GtkWidget *menubar1 = ui_lookup_widget(geany->main_widgets->window, "menubar1");
 	guint item;
@@ -539,7 +555,6 @@ void plugin_init(G_GNUC_UNUSED GeanyData *gdata)
 	ToolItem *tool_item = toolbar_items;
 	const ScopeCallback *scb;
 
-	main_locale_init(LOCALEDIR, GETTEXT_PACKAGE);
 	scope_key_group = plugin_set_key_group(geany_plugin, "scope", COUNT_KB, NULL);
 	builder = gtk_builder_new();
 	gtk_builder_set_translation_domain(builder, GETTEXT_PACKAGE);
@@ -617,6 +632,7 @@ void plugin_init(G_GNUC_UNUSED GeanyData *gdata)
 		GtkMenuItem *menu_item = GTK_MENU_ITEM(debug_menu_items[tool_item->index].widget);
 		GtkToolItem *button = gtk_tool_button_new(NULL, gtk_menu_item_get_label(menu_item));
 
+		gtk_widget_set_tooltip_text (GTK_WIDGET (button), tool_item->tooltip_text);
 		gtk_tool_button_set_use_underline(GTK_TOOL_BUTTON(button),
 			gtk_menu_item_get_use_underline(menu_item));
 		g_signal_connect(button, "clicked", G_CALLBACK(on_toolbar_button_clicked),

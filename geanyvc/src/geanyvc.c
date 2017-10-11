@@ -39,19 +39,39 @@
 
 #ifdef USE_GTKSPELL
 #include <gtkspell/gtkspell.h>
+/* forward compatibility with GtkSpell3 */
+#if GTK_CHECK_VERSION(3, 0, 0)
+#define GtkSpell GtkSpellChecker
+#define gtkspell_set_language gtk_spell_checker_set_language
+static GtkSpell *gtkspell_new_attach(GtkTextView *view, const gchar *lang, GError **error)
+{
+	GtkSpellChecker *speller = gtk_spell_checker_new();
+
+	if (! lang || gtk_spell_checker_set_language(speller, lang, error))
+		gtk_spell_checker_attach(speller, view);
+	else
+	{
+		g_object_unref(g_object_ref_sink(speller));
+		speller = NULL;
+	}
+
+	return speller;
+}
+#endif
 #endif
 
 GeanyData *geany_data;
-GeanyFunctions *geany_functions;
 GeanyPlugin		*geany_plugin;
 
 
-PLUGIN_VERSION_CHECK(188)
+PLUGIN_VERSION_CHECK(224)
 PLUGIN_SET_TRANSLATABLE_INFO(
 	LOCALEDIR,
 	GETTEXT_PACKAGE,
 	_("GeanyVC"),
-	_("Interface to different Version Control systems."),
+	_("Interface to different Version Control systems."
+	  "\nThis plugins is currently not developed actively. "
+	  "Would you like to help by contributing to this plugin?"),
 	VERSION,
 	"Yura Siamashka <yurand2@gmail.com>,\nFrank Lanitz <frank@frank.uvena.de>")
 
@@ -379,8 +399,6 @@ show_output(const gchar * std_output, const gchar * name,
 	    const gchar * force_encoding, GeanyFiletype * ftype,
 	    gint line)
 {
-	gint page;
-	GtkNotebook *book;
 	GeanyDocument *doc, *cur_doc;
 
 	if (std_output)
@@ -390,25 +408,18 @@ show_output(const gchar * std_output, const gchar * name,
 		if (doc == NULL)
 		{
 			doc = document_new_file(name, ftype, std_output);
-			/* To due the given line is Scintilla's line number, but
-			 * we need the view line number in this case.  */
-			line = line + 1;
-			if (line < 1)
-				line = 1;
 		}
 		else
 		{
 			sci_set_text(doc->editor->sci, std_output);
 			if (ftype)
 				document_set_filetype(doc, ftype);
-			book = GTK_NOTEBOOK(geany->main_widgets->notebook);
-			page = gtk_notebook_page_num(book, GTK_WIDGET(doc->editor->sci));
-			gtk_notebook_set_current_page(book, page);
 		}
+
 		document_set_text_changed(doc, set_changed_flag);
 		document_set_encoding(doc, (force_encoding ? force_encoding : "UTF-8"));
 
-		navqueue_goto_line(cur_doc, doc, line);
+		navqueue_goto_line(cur_doc, doc, MAX(line + 1, 1));
 
 	}
 	else
@@ -908,7 +919,7 @@ command_with_question_activated(gchar ** text, gint cmd, const gchar * question,
 		if (flags & (FLAG_DIR | FLAG_BASEDIR))
 			execute_command(vc, text, NULL, dir, cmd, NULL, NULL);
 		if (flags & FLAG_RELOAD)
-			document_reload_file(doc, NULL);
+			document_reload_force(doc, NULL);
 	}
 	g_free(dir);
 	return (result == GTK_RESPONSE_YES);
@@ -966,7 +977,7 @@ vcupdate_activated(G_GNUC_UNUSED GtkMenuItem * menuitem, G_GNUC_UNUSED gpointer 
 	if (command_with_question_activated(&text, VC_COMMAND_UPDATE,
 					    _("Do you really want to update?"), FLAG_BASEDIR))
 	{
-		document_reload_file(doc, NULL);
+		document_reload_force(doc, NULL);
 
 		if (!EMPTY(text))
 			show_output(text, "*VC-UPDATE*", NULL, NULL, 0);
@@ -1279,7 +1290,7 @@ get_diff_color(G_GNUC_UNUSED GeanyDocument * doc, gint style)
 
 #define GLADE_HOOKUP_OBJECT(component,widget,name) \
   g_object_set_data_full (G_OBJECT (component), name, \
-    gtk_widget_ref (widget), (GDestroyNotify) gtk_widget_unref)
+    g_object_ref (widget), (GDestroyNotify) g_object_unref)
 
 #define GLADE_HOOKUP_OBJECT_NO_REF(component,widget,name) \
   g_object_set_data (G_OBJECT (component), name, widget)
@@ -1336,7 +1347,6 @@ create_commitDialog(void)
 	GtkWidget *scrolledwindow1;
 	GtkWidget *treeSelect;
 	GtkWidget *vpaned2;
-	GtkWidget *vpaned3;
 	GtkWidget *scrolledwindow2;
 	GtkWidget *textDiff;
 	GtkWidget *frame1;
@@ -1348,6 +1358,7 @@ create_commitDialog(void)
 	GtkWidget *btnCancel;
 	GtkWidget *btnCommit;
 	GtkWidget *select_cbox;
+	GtkWidget *bottom_vbox;
 	GtkWidget *commit_text_vbox;
 	GtkWidget *lineColumnLabel;
 	GtkTreeSelection *sel;
@@ -1372,9 +1383,8 @@ create_commitDialog(void)
 	gtk_window_set_modal(GTK_WINDOW(commitDialog), TRUE);
 	gtk_window_set_destroy_with_parent(GTK_WINDOW(commitDialog), TRUE);
 	gtk_window_set_type_hint(GTK_WINDOW(commitDialog), GDK_WINDOW_TYPE_HINT_DIALOG);
-	gtk_dialog_set_has_separator(GTK_DIALOG(commitDialog), FALSE);
 
-	dialog_vbox1 = GTK_DIALOG(commitDialog)->vbox;
+	dialog_vbox1 = gtk_dialog_get_content_area(GTK_DIALOG(commitDialog));
 	gtk_widget_show(dialog_vbox1);
 
 	vpaned1 = gtk_vpaned_new();
@@ -1405,12 +1415,12 @@ create_commitDialog(void)
 				       GTK_POLICY_AUTOMATIC);
 	gtk_scrolled_window_set_shadow_type(GTK_SCROLLED_WINDOW(scrolledwindow2), GTK_SHADOW_IN);
 
-	vpaned3 = gtk_vpaned_new();
-	gtk_widget_show(vpaned3);
-	gtk_paned_pack2(GTK_PANED(vpaned2), vpaned3, FALSE, FALSE);
+	bottom_vbox = gtk_vbox_new(FALSE, 0);
+	gtk_widget_show(bottom_vbox);
+	gtk_paned_pack2(GTK_PANED(vpaned2), bottom_vbox, FALSE, FALSE);
 
 	select_cbox = GTK_WIDGET(gtk_check_button_new_with_mnemonic(_("_De-/select all files")));
-	gtk_paned_pack1(GTK_PANED(vpaned3), select_cbox, FALSE, FALSE);
+	gtk_box_pack_start(GTK_BOX(bottom_vbox), select_cbox, FALSE, FALSE, 2);
 	gtk_widget_show(select_cbox);
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(select_cbox), TRUE);
 	g_signal_connect(select_cbox, "toggled", G_CALLBACK(commit_all_toggled_cb),
@@ -1427,7 +1437,7 @@ create_commitDialog(void)
 
 	frame1 = gtk_frame_new(NULL);
 	gtk_widget_show(frame1);
-	gtk_paned_pack2(GTK_PANED(vpaned3), frame1, TRUE, TRUE);
+	gtk_box_pack_start(GTK_BOX(bottom_vbox), frame1, TRUE, TRUE, 2);
 	gtk_frame_set_shadow_type(GTK_FRAME(frame1), GTK_SHADOW_NONE);
 
 	alignment1 = gtk_alignment_new(0.5, 0.5, 1, 1);
@@ -1461,10 +1471,10 @@ create_commitDialog(void)
 	/* line/column status label */
 	lineColumnLabel = gtk_label_new("");
 	gtk_misc_set_alignment(GTK_MISC(lineColumnLabel), 0, 0.5);
-	gtk_box_pack_end(GTK_BOX(commit_text_vbox), lineColumnLabel, TRUE, TRUE, 0);
+	gtk_box_pack_end(GTK_BOX(commit_text_vbox), lineColumnLabel, FALSE, TRUE, 0);
 	gtk_widget_show(lineColumnLabel);
 
-	dialog_action_area1 = GTK_DIALOG(commitDialog)->action_area;
+	dialog_action_area1 = gtk_dialog_get_action_area(GTK_DIALOG(commitDialog));
 	gtk_widget_show(dialog_action_area1);
 	gtk_button_box_set_layout(GTK_BUTTON_BOX(dialog_action_area1), GTK_BUTTONBOX_END);
 
@@ -1592,30 +1602,17 @@ vccommit_activated(G_GNUC_UNUSED GtkMenuItem * menuitem, G_GNUC_UNUSED gpointer 
 
 	gtk_widget_show_now(commit);
 	gtk_window_get_size(GTK_WINDOW(commit), NULL, &height);
-	gtk_paned_set_position(GTK_PANED(vpaned1), height * 30 / 100);
-	gtk_paned_set_position(GTK_PANED(vpaned2), height * 55 / 100);
+	gtk_paned_set_position(GTK_PANED(vpaned1), height * 25 / 100);
+	gtk_paned_set_position(GTK_PANED(vpaned2), height * 50 / 100);
 
 #ifdef USE_GTKSPELL
-	speller = gtkspell_new_attach(GTK_TEXT_VIEW(messageView), NULL, &spellcheck_error);
-	if (speller == NULL)
+	speller = gtkspell_new_attach(GTK_TEXT_VIEW(messageView), EMPTY(lang) ? NULL : lang, &spellcheck_error);
+	if (speller == NULL && spellcheck_error != NULL)
 	{
-		ui_set_statusbar(FALSE, _("Error initializing spell checking: %s"),
+		ui_set_statusbar(TRUE, _("Error initializing GeanyVC spell checking: %s. Check your configuration."),
 				 spellcheck_error->message);
 		g_error_free(spellcheck_error);
 		spellcheck_error = NULL;
-	}
-	else if (!EMPTY(lang))
-	{
-		gtkspell_set_language(speller, lang, &spellcheck_error);
-		if (spellcheck_error != NULL)
-		{
-			ui_set_statusbar(TRUE,
-					 _
-					 ("Error while setting up language for spellchecking. Please check configuration. Error message was: %s"),
-					 spellcheck_error->message);
-			g_error_free(spellcheck_error);
-			spellcheck_error = NULL;
-		}
 	}
 #endif
 
@@ -1888,7 +1885,7 @@ plugin_configure(GtkDialog * dialog)
 	widgets.cb_changed_flag =
 		gtk_check_button_new_with_label(_
 						("Set Changed-flag for document tabs created by the plugin"));
-	ui_widget_set_tooltip_text(widgets.cb_changed_flag,
+	gtk_widget_set_tooltip_text(widgets.cb_changed_flag,
 			     _
 			     ("If this option is activated, every new by the VC-plugin created document tab "
 			      "will be marked as changed. Even this option is useful in some cases, it could cause "
@@ -1899,7 +1896,7 @@ plugin_configure(GtkDialog * dialog)
 
 	widgets.cb_confirm_add =
 		gtk_check_button_new_with_label(_("Confirm adding new files to a VCS"));
-	ui_widget_set_tooltip_text(widgets.cb_confirm_add,
+	gtk_widget_set_tooltip_text(widgets.cb_confirm_add,
 			     _
 			     ("Shows a confirmation dialog on adding a new (created) file to VCS."));
 	gtk_button_set_focus_on_click(GTK_BUTTON(widgets.cb_confirm_add), FALSE);
@@ -1908,14 +1905,14 @@ plugin_configure(GtkDialog * dialog)
 	gtk_box_pack_start(GTK_BOX(vbox), widgets.cb_confirm_add, TRUE, FALSE, 2);
 
 	widgets.cb_max_commit = gtk_check_button_new_with_label(_("Maximize commit dialog"));
-	ui_widget_set_tooltip_text(widgets.cb_max_commit, _("Show commit dialog maximize."));
+	gtk_widget_set_tooltip_text(widgets.cb_max_commit, _("Show commit dialog maximize."));
 	gtk_button_set_focus_on_click(GTK_BUTTON(widgets.cb_max_commit), FALSE);
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widgets.cb_max_commit),
 				     set_maximize_commit_dialog);
 	gtk_box_pack_start(GTK_BOX(vbox), widgets.cb_max_commit, TRUE, FALSE, 2);
 
 	widgets.cb_external_diff = gtk_check_button_new_with_label(_("Use external diff viewer"));
-	ui_widget_set_tooltip_text(widgets.cb_external_diff,
+	gtk_widget_set_tooltip_text(widgets.cb_external_diff,
 			     _("Use external diff viewer for file diff."));
 	gtk_button_set_focus_on_click(GTK_BUTTON(widgets.cb_external_diff), FALSE);
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widgets.cb_external_diff),
@@ -1923,14 +1920,14 @@ plugin_configure(GtkDialog * dialog)
 	gtk_box_pack_start(GTK_BOX(vbox), widgets.cb_external_diff, TRUE, FALSE, 2);
 
 	widgets.cb_editor_menu_entries = gtk_check_button_new_with_label(_("Show VC entries at editor menu"));
-	ui_widget_set_tooltip_text(widgets.cb_editor_menu_entries,
+	gtk_widget_set_tooltip_text(widgets.cb_editor_menu_entries,
 			     _("Show entries for VC functions inside editor menu"));
 	gtk_button_set_focus_on_click(GTK_BUTTON(widgets.cb_editor_menu_entries), FALSE);
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widgets.cb_editor_menu_entries), set_editor_menu_entries);
 	gtk_box_pack_start(GTK_BOX(vbox), widgets.cb_editor_menu_entries, TRUE, FALSE, 2);
 
 	widgets.cb_attach_to_menubar = gtk_check_button_new_with_label(_("Attach menu to menubar"));
-	ui_widget_set_tooltip_text(widgets.cb_editor_menu_entries,
+	gtk_widget_set_tooltip_text(widgets.cb_editor_menu_entries,
 			     _("Whether menu for this plugin are getting placed either "
 			       "inside tools menu or directly inside Geany's menubar."
 			       "Will take in account after next start of GeanyVC"));
@@ -2069,7 +2066,7 @@ do_current_file_menu(GtkWidget ** parent_menu, gboolean editor_menu)
 	/* Diff of current file */
 	menu_vc_diff_file = gtk_menu_item_new_with_mnemonic(_("_Diff"));
 	gtk_container_add(GTK_CONTAINER(cur_file_menu), menu_vc_diff_file);
-	ui_widget_set_tooltip_text(menu_vc_diff_file,
+	gtk_widget_set_tooltip_text(menu_vc_diff_file,
 			     _("Make a diff from the current active file"));
 
 	g_signal_connect(menu_vc_diff_file, "activate", G_CALLBACK(vcdiff_file_activated), NULL);
@@ -2077,7 +2074,7 @@ do_current_file_menu(GtkWidget ** parent_menu, gboolean editor_menu)
 	/* Revert current file */
 	menu_vc_revert_file = gtk_menu_item_new_with_mnemonic(_("_Revert"));
 	gtk_container_add(GTK_CONTAINER(cur_file_menu), menu_vc_revert_file);
-	ui_widget_set_tooltip_text(menu_vc_revert_file,
+	gtk_widget_set_tooltip_text(menu_vc_revert_file,
 			     _("Restore pristine working copy file (undo local edits)."));
 
 	g_signal_connect(menu_vc_revert_file, "activate", G_CALLBACK(vcrevert_activated), NULL);
@@ -2089,7 +2086,7 @@ do_current_file_menu(GtkWidget ** parent_menu, gboolean editor_menu)
 	/* Blame for current file */
 	menu_vc_blame = gtk_menu_item_new_with_mnemonic(_("_Blame"));
 	gtk_container_add(GTK_CONTAINER(cur_file_menu), menu_vc_blame);
-	ui_widget_set_tooltip_text(menu_vc_blame,
+	gtk_widget_set_tooltip_text(menu_vc_blame,
 			     _("Shows the changes made at one file per revision and author."));
 
 	g_signal_connect(menu_vc_blame, "activate", G_CALLBACK(vcblame_activated), NULL);
@@ -2099,7 +2096,7 @@ do_current_file_menu(GtkWidget ** parent_menu, gboolean editor_menu)
 	/* History/log of current file */
 	menu_vc_log_file = gtk_menu_item_new_with_mnemonic(_("_History (log)"));
 	gtk_container_add(GTK_CONTAINER(cur_file_menu), menu_vc_log_file);
-	ui_widget_set_tooltip_text(menu_vc_log_file,
+	gtk_widget_set_tooltip_text(menu_vc_log_file,
 			     _("Shows the log of the current file"));
 
 	g_signal_connect(menu_vc_log_file, "activate", G_CALLBACK(vclog_file_activated), NULL);
@@ -2107,7 +2104,7 @@ do_current_file_menu(GtkWidget ** parent_menu, gboolean editor_menu)
 	/* base version of the current file */
 	menu_vc_show_file = gtk_menu_item_new_with_mnemonic(_("_Original"));
 	gtk_container_add(GTK_CONTAINER(cur_file_menu), menu_vc_show_file);
-	ui_widget_set_tooltip_text(menu_vc_show_file,
+	gtk_widget_set_tooltip_text(menu_vc_show_file,
 			     _("Shows the original of the current file"));
 
 	g_signal_connect(menu_vc_show_file, "activate", G_CALLBACK(vcshow_file_activated), NULL);
@@ -2118,7 +2115,7 @@ do_current_file_menu(GtkWidget ** parent_menu, gboolean editor_menu)
 	/* add current file */
 	menu_vc_add_file = gtk_menu_item_new_with_mnemonic(_("_Add to Version Control"));
 	gtk_container_add(GTK_CONTAINER(cur_file_menu), menu_vc_add_file);
-	ui_widget_set_tooltip_text(menu_vc_add_file, _("Add file to repository."));
+	gtk_widget_set_tooltip_text(menu_vc_add_file, _("Add file to repository."));
 
 	g_signal_connect(menu_vc_add_file, "activate",
 			 G_CALLBACK(vcadd_activated), NULL);
@@ -2126,7 +2123,7 @@ do_current_file_menu(GtkWidget ** parent_menu, gboolean editor_menu)
 	/* remove current file */
 	menu_vc_remove_file = gtk_menu_item_new_with_mnemonic(_("_Remove from Version Control"));
 	gtk_container_add(GTK_CONTAINER(cur_file_menu), menu_vc_remove_file);
-	ui_widget_set_tooltip_text(menu_vc_remove_file, _("Remove file from repository."));
+	gtk_widget_set_tooltip_text(menu_vc_remove_file, _("Remove file from repository."));
 
 	g_signal_connect(menu_vc_remove_file, "activate", G_CALLBACK(vcremove_activated), NULL);
 
@@ -2146,7 +2143,7 @@ do_current_dir_menu(GtkWidget ** parent_menu)
 	/* Diff of the current dir */
 	menu_vc_diff_dir = gtk_menu_item_new_with_mnemonic(_("_Diff"));
 	gtk_container_add(GTK_CONTAINER(cur_dir_menu), menu_vc_diff_dir);
-	ui_widget_set_tooltip_text(menu_vc_diff_dir,
+	gtk_widget_set_tooltip_text(menu_vc_diff_dir,
 			     _("Make a diff from the directory of the current active file"));
 
 	g_signal_connect(menu_vc_diff_dir, "activate",
@@ -2155,7 +2152,7 @@ do_current_dir_menu(GtkWidget ** parent_menu)
 	/* Revert current dir */
 	menu_vc_revert_dir = gtk_menu_item_new_with_mnemonic(_("_Revert"));
 	gtk_container_add(GTK_CONTAINER(cur_dir_menu), menu_vc_revert_dir);
-	ui_widget_set_tooltip_text(menu_vc_revert_dir,
+	gtk_widget_set_tooltip_text(menu_vc_revert_dir,
 			     _("Restore original files in the current folder (undo local edits)."));
 
 	g_signal_connect(menu_vc_revert_dir, "activate",
@@ -2165,7 +2162,7 @@ do_current_dir_menu(GtkWidget ** parent_menu)
 	/* History/log of the current dir */
 	menu_vc_log_dir = gtk_menu_item_new_with_mnemonic(_("_History (log)"));
 	gtk_container_add(GTK_CONTAINER(cur_dir_menu), menu_vc_log_dir);
-	ui_widget_set_tooltip_text(menu_vc_log_dir,
+	gtk_widget_set_tooltip_text(menu_vc_log_dir,
 			     _("Shows the log of the current directory"));
 
 
@@ -2186,7 +2183,7 @@ do_basedir_menu(GtkWidget ** parent_menu)
 	/* Complete diff of base directory */
 	menu_vc_diff_basedir = gtk_menu_item_new_with_mnemonic(_("_Diff"));
 	gtk_container_add(GTK_CONTAINER(basedir_menu), menu_vc_diff_basedir);
-	ui_widget_set_tooltip_text(menu_vc_diff_basedir, _("Make a diff from the top VC directory"));
+	gtk_widget_set_tooltip_text(menu_vc_diff_basedir, _("Make a diff from the top VC directory"));
 
 	g_signal_connect(menu_vc_diff_basedir, "activate",
 			 G_CALLBACK(vcdiff_dir_activated), GINT_TO_POINTER(FLAG_BASEDIR));
@@ -2194,7 +2191,7 @@ do_basedir_menu(GtkWidget ** parent_menu)
 	/* Revert everything */
 	menu_vc_revert_basedir = gtk_menu_item_new_with_mnemonic(_("_Revert"));
 	gtk_container_add(GTK_CONTAINER(basedir_menu), menu_vc_revert_basedir);
-	ui_widget_set_tooltip_text(menu_vc_revert_basedir, _("Revert any local edits."));
+	gtk_widget_set_tooltip_text(menu_vc_revert_basedir, _("Revert any local edits."));
 
 	g_signal_connect(menu_vc_revert_basedir, "activate",
 			 G_CALLBACK(vcrevert_dir_activated), GINT_TO_POINTER(FLAG_BASEDIR));
@@ -2206,7 +2203,7 @@ do_basedir_menu(GtkWidget ** parent_menu)
 	/* Complete History/Log of base directory */
 	menu_vc_log_basedir = gtk_menu_item_new_with_mnemonic(_("_History (log)"));
 	gtk_container_add(GTK_CONTAINER(basedir_menu), menu_vc_log_basedir);
-	ui_widget_set_tooltip_text(menu_vc_log_basedir,
+	gtk_widget_set_tooltip_text(menu_vc_log_basedir,
 			     _("Shows the log of the top VC directory"));
 
 	g_signal_connect(menu_vc_log_basedir, "activate",
@@ -2310,13 +2307,15 @@ plugin_init(G_GNUC_UNUSED GeanyData * data)
 	if (set_menubar_entry == TRUE)
 	{
 		GtkMenuShell *menubar;
+		GList *menubar_children;
 
 		menubar = GTK_MENU_SHELL(
 				ui_lookup_widget(geany->main_widgets->window, "menubar1"));
 
 		menu_vc = gtk_menu_item_new_with_mnemonic(_("_VC"));
-		gtk_menu_shell_insert(
-			menubar, menu_vc, g_list_length(menubar->children)-1);
+		menubar_children = gtk_container_get_children(GTK_CONTAINER(menubar));
+		gtk_menu_shell_insert(menubar, menu_vc, g_list_length(menubar_children) - 1);
+		g_list_free(menubar_children);
 	}
 	else
 	{
@@ -2344,21 +2343,21 @@ plugin_init(G_GNUC_UNUSED GeanyData * data)
 	/* Status of basedir */
 	menu_vc_status = gtk_menu_item_new_with_mnemonic(_("_Status"));
 	gtk_container_add(GTK_CONTAINER(menu_vc_menu), menu_vc_status);
-	ui_widget_set_tooltip_text(menu_vc_status, _("Show status."));
+	gtk_widget_set_tooltip_text(menu_vc_status, _("Show status."));
 
 	g_signal_connect(menu_vc_status, "activate", G_CALLBACK(vcstatus_activated), NULL);
 
 	/* complete update */
 	menu_vc_update = gtk_menu_item_new_with_mnemonic(_("_Update"));
 	gtk_container_add(GTK_CONTAINER(menu_vc_menu), menu_vc_update);
-	ui_widget_set_tooltip_text(menu_vc_update, _("Update from remote repository."));
+	gtk_widget_set_tooltip_text(menu_vc_update, _("Update from remote repository."));
 
 	g_signal_connect(menu_vc_update, "activate", G_CALLBACK(vcupdate_activated), NULL);
 
 	/* Commit all changes */
 	menu_vc_commit = gtk_menu_item_new_with_mnemonic(_("_Commit"));
 	gtk_container_add(GTK_CONTAINER(menu_vc_menu), menu_vc_commit);
-	ui_widget_set_tooltip_text(menu_vc_commit, _("Commit changes."));
+	gtk_widget_set_tooltip_text(menu_vc_commit, _("Commit changes."));
 
 	g_signal_connect(menu_vc_commit, "activate", G_CALLBACK(vccommit_activated), NULL);
 

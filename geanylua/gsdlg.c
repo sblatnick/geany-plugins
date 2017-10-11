@@ -28,9 +28,6 @@
 #include <stdlib.h>
 
 #include "geanyplugin.h"
-/* we need tm_get_real_path(), and we can't include glspi.h for those, so hack */
-extern GeanyFunctions *glspi_geany_functions;
-#define geany_functions glspi_geany_functions
 
 
 #define TextKey "gsdlg_TextKey_bc4871f4e3478ab5234e28432460a6b8"
@@ -109,7 +106,7 @@ static void file_btn_clicked(GtkButton *button, gpointer user_data)
 	fn=gtk_entry_get_text(GTK_ENTRY(user_data));
 	if (fn && *fn) {
 		if (g_file_test(fn,G_FILE_TEST_IS_REGULAR)) {
-			gchar *rp=tm_get_real_path(fn);
+			gchar *rp=utils_get_real_path(fn);
 			gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(dlg), rp);
 			if (rp) g_free(rp);
 		} else {
@@ -118,7 +115,7 @@ static void file_btn_clicked(GtkButton *button, gpointer user_data)
 			} else {
 				gchar *dn=g_path_get_dirname(fn);
 				if (g_file_test(dn,G_FILE_TEST_IS_DIR)) {
-					gchar *rp=tm_get_real_path(dn);
+					gchar *rp=utils_get_real_path(dn);
 					gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dlg), rp);
 					if (rp) g_free(rp);
 					bn=g_path_get_basename(fn);

@@ -30,7 +30,6 @@
 /* These items are set by Geany before plugin_init() is called. */
 GeanyPlugin 				*geany_plugin;
 GeanyData 					*geany_data;
-GeanyFunctions 				*geany_functions;
 
 static gint 				page_number 				= 0;
 static GtkTreeStore 		*treestore;
@@ -111,6 +110,7 @@ enum
 	KB_CREATE_FILE,
 	KB_CREATE_DIR,
 	KB_REFRESH,
+	KB_TRACK_CURRENT,
 	KB_COUNT
 };
 
@@ -119,13 +119,16 @@ enum
  * PLUGIN INFO
  * ------------------ */
 
-PLUGIN_VERSION_CHECK(188)
+PLUGIN_VERSION_CHECK(224)
 
 PLUGIN_SET_TRANSLATABLE_INFO(
 	LOCALEDIR,
 	GETTEXT_PACKAGE,
 	_("TreeBrowser"),
-	_("This plugin adds a tree browser to Geany, allowing the user to browse files using a tree view of the directory being browsed."),
+	_("This plugin adds a tree browser to Geany, allowing the user to "
+	  "browse files using a tree view of the directory being browsed."
+	  "\nThis plugin currently has no maintainer. Would you like to help "
+	  "by contributing to this plugin?"),
 	"0.20" ,
 	"Adrian Dimitrov (dimitrov.adrian@gmail.com)")
 
@@ -151,7 +154,7 @@ _gtk_cell_layout_get_cells(GtkTreeViewColumn *column)
  * PROTOTYPES
  * ------------------ */
 
-static void 	project_change_cb(G_GNUC_UNUSED GObject *obj, G_GNUC_UNUSED GKeyFile *config, G_GNUC_UNUSED gpointer data);
+static void 	project_open_cb(G_GNUC_UNUSED GObject *obj, G_GNUC_UNUSED GKeyFile *config, G_GNUC_UNUSED gpointer data);
 static void 	treebrowser_browse(gchar *directory, gpointer parent);
 static void 	treebrowser_bookmarks_set_state(void);
 static void 	treebrowser_load_bookmarks(void);
@@ -168,8 +171,7 @@ static gboolean save_settings(void);
 
 PluginCallback plugin_callbacks[] =
 {
-	{ "project-open", (GCallback) &project_change_cb, TRUE, NULL },
-	{ "project-save", (GCallback) &project_change_cb, TRUE, NULL },
+	{ "project-open", (GCallback) &project_open_cb, TRUE, NULL },
 	{ NULL, NULL, FALSE, NULL }
 };
 
@@ -461,7 +463,6 @@ treebrowser_chroot(const gchar *dir)
 
 	treebrowser_bookmarks_set_state();
 
-	gtk_tree_store_clear(treestore);
 	setptr(addressbar_last_address, directory);
 
 	treebrowser_browse(addressbar_last_address, NULL);
@@ -499,6 +500,8 @@ treebrowser_browse(gchar *directory, gpointer parent)
 
 	if (parent)
 		gtk_tree_store_iter_clear_nodes(parent, FALSE);
+	else
+		gtk_tree_store_clear(treestore);
 
 	list = utils_get_file_list(directory, NULL, NULL);
 	if (list != NULL)
@@ -1205,11 +1208,11 @@ create_popup_menu(const gchar *name, const gchar *uri)
 	gboolean is_dir 		= is_exists ? g_file_test(uri, G_FILE_TEST_IS_DIR) : FALSE;
 	gboolean is_document 	= document_find_by_filename(uri) != NULL ? TRUE : FALSE;
 
-	item = ui_image_menu_item_new(GTK_STOCK_GO_UP, _("Go up"));
+	item = ui_image_menu_item_new(GTK_STOCK_GO_UP, _("Go _up"));
 	gtk_container_add(GTK_CONTAINER(menu), item);
 	g_signal_connect(item, "activate", G_CALLBACK(on_menu_go_up), NULL);
 
-	item = ui_image_menu_item_new(GTK_STOCK_GO_UP, _("Set path from document"));
+	item = ui_image_menu_item_new(GTK_STOCK_GO_UP, _("Set _path from document"));
 	gtk_container_add(GTK_CONTAINER(menu), item);
 	g_signal_connect(item, "activate", G_CALLBACK(on_menu_current_path), NULL);
 
@@ -1218,16 +1221,16 @@ create_popup_menu(const gchar *name, const gchar *uri)
 	g_signal_connect_data(item, "activate", G_CALLBACK(on_menu_open_externally), g_strdup(uri), (GClosureNotify)g_free, 0);
 	gtk_widget_set_sensitive(item, is_exists);
 
-	item = ui_image_menu_item_new("utilities-terminal", _("Open Terminal"));
+	item = ui_image_menu_item_new("utilities-terminal", _("Open _Terminal"));
 	gtk_container_add(GTK_CONTAINER(menu), item);
 	g_signal_connect_data(item, "activate", G_CALLBACK(on_menu_open_terminal), g_strdup(uri), (GClosureNotify)g_free, 0);
 
-	item = ui_image_menu_item_new(GTK_STOCK_GOTO_TOP, _("Set as root"));
+	item = ui_image_menu_item_new(GTK_STOCK_GOTO_TOP, _("Set as _root"));
 	gtk_container_add(GTK_CONTAINER(menu), item);
 	g_signal_connect_data(item, "activate", G_CALLBACK(on_menu_set_as_root), g_strdup(uri), (GClosureNotify)g_free, 0);
 	gtk_widget_set_sensitive(item, is_dir);
 
-	item = ui_image_menu_item_new(GTK_STOCK_REFRESH, _("Refresh"));
+	item = ui_image_menu_item_new(GTK_STOCK_REFRESH, _("Refres_h"));
 	gtk_container_add(GTK_CONTAINER(menu), item);
 	g_signal_connect(item, "activate", G_CALLBACK(on_menu_refresh), NULL);
 
@@ -1239,20 +1242,20 @@ create_popup_menu(const gchar *name, const gchar *uri)
 	item = gtk_separator_menu_item_new();
 	gtk_container_add(GTK_CONTAINER(menu), item);
 
-	item = ui_image_menu_item_new(GTK_STOCK_ADD, _("Create new directory"));
+	item = ui_image_menu_item_new(GTK_STOCK_ADD, _("Creat_e new directory"));
 	gtk_container_add(GTK_CONTAINER(menu), item);
 	g_signal_connect(item, "activate", G_CALLBACK(on_menu_create_new_object), (gpointer)"directory");
 
-	item = ui_image_menu_item_new(GTK_STOCK_NEW, _("Create new file"));
+	item = ui_image_menu_item_new(GTK_STOCK_NEW, _("Create _new file"));
 	gtk_container_add(GTK_CONTAINER(menu), item);
 	g_signal_connect(item, "activate", G_CALLBACK(on_menu_create_new_object), (gpointer)"file");
 
-	item = ui_image_menu_item_new(GTK_STOCK_SAVE_AS, _("Rename"));
+	item = ui_image_menu_item_new(GTK_STOCK_SAVE_AS, _("Rena_me"));
 	gtk_container_add(GTK_CONTAINER(menu), item);
 	g_signal_connect(item, "activate", G_CALLBACK(on_menu_rename), NULL);
 	gtk_widget_set_sensitive(item, is_exists);
 
-	item = ui_image_menu_item_new(GTK_STOCK_DELETE, _("Delete"));
+	item = ui_image_menu_item_new(GTK_STOCK_DELETE, _("_Delete"));
 	gtk_container_add(GTK_CONTAINER(menu), item);
 	g_signal_connect(item, "activate", G_CALLBACK(on_menu_delete), NULL);
 	gtk_widget_set_sensitive(item, is_exists);
@@ -1265,7 +1268,7 @@ create_popup_menu(const gchar *name, const gchar *uri)
 	g_signal_connect_data(item, "activate", G_CALLBACK(on_menu_close), g_strdup(uri), (GClosureNotify)g_free, 0);
 	gtk_widget_set_sensitive(item, is_document);
 
-	item = ui_image_menu_item_new(GTK_STOCK_CLOSE, g_strdup_printf(_("Close Child Documents ")));
+	item = ui_image_menu_item_new(GTK_STOCK_CLOSE, g_strdup_printf(_("Clo_se Child Documents ")));
 	gtk_container_add(GTK_CONTAINER(menu), item);
 	g_signal_connect_data(item, "activate", G_CALLBACK(on_menu_close_children), g_strdup(uri), (GClosureNotify)g_free, 0);
 	gtk_widget_set_sensitive(item, is_dir);
@@ -1279,28 +1282,28 @@ create_popup_menu(const gchar *name, const gchar *uri)
 	gtk_container_add(GTK_CONTAINER(menu), item);
 	gtk_widget_show(item);
 
-	item = ui_image_menu_item_new(GTK_STOCK_GO_FORWARD, _("Expand all"));
+	item = ui_image_menu_item_new(GTK_STOCK_GO_FORWARD, _("E_xpand all"));
 	gtk_container_add(GTK_CONTAINER(menu), item);
 	g_signal_connect(item, "activate", G_CALLBACK(on_menu_expand_all), NULL);
 
-	item = ui_image_menu_item_new(GTK_STOCK_GO_BACK, _("Collapse all"));
+	item = ui_image_menu_item_new(GTK_STOCK_GO_BACK, _("Coll_apse all"));
 	gtk_container_add(GTK_CONTAINER(menu), item);
 	g_signal_connect(item, "activate", G_CALLBACK(on_menu_collapse_all), NULL);
 
 	item = gtk_separator_menu_item_new();
 	gtk_container_add(GTK_CONTAINER(menu), item);
 
-	item = gtk_check_menu_item_new_with_mnemonic(_("Show bookmarks"));
+	item = gtk_check_menu_item_new_with_mnemonic(_("Show boo_kmarks"));
 	gtk_container_add(GTK_CONTAINER(menu), item);
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(item), CONFIG_SHOW_BOOKMARKS);
 	g_signal_connect(item, "activate", G_CALLBACK(on_menu_show_bookmarks), NULL);
 
-	item = gtk_check_menu_item_new_with_mnemonic(_("Show hidden files"));
+	item = gtk_check_menu_item_new_with_mnemonic(_("Sho_w hidden files"));
 	gtk_container_add(GTK_CONTAINER(menu), item);
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(item), CONFIG_SHOW_HIDDEN_FILES);
 	g_signal_connect(item, "activate", G_CALLBACK(on_menu_show_hidden_files), NULL);
 
-	item = gtk_check_menu_item_new_with_mnemonic(_("Show toolbars"));
+	item = gtk_check_menu_item_new_with_mnemonic(_("Show tool_bars"));
 	gtk_container_add(GTK_CONTAINER(menu), item);
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(item), CONFIG_SHOW_BARS ? TRUE : FALSE);
 	g_signal_connect(item, "activate", G_CALLBACK(on_menu_show_bars), NULL);
@@ -1428,6 +1431,7 @@ on_treeview_keypress(GtkWidget *widget, GdkEventKey *event)
 	GtkTreeIter		iter;
 	GtkTreeModel	*model;
 	GtkTreePath		*path;
+	GdkModifierType	modifiers = gtk_accelerator_get_default_mod_mask();
 
 	if (event->keyval == GDK_space)
 	{
@@ -1446,7 +1450,8 @@ on_treeview_keypress(GtkWidget *widget, GdkEventKey *event)
 		on_button_go_up();
 		return TRUE;
 	}
-	if (event->keyval == GDK_Menu)
+	if ((event->keyval == GDK_Menu) ||
+	    (event->keyval == GDK_F10 && (event->state & modifiers) == GDK_SHIFT_MASK))
 	{
 		gchar *name = NULL, *uri = NULL;
 		GtkWidget *menu;
@@ -1606,6 +1611,7 @@ on_treeview_renamed(GtkCellRenderer *renderer, const gchar *path_string, const g
 	column 		= gtk_tree_view_get_column(GTK_TREE_VIEW(treeview), 0);
 	renderers 	= _gtk_cell_layout_get_cells(column);
 	renderer 	= g_list_nth_data(renderers, TREEBROWSER_RENDER_TEXT);
+	g_list_free(renderers);
 
 	g_object_set(G_OBJECT(renderer), "editable", FALSE, NULL);
 
@@ -1736,32 +1742,32 @@ create_sidebar(void)
 	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS);
 
 	wid = GTK_WIDGET(gtk_tool_button_new_from_stock(GTK_STOCK_GO_UP));
-	ui_widget_set_tooltip_text(wid, _("Go up"));
+	gtk_widget_set_tooltip_text(wid, _("Go up"));
 	g_signal_connect(wid, "clicked", G_CALLBACK(on_button_go_up), NULL);
 	gtk_container_add(GTK_CONTAINER(toolbar), wid);
 
 	wid = GTK_WIDGET(gtk_tool_button_new_from_stock(GTK_STOCK_REFRESH));
-	ui_widget_set_tooltip_text(wid, _("Refresh"));
+	gtk_widget_set_tooltip_text(wid, _("Refresh"));
 	g_signal_connect(wid, "clicked", G_CALLBACK(on_button_refresh), NULL);
 	gtk_container_add(GTK_CONTAINER(toolbar), wid);
 
 	wid = GTK_WIDGET(gtk_tool_button_new_from_stock(GTK_STOCK_HOME));
-	ui_widget_set_tooltip_text(wid, _("Home"));
+	gtk_widget_set_tooltip_text(wid, _("Home"));
 	g_signal_connect(wid, "clicked", G_CALLBACK(on_button_go_home), NULL);
 	gtk_container_add(GTK_CONTAINER(toolbar), wid);
 
 	wid = GTK_WIDGET(gtk_tool_button_new_from_stock(GTK_STOCK_JUMP_TO));
-	ui_widget_set_tooltip_text(wid, _("Set path from document"));
+	gtk_widget_set_tooltip_text(wid, _("Set path from document"));
 	g_signal_connect(wid, "clicked", G_CALLBACK(on_button_current_path), NULL);
 	gtk_container_add(GTK_CONTAINER(toolbar), wid);
 
 	wid = GTK_WIDGET(gtk_tool_button_new_from_stock(GTK_STOCK_DIRECTORY));
-	ui_widget_set_tooltip_text(wid, _("Track path"));
+	gtk_widget_set_tooltip_text(wid, _("Track path"));
 	g_signal_connect(wid, "clicked", G_CALLBACK(treebrowser_track_current), NULL);
 	gtk_container_add(GTK_CONTAINER(toolbar), wid);
 
 	wid = GTK_WIDGET(gtk_tool_button_new_from_stock(GTK_STOCK_CLOSE));
-	ui_widget_set_tooltip_text(wid, _("Hide bars"));
+	gtk_widget_set_tooltip_text(wid, _("Hide bars"));
 	g_signal_connect(wid, "clicked", G_CALLBACK(on_button_hide_bars), NULL);
 	gtk_container_add(GTK_CONTAINER(toolbar), wid);
 
@@ -1770,7 +1776,7 @@ create_sidebar(void)
 	gtk_box_pack_start(GTK_BOX(sidebar_vbox_bars), 			addressbar, 		FALSE, TRUE,  1);
 	gtk_box_pack_start(GTK_BOX(sidebar_vbox_bars), 			toolbar, 			FALSE, TRUE,  1);
 
-	ui_widget_set_tooltip_text(filter,
+	gtk_widget_set_tooltip_text(filter,
 		_("Filter (*.c;*.h;*.cpp), and if you want temporary filter using the '!' reverse try for example this '!;*.c;*.h;*.cpp'"));
 	if (gtk_check_version(2, 15, 2) == NULL)
 	{
@@ -1778,7 +1784,7 @@ create_sidebar(void)
 		g_signal_connect(filter, "icon-release", G_CALLBACK(on_filter_clear), NULL);
 	}
 
-	ui_widget_set_tooltip_text(addressbar,
+	gtk_widget_set_tooltip_text(addressbar,
 		_("Addressbar for example '/projects/my-project'"));
 
 	if (CONFIG_SHOW_BARS == 2)
@@ -1888,7 +1894,7 @@ save_settings(void)
 	g_key_file_set_boolean(config, 	"treebrowser", "show_tree_lines", 		CONFIG_SHOW_TREE_LINES);
 	g_key_file_set_boolean(config, 	"treebrowser", "show_bookmarks", 		CONFIG_SHOW_BOOKMARKS);
 	g_key_file_set_integer(config, 	"treebrowser", "show_icons", 			CONFIG_SHOW_ICONS);
-	g_key_file_set_boolean(config,	"treebrowser", "open_new_file",			CONFIG_OPEN_NEW_FILES);
+	g_key_file_set_boolean(config,	"treebrowser", "open_new_files",		CONFIG_OPEN_NEW_FILES);
 
 	data = g_key_file_to_data(config, NULL, NULL);
 	utils_write_file(CONFIG_FILE, data);
@@ -1951,7 +1957,7 @@ plugin_configure(GtkDialog *dialog)
 	configure_widgets.OPEN_EXTERNAL_CMD = gtk_entry_new();
 	gtk_entry_set_text(GTK_ENTRY(configure_widgets.OPEN_EXTERNAL_CMD), CONFIG_OPEN_EXTERNAL_CMD);
 	gtk_misc_set_alignment(GTK_MISC(label), 0, 0.5);
-	ui_widget_set_tooltip_text(configure_widgets.OPEN_EXTERNAL_CMD,
+	gtk_widget_set_tooltip_text(configure_widgets.OPEN_EXTERNAL_CMD,
 		_("The command to execute when using \"Open with\". You can use %f and %d wildcards.\n"
 		  "%f will be replaced with the filename including full path\n"
 		  "%d will be replaced with the path name of the selected file without the filename"));
@@ -1964,7 +1970,7 @@ plugin_configure(GtkDialog *dialog)
 	configure_widgets.OPEN_TERMINAL = gtk_entry_new();
 	gtk_entry_set_text(GTK_ENTRY(configure_widgets.OPEN_TERMINAL), CONFIG_OPEN_TERMINAL);
 	gtk_misc_set_alignment(GTK_MISC(label), 0, 0.5);
-	ui_widget_set_tooltip_text(configure_widgets.OPEN_TERMINAL,
+	gtk_widget_set_tooltip_text(configure_widgets.OPEN_TERMINAL,
 		_("The terminal to use with the command \"Open Terminal\""));
 	gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 6);
 	gtk_box_pack_start(GTK_BOX(hbox), configure_widgets.OPEN_TERMINAL, FALSE, FALSE, 0);
@@ -1979,7 +1985,7 @@ plugin_configure(GtkDialog *dialog)
 	gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 6);
 	gtk_box_pack_start(GTK_BOX(hbox), configure_widgets.SHOW_BARS, FALSE, FALSE, 0);
 	gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 6);
-	ui_widget_set_tooltip_text(configure_widgets.SHOW_BARS,
+	gtk_widget_set_tooltip_text(configure_widgets.SHOW_BARS,
 		_("If position is changed, the option require plugin restart."));
 	gtk_combo_box_set_active(GTK_COMBO_BOX(configure_widgets.SHOW_BARS), CONFIG_SHOW_BARS);
 
@@ -1998,14 +2004,14 @@ plugin_configure(GtkDialog *dialog)
 	gtk_button_set_focus_on_click(GTK_BUTTON(configure_widgets.SHOW_HIDDEN_FILES), FALSE);
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(configure_widgets.SHOW_HIDDEN_FILES), CONFIG_SHOW_HIDDEN_FILES);
 	gtk_box_pack_start(GTK_BOX(vbox), configure_widgets.SHOW_HIDDEN_FILES, FALSE, FALSE, 0);
-	ui_widget_set_tooltip_text(configure_widgets.SHOW_HIDDEN_FILES,
+	gtk_widget_set_tooltip_text(configure_widgets.SHOW_HIDDEN_FILES,
 		_("On Windows, this just hide files that are prefixed with '.' (dot)"));
 
 	configure_widgets.HIDE_OBJECT_FILES = gtk_check_button_new_with_label(_("Hide object files"));
 	gtk_button_set_focus_on_click(GTK_BUTTON(configure_widgets.HIDE_OBJECT_FILES), FALSE);
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(configure_widgets.HIDE_OBJECT_FILES), CONFIG_HIDE_OBJECT_FILES);
 	gtk_box_pack_start(GTK_BOX(vbox), configure_widgets.HIDE_OBJECT_FILES, FALSE, FALSE, 0);
-	ui_widget_set_tooltip_text(configure_widgets.HIDE_OBJECT_FILES,
+	gtk_widget_set_tooltip_text(configure_widgets.HIDE_OBJECT_FILES,
 		_("Don't show generated object files in the file browser, this includes *.o, *.obj. *.so, *.dll, *.a, *.lib"));
 
 	configure_widgets.REVERSE_FILTER = gtk_check_button_new_with_label(_("Reverse filter"));
@@ -2068,7 +2074,7 @@ plugin_configure(GtkDialog *dialog)
  * ------------------ */
 
 static void
-project_change_cb(G_GNUC_UNUSED GObject *obj, G_GNUC_UNUSED GKeyFile *config, G_GNUC_UNUSED gpointer data)
+project_open_cb(G_GNUC_UNUSED GObject *obj, G_GNUC_UNUSED GKeyFile *config, G_GNUC_UNUSED gpointer data)
 {
 	gchar *uri;
 
@@ -2105,6 +2111,10 @@ static void kb_activate(guint key_id)
 		case KB_REFRESH:
 			on_menu_refresh(NULL, NULL);
 			break;
+
+		case KB_TRACK_CURRENT:
+			treebrowser_track_current();
+			break;
 	}
 }
 
@@ -2137,6 +2147,8 @@ plugin_init(GeanyData *data)
 		0, 0, "create_dir", _("Create New Directory"), NULL);
 	keybindings_set_item(key_group, KB_REFRESH, kb_activate,
 		0, 0, "rename_refresh", _("Refresh"), NULL);
+	keybindings_set_item(key_group, KB_TRACK_CURRENT, kb_activate,
+		0, 0, "track_current", _("Track Current"), NULL);
 
 	plugin_signal_connect(geany_plugin, NULL, "document-activate", TRUE,
 		(GCallback)&treebrowser_track_current_cb, NULL);

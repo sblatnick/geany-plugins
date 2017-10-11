@@ -8,8 +8,8 @@ Git Change Bar
 About
 =====
 
-This plugin highlights uncommitted changes to files tracked with Git, and
-allows to navigate through the hunks.
+This plugin highlights uncommitted changes to files tracked with Git,
+allows to navigate through the hunks and undo them.
 
 
 Requirements
@@ -31,10 +31,17 @@ Usage
 When loaded into Geany, this plugins adds markers in the markers margin.
 If the marker margin is not visible, they are displayed as line backgrounds.
 
+When you point your mouse on a marker that indicates a changed or removed hunk,
+a tooltip pops up showing the original contents of that hunk.
+
 To navigate through the hunks of the current file, you need to configure the
 plugin's *Go to next hunk* and *Go to previous hunk* keybindings in Geany's
 preferences dialog.
 
+Hunks can also be undone by either setting a cursor at a line with a hunk and
+invoking the *Undo hunk at the cursor position* or by right-clicking in the
+editor where the hunk is located and selecting *Undo Git hunk* from the popup
+menu.
 
 License
 =======
@@ -42,7 +49,7 @@ License
 This plugin is distributed under the terms of the GNU General Public License
 as published by the Free Software Foundation, either version 3 of the
 License, or (at your option) any later version. You should have received a copy
-of the GNU General Public License along with WebHelper.  If not, see
+of the GNU General Public License along with Git Change Bar.  If not, see
 <http://www.gnu.org/licenses/>.
 
 

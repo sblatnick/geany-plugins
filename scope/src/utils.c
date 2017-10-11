@@ -312,7 +312,7 @@ gboolean utils_source_filetype(GeanyFiletype *ft)
 {
 	if (ft)
 	{
-		static const filetype_id ft_id[] = { GEANY_FILETYPES_C, GEANY_FILETYPES_CPP,
+		static const GeanyFiletypeID ft_id[] = { GEANY_FILETYPES_C, GEANY_FILETYPES_CPP,
 			GEANY_FILETYPES_D, GEANY_FILETYPES_OBJECTIVEC, GEANY_FILETYPES_FORTRAN,
 			GEANY_FILETYPES_F77, GEANY_FILETYPES_JAVA, /* GEANY_FILETYPES_OPENCL_C, */
 			GEANY_FILETYPES_PASCAL, /* GEANY_FILETYPES_S, */ GEANY_FILETYPES_ASM,
@@ -651,7 +651,7 @@ static gchar *validate_number(gchar *text)
 	for (s = text; isdigit(*s); s++);
 	*s = '\0';
 	return *text && (s - text < 10 ||
-		(s - text == 10 && strcmp(text, "2147483648")) < 0) ? text : NULL;
+		(s - text == 10 && strcmp(text, "2147483648") < 0)) ? text : NULL;
 }
 
 gchar *validate_column(gchar *text, gboolean string)
@@ -727,7 +727,7 @@ void utils_init(void)
 
 void utils_finalize(void)
 {
-	guint i;
+	guint i = 0;
 	DebugState state = debug_state();
 
 	foreach_document(i)

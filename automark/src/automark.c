@@ -39,9 +39,8 @@
 
 GeanyPlugin	*geany_plugin;
 GeanyData	*geany_data;
-GeanyFunctions	*geany_functions;
 
-PLUGIN_VERSION_CHECK(216)
+PLUGIN_VERSION_CHECK(224)
 PLUGIN_SET_TRANSLATABLE_INFO(
 	LOCALEDIR,
 	GETTEXT_PACKAGE,
@@ -81,21 +80,19 @@ search_mark_in_range(
 }
 
 /* based on editor_find_current_word_sciwc from editor.c */
-static void
-get_current_word(ScintillaObject *sci, gchar *word, gsize wordlen)
+static gchar *
+get_current_word(ScintillaObject *sci)
 {
 	gint pos = sci_get_current_position(sci);
 	gint start = SSM(sci, SCI_WORDSTARTPOSITION, pos, TRUE);
 	gint end = SSM(sci, SCI_WORDENDPOSITION, pos, TRUE);
-	
-	if (start == end)
-		*word = 0;
-	else
-	{
-		if ((guint)(end - start) >= wordlen)
-			end = start + (wordlen - 1);
-		sci_get_text_range(sci, start, end, word);
-	}
+
+	if (end == start)
+		return NULL;
+
+	if ((guint)(end - start) >= GEANY_MAX_WORD_LENGTH)
+		end = start + (GEANY_MAX_WORD_LENGTH - 1);
+	return sci_get_contents_range(sci, start, end);
 }
 
 static gboolean
@@ -105,7 +102,7 @@ automark(gpointer user_data)
 	GeanyEditor        *editor = doc->editor;
 	static GeanyEditor *editor_cache = NULL;
 	ScintillaObject    *sci = editor->sci;
-	gchar               text[GEANY_MAX_WORD_LENGTH];
+	gchar              *text;
 	static gchar        text_cache[GEANY_MAX_WORD_LENGTH] = {0};
 	gint                match_flag = SCFIND_MATCHCASE | SCFIND_WHOLEWORD;
 	struct              Sci_TextToFind ttf;
@@ -120,11 +117,12 @@ automark(gpointer user_data)
 	if (sci_has_selection(sci))
 		return FALSE;
 
-	get_current_word(editor->sci, text, sizeof(text));
+	text = get_current_word(editor->sci);
 
-	if (!*text)
+	if (EMPTY(text))
 	{
 		editor_indicator_clear(editor, AUTOMARK_INDICATOR);
+		g_free(text);
 		return FALSE;
 	}
 
@@ -134,7 +132,7 @@ automark(gpointer user_data)
 		strcpy(text_cache, text);
 		editor_cache = editor;
 	}
-	
+
 	gint vis_first = SSM(sci, SCI_GETFIRSTVISIBLELINE, 0, 0);
 	gint doc_first = SSM(sci, SCI_DOCLINEFROMVISIBLE, vis_first, 0);
 	gint vis_last  = SSM(sci, SCI_LINESONSCREEN, 0, 0) + vis_first;
@@ -147,6 +145,8 @@ automark(gpointer user_data)
 	ttf.lpstrText  = text;
 
 	search_mark_in_range(editor, match_flag, &ttf);
+
+	g_free(text);
 
 	return FALSE;
 }

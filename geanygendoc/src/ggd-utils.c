@@ -135,6 +135,24 @@ ggd_copy_file (const gchar *input,
   return success;
 }
 
+static gchar *
+get_data_dir_path (const gchar *filename)
+{
+  gchar *prefix = NULL;
+  gchar *path;
+
+#ifdef G_OS_WIN32
+  prefix = g_win32_get_package_installation_directory_of_module (NULL);
+#elif defined(__APPLE__)
+  if (g_getenv ("GEANY_PLUGINS_SHARE_PATH"))
+    return g_build_filename (g_getenv ("GEANY_PLUGINS_SHARE_PATH"), 
+                             PLUGIN, filename, NULL);
+#endif
+  path = g_build_filename (prefix ? prefix : "", PLUGINDATADIR, filename, NULL);
+  g_free (prefix);
+  return path;
+}
+
 /**
  * ggd_get_config_file:
  * @name: The name of the configuration file to get (ASCII string)
@@ -174,7 +192,7 @@ ggd_get_config_file (const gchar *name,
    * everywhere if it is not anyway */
   user_dir = g_build_filename (geany->app->configdir, "plugins",
                                GGD_PLUGIN_CNAME, section, NULL);
-  system_dir = g_build_filename (PKGDATADIR, GGD_PLUGIN_CNAME, section, NULL);
+  system_dir = get_data_dir_path (section);
   user_path = g_build_filename (user_dir, name, NULL);
   system_path = g_build_filename (system_dir, name, NULL);
   if (perms_req & GGD_PERM_R) {

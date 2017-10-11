@@ -21,16 +21,21 @@
 #define NONMATCHING_PAIR_COLOR  0xff0000    /* red */
 #define EMPTY_TAG_COLOR         0xffff00    /* yellow */
 
+/* Keyboard Shortcut */
+enum {
+  KB_MATCH_TAG,
+  KB_COUNT
+};
+
 /* These items are set by Geany before plugin_init() is called. */
 GeanyPlugin     *geany_plugin;
 GeanyData       *geany_data;
-GeanyFunctions  *geany_functions;
 
 /* Is needed for clearing highlighting after moving cursor out
  * from the tag */
 static gint highlightedBrackets[] = {0, 0, 0, 0};
 
-PLUGIN_VERSION_CHECK(211)
+PLUGIN_VERSION_CHECK(224)
 
 PLUGIN_SET_TRANSLATABLE_INFO(LOCALEDIR, GETTEXT_PACKAGE, _("Pair Tag Highlighter"),
                             _("Finds and highlights matching opening/closing HTML tag"),
@@ -170,8 +175,10 @@ static gboolean is_tag_empty(gchar *tagName)
     const char *emptyTags[] = {"area", "base", "br", "col", "embed",
                          "hr", "img", "input", "keygen", "link", "meta",
                          "param", "source", "track", "wbr", "!DOCTYPE"};
-
     unsigned int i;
+
+    g_return_val_if_fail(tagName != NULL, FALSE);
+
     for(i=0; i<(sizeof(emptyTags)/sizeof(emptyTags[0])); i++)
     {
         if(strcmp(tagName, emptyTags[i]) == 0)
@@ -193,8 +200,8 @@ static gboolean is_tag_opening(ScintillaObject *sci, gint openingBracket)
 }
 
 
-static void get_tag_name(ScintillaObject *sci, gint openingBracket, gint closingBracket,
-                    gchar tagName[], gboolean isTagOpening)
+static gchar *get_tag_name(ScintillaObject *sci, gint openingBracket, gint closingBracket,
+                    gboolean isTagOpening)
 {
     gint nameStart = openingBracket + (TRUE == isTagOpening ? 1 : 2);
     gint nameEnd = nameStart;
@@ -208,7 +215,7 @@ static void get_tag_name(ScintillaObject *sci, gint openingBracket, gint closing
         if(nameEnd-nameStart > MAX_TAG_NAME)
             break;
     }
-    sci_get_text_range(sci, nameStart, nameEnd-1, tagName);
+    return nameEnd > nameStart ? sci_get_contents_range(sci, nameStart, nameEnd-1) : NULL;
 }
 
 
@@ -230,11 +237,11 @@ static void findMatchingOpeningTag(ScintillaObject *sci, gchar *tagName, gint op
             && (matchingClosingBracket > matchingOpeningBracket))
         {
             /* we are inside of some tag. Let us check what tag*/
-            gchar matchingTagName[MAX_TAG_NAME];
             gboolean isMatchingTagOpening = is_tag_opening(sci, matchingOpeningBracket);
-            get_tag_name(sci, matchingOpeningBracket, matchingClosingBracket,
-                            matchingTagName, isMatchingTagOpening);
-            if(strcmp(tagName, matchingTagName) == 0)
+            gchar *matchingTagName = get_tag_name(sci, matchingOpeningBracket,
+                                                  matchingClosingBracket,
+                                                  isMatchingTagOpening);
+            if(matchingTagName && strcmp(tagName, matchingTagName) == 0)
             {
                 if(TRUE == isMatchingTagOpening)
                     openingTagsCount++;
@@ -242,6 +249,7 @@ static void findMatchingOpeningTag(ScintillaObject *sci, gchar *tagName, gint op
                     closingTagsCount++;
             }
             pos = matchingOpeningBracket+1;
+            g_free(matchingTagName);
         }
         /* Speed up search: if findBracket returns -1, that means start of line
          * is reached. There is no need to go through the same positions again.
@@ -285,11 +293,11 @@ static void findMatchingClosingTag(ScintillaObject *sci, gchar *tagName, gint cl
             && (matchingClosingBracket > matchingOpeningBracket))
         {
             /* we are inside of some tag. Let us check what tag*/
-            gchar matchingTagName[64];
             gboolean isMatchingTagOpening = is_tag_opening(sci, matchingOpeningBracket);
-            get_tag_name(sci, matchingOpeningBracket, matchingClosingBracket,
-                            matchingTagName, isMatchingTagOpening);
-            if(strcmp(tagName, matchingTagName) == 0)
+            gchar *matchingTagName = get_tag_name(sci, matchingOpeningBracket,
+                                                  matchingClosingBracket,
+                                                  isMatchingTagOpening);
+            if(matchingTagName && strcmp(tagName, matchingTagName) == 0)
             {
                 if(TRUE == isMatchingTagOpening)
                     openingTagsCount++;
@@ -297,6 +305,7 @@ static void findMatchingClosingTag(ScintillaObject *sci, gchar *tagName, gint cl
                     closingTagsCount++;
             }
             pos = matchingClosingBracket;
+            g_free(matchingTagName);
         }
 
         if(openingTagsCount == closingTagsCount)
@@ -315,10 +324,11 @@ static void findMatchingClosingTag(ScintillaObject *sci, gchar *tagName, gint cl
 
 static void findMatchingTag(ScintillaObject *sci, gint openingBracket, gint closingBracket)
 {
-    gchar tagName[MAX_TAG_NAME];
     gboolean isTagOpening = is_tag_opening(sci, openingBracket);
+    gchar *tagName = get_tag_name(sci, openingBracket, closingBracket, isTagOpening);
 
-    get_tag_name(sci, openingBracket, closingBracket, tagName, isTagOpening);
+    if (!tagName)
+        return;
 
     if(is_tag_self_closing(sci, closingBracket) || is_tag_empty(tagName)) {
         highlight_tag(sci, openingBracket, closingBracket, EMPTY_TAG_COLOR);
@@ -328,6 +338,8 @@ static void findMatchingTag(ScintillaObject *sci, gint openingBracket, gint clos
         else
             findMatchingOpeningTag(sci, tagName, openingBracket);
     }
+
+    g_free(tagName);
 }
 
 
@@ -376,7 +388,7 @@ static gboolean on_editor_notify(GObject *obj, GeanyEditor *editor,
     gint lexer;
 
     lexer = sci_get_lexer(editor->sci);
-    if((lexer != SCLEX_HTML) && (lexer != SCLEX_XML))
+    if((lexer != SCLEX_HTML) && (lexer != SCLEX_XML) && (lexer != SCLEX_PHPSCRIPT))
     {
         return FALSE;
     }
@@ -393,6 +405,25 @@ static gboolean on_editor_notify(GObject *obj, GeanyEditor *editor,
     return FALSE;
 }
 
+static void
+on_kb_goto_matching_tag (guint key_id)
+{
+    gint cur_line;
+    gint jump_line = 0;
+    if(highlightedBrackets[0] != highlightedBrackets[2] && highlightedBrackets[0] != 0){
+        GeanyDocument *doc = document_get_current();
+        cur_line = sci_get_current_position(doc->editor->sci);
+        if(cur_line >= highlightedBrackets[0] && cur_line <= highlightedBrackets[1]){
+            jump_line = highlightedBrackets[2];
+        }
+        else if(cur_line >= highlightedBrackets[2] && cur_line <= highlightedBrackets[3]){
+            jump_line = highlightedBrackets[0];
+        }
+        if(jump_line != 0){
+            sci_set_current_position(doc->editor->sci, jump_line, TRUE);
+        }
+    }
+}
 
 PluginCallback plugin_callbacks[] =
 {
@@ -403,6 +434,10 @@ PluginCallback plugin_callbacks[] =
 
 void plugin_init(GeanyData *data)
 {
+    GeanyKeyGroup *group;
+    group = plugin_set_key_group (geany_plugin, "Pair Tag Highlighter", KB_COUNT, NULL);
+    keybindings_set_item (group, KB_MATCH_TAG, on_kb_goto_matching_tag,
+                        0, 0, "goto_matching_tag", _("Go To Matching Tag"), NULL);
 }
 
 

@@ -1,18 +1,18 @@
 /*
  *      dbm_gdm.c
- *      
+ *
  *      Copyright 2010 Alexander Petukhov <devel(at)apetukhov.ru>
- *      
+ *
  *      This program is free software; you can redistribute it and/or modify
  *      it under the terms of the GNU General Public License as published by
  *      the Free Software Foundation; either version 2 of the License, or
  *      (at your option) any later version.
- *      
+ *
  *      This program is distributed in the hope that it will be useful,
  *      but WITHOUT ANY WARRANTY; without even the implied warranty of
  *      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *      GNU General Public License for more details.
- *      
+ *
  *      You should have received a copy of the GNU General Public License
  *      along with this program; if not, write to the Free Software
  *      Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -33,11 +33,11 @@
 	#include "config.h"
 #endif
 #include <geanyplugin.h>
-extern GeanyFunctions	*geany_functions;
 extern GeanyData		*geany_data;
 
 #include "breakpoint.h"
 #include "debug_module.h"
+#include "gdb_mi.h"
 
 /* module features */
 #define MODULE_FEATURES MF_ASYNC_BREAKS
@@ -59,9 +59,9 @@ typedef enum _result_class {
 
 /* structure to keep async command data (command line, messages) */
 typedef struct _queue_item {
-	GString *message;
-	GString *command;
-	GString *error_message;
+	gchar *message;
+	gchar *command;
+	gchar *error_message;
 	gboolean format_error_message;
 } queue_item;
 
@@ -144,7 +144,7 @@ static void colorize_message(gchar *message)
 		color = "grey";
 	else
 		color = "red";
-	
+
 	dbg_cbs->send_message(message, color);
 }
 
@@ -155,9 +155,8 @@ static void shutdown_channel(GIOChannel ** ch)
 {
 	if (*ch)
 	{
-		GError *err = NULL;
 		gint fd = g_io_channel_unix_get_fd(*ch);
-		g_io_channel_shutdown(*ch, TRUE, &err);
+		g_io_channel_shutdown(*ch, TRUE, NULL);
 		g_io_channel_unref(*ch);
 		*ch = NULL;
 		if (fd >= 0)
@@ -176,24 +175,25 @@ static void on_gdb_exit(GPid pid, gint status, gpointer data)
 	g_spawn_close_pid(pid);
 	shutdown_channel(&gdb_ch_in);
 	shutdown_channel(&gdb_ch_out);
-	
+
 	/* delete autos */
 	g_list_foreach(autos, (GFunc)g_free, NULL);
 	g_list_free(autos);
 	autos = NULL;
-	
+
 	/* delete watches */
 	g_list_foreach(watches, (GFunc)g_free, NULL);
 	g_list_free(watches);
 	watches = NULL;
-	
+
 	/* delete files */
 	g_list_foreach(files, (GFunc)g_free, NULL);
 	g_list_free(files);
 	files = NULL;
-	
+
 	g_source_remove(gdb_src_id);
-	
+	gdb_src_id = 0;
+
 	dbg_cbs->set_exited(0);
 }
 
@@ -212,33 +212,36 @@ static GList* read_until_prompt(void)
 			break;
 
 		line[terminator] = '\0';
-		lines = g_list_append (lines, line);
+		lines = g_list_prepend (lines, line);
 	}
-	
-	return lines;
+
+	return g_list_reverse(lines);
 }
 
 /*
- * write a command to a gdb channel and flush with a newlinw character 
+ * write a command to a gdb channel and flush with a newlinw character
  */
 static void gdb_input_write_line(const gchar *line)
 {
 	GIOStatus st;
 	GError *err = NULL;
 	gsize count;
-	
+	const char *p;
 	char command[1000];
-	sprintf(command, "%s\n", line);
-	
-	while (strlen(command))
+	g_snprintf(command, sizeof command, "%s\n", line);
+
+	for (p = command; *p; p += count)
 	{
-		st = g_io_channel_write_chars(gdb_ch_in, command, strlen(command), &count, &err);
-		strcpy(command, command + count);
+		st = g_io_channel_write_chars(gdb_ch_in, p, strlen(p), &count, &err);
 		if (err || (st == G_IO_STATUS_ERROR) || (st == G_IO_STATUS_EOF))
 		{
+			if (err)
+			{
 #ifdef DEBUG_OUTPUT
-			dbg_cbs->send_message(err->message, "red");
+				dbg_cbs->send_message(err->message, "red");
 #endif
+				g_clear_error(&err);
+			}
 			break;
 		}
 	}
@@ -246,25 +249,29 @@ static void gdb_input_write_line(const gchar *line)
 	st = g_io_channel_flush(gdb_ch_in, &err);
 	if (err || (st == G_IO_STATUS_ERROR) || (st == G_IO_STATUS_EOF))
 	{
-#ifdef DEBUG_OUTPUT
-		dbg_cbs->send_message(err->message, "red");
-#endif
+		if (err)
+		{
+			#ifdef DEBUG_OUTPUT
+			dbg_cbs->send_message(err->message, "red");
+			#endif
+			g_clear_error(&err);
+		}
 	}
 }
 
 /*
- * free memory occupied by a queue item 
+ * free memory occupied by a queue item
  */
 static void free_queue_item(queue_item *item)
 {
-	g_string_free(item->message, TRUE);
-	g_string_free(item->command, TRUE);
-	g_string_free(item->error_message, TRUE);
+	g_free(item->message);
+	g_free(item->command);
+	g_free(item->error_message);
 	g_free(item);
 }
 
 /*
- * free a list of "queue_item" structures 
+ * free a list of "queue_item" structures
  */
 static void free_commands_queue(GList *queue)
 {
@@ -275,7 +282,7 @@ static void free_commands_queue(GList *queue)
 }
 
 /*
- * add a new command ("queue_item" structure) to a list 
+ * add a new command ("queue_item" structure) to a list
  */
 static GList* add_to_queue(GList* queue, const gchar *message, const gchar *command, const gchar *error_message, gboolean format_error_message)
 {
@@ -283,19 +290,13 @@ static GList* add_to_queue(GList* queue, const gchar *message, const gchar *comm
 
 	memset((void*)item, 0, sizeof(queue_item));
 
-	if (message)
-	{
-		item->message = g_string_new(message);
-	}
-	item->command = g_string_new(command);
-	if (error_message)
-	{
-		item->error_message = g_string_new(error_message);
-	}
+	item->message = g_strdup(message);
+	item->command = g_strdup(command);
+	item->error_message = g_strdup(error_message);
 	item->format_error_message = format_error_message;
 
 	return g_list_append(queue, (gpointer)item);
-} 
+}
 
 /*
  * asyncronous output reader
@@ -307,36 +308,31 @@ static gboolean on_read_async_output(GIOChannel * src, GIOCondition cond, gpoint
 {
 	gchar *line;
 	gsize length;
-	
+	struct gdb_mi_record *record;
+
 	if (G_IO_STATUS_NORMAL != g_io_channel_read_line(src, &line, NULL, &length, NULL))
-		return TRUE;		
+		return TRUE;
 
-	*(line + length) = '\0';
+	record = gdb_mi_record_parse(line);
 
-	if ('^' == line[0])
+	if (record && record->type == '^')
 	{
 		/* got some result */
 
 		GList *lines;
 		GList *commands = (GList*)data;
-		gchar *coma;
 
-		g_source_remove(gdb_id_out);
+		if (gdb_id_out)
+		{
+			g_source_remove(gdb_id_out);
+			gdb_id_out = 0;
+		}
 
 		lines = read_until_prompt();
 		g_list_foreach(lines, (GFunc)g_free, NULL);
 		g_list_free (lines);
 
-		coma = strchr(line, ',');
-		if (coma)
-		{
-			*coma = '\0';
-			coma++;
-		}
-		else
-			coma = line + strlen(line);
-		
-		if (!strcmp(line, "^done"))
+		if (!strcmp(record->klass, "done"))
 		{
 			/* command completed succesfully - run next command if exists */
 			if (commands->next)
@@ -350,10 +346,10 @@ static gboolean on_read_async_output(GIOChannel * src, GIOCondition cond, gpoint
 				/* send message to debugger messages window */
 				if (item->message)
 				{
-					dbg_cbs->send_message(item->message->str, "grey");
+					dbg_cbs->send_message(item->message, "grey");
 				}
 
-				gdb_input_write_line(item->command->str);
+				gdb_input_write_line(item->command);
 
 				gdb_id_out = g_io_add_watch(gdb_ch_out, G_IO_IN, on_read_async_output, commands);
 			}
@@ -363,7 +359,11 @@ static gboolean on_read_async_output(GIOChannel * src, GIOCondition cond, gpoint
 				free_commands_queue(commands);
 
 				/* removing read callback */
-				g_source_remove(gdb_id_out);
+				if (gdb_id_out)
+				{
+					g_source_remove(gdb_id_out);
+					gdb_id_out = 0;
+				}
 
 				/* update source files list */
 				update_files();
@@ -379,21 +379,18 @@ static gboolean on_read_async_output(GIOChannel * src, GIOCondition cond, gpoint
 			{
 				if (item->format_error_message)
 				{
-					gchar* gdb_msg = g_strcompress(strstr(coma, "msg=\"") + strlen("msg=\""));
+					const gchar* gdb_msg = gdb_mi_result_var(record->first, "msg", GDB_MI_VAL_STRING);
+					gchar *msg = g_strdup_printf(item->error_message, gdb_msg);
 
-					GString *msg = g_string_new("");
-					g_string_printf(msg, item->error_message->str, gdb_msg);
-					dbg_cbs->report_error(msg->str);
-
-					g_free(gdb_msg);
-					g_string_free(msg, FALSE);
+					dbg_cbs->report_error(msg);
+					g_free(msg);
 				}
 				else
 				{
-					dbg_cbs->report_error(item->error_message->str);
+					dbg_cbs->report_error(item->error_message);
 				}
 			}
-			
+
 			/* free commands queue */
 			free_commands_queue(commands);
 
@@ -401,6 +398,7 @@ static gboolean on_read_async_output(GIOChannel * src, GIOCondition cond, gpoint
 		}
 	}
 
+	gdb_mi_record_free(record);
 	g_free(line);
 
 	return TRUE;
@@ -415,18 +413,18 @@ static gboolean on_read_from_gdb(GIOChannel * src, GIOCondition cond, gpointer d
 {
 	gchar *line;
 	gsize length;
-	gboolean prompt;
-	
+	const gchar *id;
+	struct gdb_mi_record *record;
+
 	if (G_IO_STATUS_NORMAL != g_io_channel_read_line(src, &line, NULL, &length, NULL))
-		return TRUE;		
+		return TRUE;
 
-	prompt = !strcmp(line, GDB_PROMPT);
-	
-	*(line + length) = '\0';
+	record = gdb_mi_record_parse(line);
 
-	if (!prompt)
+	if (! record || record->type != GDB_MI_TYPE_PROMPT)
 	{
-		if ('~' == line[0])
+		line[length] = '\0';
+		if ((record && '~' == record->type) || '~' == line[0])
 		{
 			colorize_message(line);
 		}
@@ -437,161 +435,145 @@ static gboolean on_read_from_gdb(GIOChannel * src, GIOCondition cond, gpointer d
 			g_free(compressed);
 		}
 	}
-		
-	if (!target_pid && g_str_has_prefix(line, "=thread-group-created"))
-	{
-		*(strrchr(line, '\"')) = '\0';
-		target_pid = atoi(line + strlen("=thread-group-created,id=\""));
-	}
-	else if (!target_pid && g_str_has_prefix(line, "=thread-group-started"))
-	{
-		*(strrchr(line, '\"')) = '\0';
-		target_pid = atoi(strrchr(line, '\"') + 1);
-	}
-	else if (g_str_has_prefix(line, "=thread-created"))
-	{
-		int thread_id;
 
-		*(strrchr(line, ',') - 1) = '\0';
-		thread_id = atoi(line + strlen("=thread-created,id=\""));
-		dbg_cbs->add_thread(thread_id);
-	}
-	else if (g_str_has_prefix(line, "=thread-exited"))
+	if (! record)
 	{
-		int thread_id;
-
-		*(strrchr(line, ',') - 1) = '\0';
-		thread_id = atoi(line + strlen("=thread-exited,id=\""));
-		dbg_cbs->remove_thread(thread_id);
+		g_free(line);
+		return TRUE;
 	}
-	else if (g_str_has_prefix(line, "=library-loaded") || g_str_has_prefix(line, "=library-unloaded"))
+
+	if (!target_pid &&
+		/* FIXME: =thread-group-created doesn't seem to exist, at least not in latest GDB docs */
+		(gdb_mi_record_matches(record, '=', "thread-group-created", "id", &id, NULL) ||
+		 gdb_mi_record_matches(record, '=', "thread-group-started", "pid", &id, NULL)))
+	{
+		target_pid = atoi(id);
+	}
+	else if (gdb_mi_record_matches(record, '=', "thread-created", "id", &id, NULL))
+	{
+		dbg_cbs->add_thread(atoi(id));
+	}
+	else if (gdb_mi_record_matches(record, '=', "thread-exited", "id", &id, NULL))
+	{
+		dbg_cbs->remove_thread(atoi(id));
+	}
+	else if (gdb_mi_record_matches(record, '=', "library-loaded", NULL) ||
+			 gdb_mi_record_matches(record, '=', "library-unloaded", NULL))
 	{
 		file_refresh_needed = TRUE;
 	}
-	else if (*line == '*')
+	else if (gdb_mi_record_matches(record, '*', "running", NULL))
+		dbg_cbs->set_run();
+	else if (gdb_mi_record_matches(record, '*', "stopped", NULL))
 	{
-		/* asyncronous record found */
-		char *record = NULL;
-		if ( (record = strchr(line, ',')) )
+		const gchar *reason;
+
+		/* removing read callback (will pulling all output left manually) */
+		if (gdb_id_out)
 		{
-			*record = '\0';
-			record++;
+			g_source_remove(gdb_id_out);
+			gdb_id_out = 0;
+		}
+
+		/* looking for a reason to stop */
+		if ((reason = gdb_mi_result_var(record->first, "reason", GDB_MI_VAL_STRING)) != NULL)
+		{
+			if (!strcmp(reason, "breakpoint-hit"))
+				stop_reason = SR_BREAKPOINT_HIT;
+			else if (!strcmp(reason, "end-stepping-range"))
+				stop_reason = SR_END_STEPPING_RANGE;
+			else if (!strcmp(reason, "signal-received"))
+				stop_reason = SR_SIGNAL_RECIEVED;
+			else if (!strcmp(reason, "exited-normally"))
+				stop_reason = SR_EXITED_NORMALLY;
+			else if (!strcmp(reason, "exited-signalled"))
+				stop_reason = SR_EXITED_SIGNALLED;
+			else if (!strcmp(reason, "exited"))
+				stop_reason = SR_EXITED_WITH_CODE;
+			/* FIXME: handle "location-reached" */
 		}
 		else
-			record = line + strlen(line);
-		
-		if (!strcmp(line, "*running"))
-			dbg_cbs->set_run();
-		else if (!strcmp(line, "*stopped"))
 		{
-			char *reason;
+			/* somehow, sometimes there can be no stop reason */
+			stop_reason = SR_EXITED_NORMALLY;
+		}
 
-			/* removing read callback (will pulling all output left manually) */
-			g_source_remove(gdb_id_out);
+		if (SR_BREAKPOINT_HIT == stop_reason || SR_END_STEPPING_RANGE == stop_reason || SR_SIGNAL_RECIEVED == stop_reason)
+		{
+			const gchar *thread_id = gdb_mi_result_var(record->first, "thread-id", GDB_MI_VAL_STRING);
 
-			/* looking for a reason to stop */
-			reason = strstr(record, "reason=\"");
-			if (reason)
+			active_frame = 0;
+
+			if (SR_BREAKPOINT_HIT == stop_reason || SR_END_STEPPING_RANGE == stop_reason)
 			{
-				char *next;
+				/* update autos */
+				update_autos();
 
-				reason += strlen("reason=\"");
-				next = strstr(reason, "\"") + 1;
-				*(next - 1) = '\0';
-				if (!strcmp(reason, "breakpoint-hit"))
-					stop_reason = SR_BREAKPOINT_HIT;
-				else if (!strcmp(reason, "end-stepping-range"))
-					stop_reason = SR_END_STEPPING_RANGE;
-				else if (!strcmp(reason, "signal-received"))
-					stop_reason = SR_SIGNAL_RECIEVED;
-				else if (!strcmp(reason, "exited-normally"))
-					stop_reason = SR_EXITED_NORMALLY;
-				else if (!strcmp(reason, "exited-signalled"))
-					stop_reason = SR_EXITED_SIGNALLED;
-				else if (!strcmp(reason, "exited"))
-					stop_reason = SR_EXITED_WITH_CODE;
+				/* update watches */
+				update_watches();
+
+				/* update files */
+				if (file_refresh_needed)
+				{
+					update_files();
+					file_refresh_needed = FALSE;
+				}
 			}
 			else
 			{
-				/* somehow, sometimes there can be no stop reason */
-				stop_reason = SR_EXITED_NORMALLY;
-			}
-			
-			if (SR_BREAKPOINT_HIT == stop_reason || SR_END_STEPPING_RANGE == stop_reason || SR_SIGNAL_RECIEVED == stop_reason)
-			{
-				gchar *thread_id = strstr(reason + strlen(reason) + 1,"thread-id=\"") + strlen("thread-id=\"");
-				*(strchr(thread_id, '\"')) = '\0'; 
-				
-				active_frame = 0;
-
-				if (SR_BREAKPOINT_HIT == stop_reason || SR_END_STEPPING_RANGE == stop_reason)
+				if (!requested_interrupt)
 				{
-					/* update autos */
-					update_autos();
-			
-					/* update watches */
-					update_watches();
-			
-					/* update files */
-					if (file_refresh_needed)
-					{
-						update_files();
-						file_refresh_needed = FALSE;
-					}
+					gchar *msg = g_strdup_printf(_("Program received signal %s (%s)"),
+					                             (gchar *) gdb_mi_result_var(record->first, "signal-name", GDB_MI_VAL_STRING),
+					                             (gchar *) gdb_mi_result_var(record->first, "signal-meaning", GDB_MI_VAL_STRING));
 
-					dbg_cbs->set_stopped(atoi(thread_id));
+					dbg_cbs->report_error(msg);
+					g_free(msg);
 				}
 				else
-				{
-					if (!requested_interrupt)
-						dbg_cbs->report_error(_("Program received a signal"));
-					else
-						requested_interrupt = FALSE;
-						
-					dbg_cbs->set_stopped(atoi(thread_id));
-				}
+					requested_interrupt = FALSE;
 			}
-			else if (stop_reason == SR_EXITED_NORMALLY || stop_reason == SR_EXITED_SIGNALLED || stop_reason == SR_EXITED_WITH_CODE)
+
+			dbg_cbs->set_stopped(thread_id ? atoi(thread_id) : 0);
+		}
+		else if (stop_reason == SR_EXITED_NORMALLY || stop_reason == SR_EXITED_SIGNALLED || stop_reason == SR_EXITED_WITH_CODE)
+		{
+			if (stop_reason == SR_EXITED_WITH_CODE)
 			{
-				if (stop_reason == SR_EXITED_WITH_CODE)
-				{
-					gchar *code;
-					gchar *message;
+				const gchar *exit_code = gdb_mi_result_var(record->first, "exit-code", GDB_MI_VAL_STRING);
+				long int code = exit_code ? strtol(exit_code, NULL, 8) : 0;
+				gchar *message;
 
-					code = strstr(reason + strlen(reason) + 1,"exit-code=\"") + strlen("exit-code=\"");
-					*(strchr(code, '\"')) = '\0';
-					message = g_strdup_printf(_("Program exited with code \"%i\""), (int)(char)strtol(code, NULL, 8));
-					dbg_cbs->report_error(message);
+				message = g_strdup_printf(_("Program exited with code \"%i\""), (int)(char)code);
+				dbg_cbs->report_error(message);
 
-					g_free(message);
-				}
-
-				stop();
+				g_free(message);
 			}
+
+			stop();
 		}
 	}
-	else if (g_str_has_prefix (line, "^error"))
+	else if (gdb_mi_record_matches(record, '^', "error", NULL))
 	{
 		GList *lines, *iter;
-		char *msg;
+		const gchar *msg = gdb_mi_result_var(record->first, "msg", GDB_MI_VAL_STRING);
 
 		/* removing read callback (will pulling all output left manually) */
-		g_source_remove(gdb_id_out);
+		if (gdb_id_out)
+		{
+			g_source_remove(gdb_id_out);
+			gdb_id_out = 0;
+		}
 
 		/* set debugger stopped if is running */
 		if (DBS_STOPPED != debug_get_state())
 		{
-			gchar *thread_id = strstr(line + strlen(line) + 1,"thread-id=\"");
-			*(strchr(thread_id, '\"')) = '\0'; 
+			/* FIXME: does GDB/MI ever return a thread-id with an error?? */
+			const gchar *thread_id = gdb_mi_result_var(record->first, "thread-id", GDB_MI_VAL_STRING);
 
-			dbg_cbs->set_stopped(atoi(thread_id));
+			dbg_cbs->set_stopped(thread_id ? atoi(thread_id) : 0);
 		}
 
-		/* get message */
-		msg = strstr(line, "msg=\"") + strlen("msg=\"");
-		*strrchr(msg, '\"') = '\0';
-		msg = g_strcompress(msg);
-		
 		/* reading until prompt */
 		lines = read_until_prompt();
 		for (iter = lines; iter; iter = iter->next)
@@ -605,11 +587,10 @@ static gboolean on_read_from_gdb(GIOChannel * src, GIOCondition cond, gpointer d
 
 		/* send error message */
 		dbg_cbs->report_error(msg);
-
-		g_free(msg);
 	}
 
 	g_free(line);
+	gdb_mi_record_free(record);
 
 	return TRUE;
 }
@@ -619,7 +600,7 @@ static gboolean on_read_from_gdb(GIOChannel * src, GIOCondition cond, gpointer d
  * after writing command to an input channel
  * connects reader to output channel and exits
  * after execution
- */ 
+ */
 static void exec_async_command(const gchar* command)
 {
 #ifdef DEBUG_OUTPUT
@@ -636,8 +617,8 @@ static void exec_async_command(const gchar* command)
  * execute "command" syncronously
  * i.e. reading output right
  * after execution
- */ 
-static result_class exec_sync_command(const gchar* command, gboolean wait4prompt, gchar** command_record)
+ */
+static result_class exec_sync_command(const gchar* command, gboolean wait4prompt, struct gdb_mi_record ** command_record)
 {
 	GList *lines, *iter;
 	result_class rc;
@@ -648,10 +629,13 @@ static result_class exec_sync_command(const gchar* command, gboolean wait4prompt
 
 	/* write command to gdb input channel */
 	gdb_input_write_line(command);
-	
+
 	if (!wait4prompt)
 		return RC_DONE;
-	
+
+	if (command_record)
+		*command_record = NULL;
+
 	lines = read_until_prompt();
 
 #ifdef DEBUG_OUTPUT
@@ -666,48 +650,66 @@ static result_class exec_sync_command(const gchar* command, gboolean wait4prompt
 	for (iter = lines; iter; iter = iter->next)
 	{
 		gchar *line = (gchar*)iter->data;
+		struct gdb_mi_record *record = gdb_mi_record_parse(line);
 
-		if ('^' == line[0])
+		if (record && '^' == record->type)
 		{
-			gchar* coma = strchr(line, ',');
-			if (coma)
-			{
-				*coma = '\0';
-				coma++;
-			}
-			else
-				coma = line + strlen(line);
-			
-			if (command_record)
-			{
-				*command_record = (gchar*)g_malloc(strlen(coma) + 1);
-				strcpy(*command_record, coma);
-			}
-			
-			if (!strcmp(line, "^done"))
+			if (gdb_mi_record_matches(record, '^', "done", NULL))
 				rc = RC_DONE;
-			else if (!strcmp(line, "^error"))
+			else if (gdb_mi_record_matches(record, '^', "error", NULL))
 			{
 				/* save error message */
-				gchar* msg = g_strcompress(strstr(coma, "msg=\"") + strlen("msg=\""));
-				strcpy(err_message, msg);
-				g_free(msg);
-				
+				const gchar *msg = gdb_mi_result_var(record->first, "msg", GDB_MI_VAL_STRING);
+				strncpy(err_message, msg ? msg : "", G_N_ELEMENTS(err_message) - 1);
+
 				rc = RC_ERROR;
 			}
-			else if (!strcmp(line, "^exit"))
+			else if (gdb_mi_record_matches(record, '^', "exit", NULL))
 				rc = RC_EXIT;
+
+			if (command_record)
+			{
+				*command_record = record;
+				record = NULL;
+			}
 		}
-		else if ('&' != line[0])
+		else if (! record || '&' != record->type)
 		{
 			colorize_message (line);
 		}
+		gdb_mi_record_free(record);
 	}
-	
+
 	g_list_foreach(lines, (GFunc)g_free, NULL);
 	g_list_free(lines);
-	
+
 	return rc;
+}
+
+
+/* escapes @str so it is valid to put it inside a quoted argument
+ * escapes '\' and '"'
+ * unlike g_strescape(), it doesn't escape non-ASCII characters so keeps
+ * all of UTF-8 */
+static gchar *escape_string(const gchar *str)
+{
+	gchar *new = g_malloc(strlen(str) * 2 + 1);
+	gchar *p;
+
+	for (p = new; *str; str++) {
+		switch (*str) {
+			/* FIXME: what to do with '\n'?  can't seem to find a way to escape it */
+			case '\\':
+			case '"':
+				*p++ = '\\';
+				/* fallthrough */
+			default:
+				*p++ = *str;
+		}
+	}
+	*p = 0;
+
+	return new;
 }
 
 /*
@@ -715,13 +717,13 @@ static result_class exec_sync_command(const gchar* command, gboolean wait4prompt
  */
 static gboolean run(const gchar* file, const gchar* commandline, GList* env, GList *witer, GList *biter, const gchar* terminal_device, dbg_callbacks* callbacks)
 {
-	GError *err = NULL;
 	const gchar *exclude[] = { "LANG", NULL };
 	gchar **gdb_env = utils_copy_environment(exclude, "LANG", "C", NULL);
 	gchar *working_directory = g_path_get_dirname(file);
 	GList *lines, *iter;
 	GList *commands = NULL;
-	GString *command;
+	gchar *command;
+	gchar *escaped;
 	int bp_index;
 	queue_item *item;
 
@@ -730,7 +732,7 @@ static gboolean run(const gchar* file, const gchar* commandline, GList* env, GLi
 	/* spawn GDB */
 	if (!g_spawn_async_with_pipes(working_directory, (gchar**)gdb_args, gdb_env,
 				     GDB_SPAWN_FLAGS, NULL,
-				     NULL, &gdb_pid, &gdb_in, &gdb_out, NULL, &err))
+				     NULL, &gdb_pid, &gdb_in, &gdb_out, NULL, NULL))
 	{
 		dbg_cbs->report_error(_("Failed to spawn gdb process"));
 		g_free(working_directory);
@@ -739,11 +741,11 @@ static gboolean run(const gchar* file, const gchar* commandline, GList* env, GLi
 	}
 	g_free(working_directory);
 	g_strfreev(gdb_env);
-	
+
 	/* move gdb to it's own process group */
 	setpgid(gdb_pid, 0);
-	
-	/* set handler for gdb process exit event */ 
+
+	/* set handler for gdb process exit event */
 	gdb_src_id = g_child_watch_add(gdb_pid, on_gdb_exit, NULL);
 
 	/* create GDB GIO chanels */
@@ -770,17 +772,18 @@ static gboolean run(const gchar* file, const gchar* commandline, GList* env, GLi
 
 		variable *var = variable_new(name, VT_WATCH);
 		watches = g_list_append(watches, var);
-		
+
 		witer = witer->next;
 	}
 
 	/* collect commands */
 
 	/* loading file */
-	command = g_string_new("");
-	g_string_printf(command, "-file-exec-and-symbols \"%s\"", file);
-	commands = add_to_queue(commands, _("~\"Loading target file.\\n\""), command->str, _("Error loading file"), FALSE);
-	g_string_free(command, TRUE);
+	escaped = escape_string(file);
+	command = g_strdup_printf("-file-exec-and-symbols \"%s\"", escaped);
+	commands = add_to_queue(commands, _("~\"Loading target file.\\n\""), command, _("Error loading file"), FALSE);
+	g_free(command);
+	g_free(escaped);
 
 	/* setting asyncronous mode */
 	commands = add_to_queue(commands, NULL, "-gdb-set target-async 1", _("Error configuring GDB"), FALSE);
@@ -792,16 +795,14 @@ static gboolean run(const gchar* file, const gchar* commandline, GList* env, GLi
 	commands = add_to_queue(commands, NULL, "-enable-pretty-printing", _("Error configuring GDB"), FALSE);
 
 	/* set locale */
-	command = g_string_new("");
-	g_string_printf(command, "-gdb-set environment LANG=%s", g_getenv("LANG"));
-	commands = add_to_queue(commands, NULL, command->str, NULL, FALSE);
-	g_string_free(command, TRUE);
+	command = g_strdup_printf("-gdb-set environment LANG=%s", g_getenv("LANG"));
+	commands = add_to_queue(commands, NULL, command, NULL, FALSE);
+	g_free(command);
 
 	/* set arguments */
-	command = g_string_new("");
-	g_string_printf(command, "-exec-arguments %s", commandline);
-	commands = add_to_queue(commands, NULL, command->str, NULL, FALSE);
-	g_string_free(command, TRUE);
+	command = g_strdup_printf("-exec-arguments %s", commandline);
+	commands = add_to_queue(commands, NULL, command, NULL, FALSE);
+	g_free(command);
 
 	/* set passed evironment */
 	iter = env;
@@ -813,11 +814,9 @@ static gboolean run(const gchar* file, const gchar* commandline, GList* env, GLi
 		iter = iter->next;
 		value = (gchar*)iter->data;
 
-		command = g_string_new("");
-		g_string_printf(command, "-gdb-set environment %s=%s", name, value);
-
-		commands = add_to_queue(commands, NULL, command->str, NULL, FALSE);
-		g_string_free(command, TRUE);
+		command = g_strdup_printf("-gdb-set environment %s=%s", name, value);
+		commands = add_to_queue(commands, NULL, command, NULL, FALSE);
+		g_free(command);
 
 		iter = iter->next;
 	}
@@ -827,50 +826,47 @@ static gboolean run(const gchar* file, const gchar* commandline, GList* env, GLi
 	while (biter)
 	{
 		breakpoint *bp = (breakpoint*)biter->data;
-		GString *error_message = g_string_new("");
+		gchar *error_message;
 
-		command = g_string_new("");
-		g_string_printf(command, "-break-insert -f \"\\\"%s\\\":%i\"", bp->file, bp->line);
+		escaped = escape_string(bp->file);
+		command = g_strdup_printf("-break-insert -f \"\\\"%s\\\":%i\"", escaped, bp->line);
+		g_free(escaped);
 
-		g_string_printf(error_message, _("Breakpoint at %s:%i cannot be set\nDebugger message: %s"), bp->file, bp->line, "%s");
-		
-		commands = add_to_queue(commands, NULL, command->str, error_message->str, TRUE);
+		error_message = g_strdup_printf(_("Breakpoint at %s:%i cannot be set\nDebugger message: %s"), bp->file, bp->line, "%s");
 
-		g_string_free(command, TRUE);
+		commands = add_to_queue(commands, NULL, command, error_message, TRUE);
+
+		g_free(command);
 
 		if (bp->hitscount)
 		{
-			command = g_string_new("");
-			g_string_printf(command, "-break-after %i %i", bp_index, bp->hitscount);
-			commands = add_to_queue(commands, NULL, command->str, error_message->str, TRUE);
-			g_string_free(command, TRUE);
+			command = g_strdup_printf("-break-after %i %i", bp_index, bp->hitscount);
+			commands = add_to_queue(commands, NULL, command, error_message, TRUE);
+			g_free(command);
 		}
 		if (strlen(bp->condition))
 		{
-			command = g_string_new("");
-			g_string_printf (command, "-break-condition %i %s", bp_index, bp->condition);
-			commands = add_to_queue(commands, NULL, command->str, error_message->str, TRUE);
-			g_string_free(command, TRUE);
+			command = g_strdup_printf ("-break-condition %i %s", bp_index, bp->condition);
+			commands = add_to_queue(commands, NULL, command, error_message, TRUE);
+			g_free(command);
 		}
 		if (!bp->enabled)
 		{
-			command = g_string_new("");
-			g_string_printf (command, "-break-disable %i", bp_index);
-			commands = add_to_queue(commands, NULL, command->str, error_message->str, TRUE);
-			g_string_free(command, TRUE);
+			command = g_strdup_printf ("-break-disable %i", bp_index);
+			commands = add_to_queue(commands, NULL, command, error_message, TRUE);
+			g_free(command);
 		}
 
-		g_string_free(error_message, TRUE);
+		g_free(error_message);
 
 		bp_index++;
 		biter = biter->next;
 	}
 
 	/* set debugging terminal */
-	command = g_string_new("-inferior-tty-set ");
-	g_string_append(command, terminal_device);
-	commands = add_to_queue(commands, NULL, command->str, NULL, FALSE);
-	g_string_free(command, TRUE);
+	command = g_strconcat("-inferior-tty-set ", terminal_device, NULL);
+	commands = add_to_queue(commands, NULL, command, NULL, FALSE);
+	g_free(command);
 
 	/* connect read callback to the output chanel */
 	gdb_id_out = g_io_add_watch(gdb_ch_out, G_IO_IN, on_read_async_output, commands);
@@ -880,11 +876,11 @@ static gboolean run(const gchar* file, const gchar* commandline, GList* env, GLi
 	/* send message to debugger messages window */
 	if (item->message)
 	{
-		dbg_cbs->send_message(item->message->str, "grey");
+		dbg_cbs->send_message(item->message, "grey");
 	}
 
 	/* send first command */
-	gdb_input_write_line(item->command->str);
+	gdb_input_write_line(item->command);
 
 	return TRUE;
 }
@@ -897,7 +893,7 @@ static void restart(void)
 	dbg_cbs->clear_messages();
 	exec_async_command("-exec-run");
 }
-	
+
 /*
  * stops GDB
  */
@@ -944,7 +940,7 @@ static void step_out(void)
 static void execute_until(const gchar *file, int line)
 {
 	gchar command[1000];
-	sprintf(command, "-exec-until %s:%i", file, line);
+	g_snprintf(command, sizeof command, "-exec-until %s:%i", file, line);
 	exec_async_command(command);
 }
 
@@ -953,45 +949,49 @@ static void execute_until(const gchar *file, int line)
  */
 static int get_break_number(char* file, int line)
 {
-	gchar *record, *bstart;
+	struct gdb_mi_record *record;
+	const struct gdb_mi_result *table, *body, *bkpt;
+	int break_number = -1;
 
 	exec_sync_command("-break-list", TRUE, &record);
-	bstart = record;
+	if (! record)
+		return -1;
 
-	while ( (bstart = strstr(bstart, "bkpt=")) )
+	table = gdb_mi_result_var(record->first, "BreakpointTable", GDB_MI_VAL_LIST);
+	body = gdb_mi_result_var(table, "body", GDB_MI_VAL_LIST);
+	gdb_mi_result_foreach_matched (bkpt, body, "bkpt", GDB_MI_VAL_LIST)
 	{
-		gchar *fname, *file_quoted;
-		int num, bline;
-		gboolean break_found;
+		const gchar *number = gdb_mi_result_var(bkpt->val->v.list, "number", GDB_MI_VAL_STRING);
+		const gchar *location = gdb_mi_result_var(bkpt->val->v.list, "original-location", GDB_MI_VAL_STRING);
+		const gchar *colon;
+		gboolean break_found = FALSE;
 
-		bstart += strlen("bkpt={number=\"");
-		*strchr(bstart, '\"') = '\0';
-		num = atoi(bstart);
-		
-		bstart += strlen(bstart) + 1;
-		bstart = strstr(bstart, "original-location=\"") + strlen("original-location=\"");
-		*strchr(bstart, ':') = '\0';
-		fname = bstart;
-		
-		bstart += strlen(bstart) + 1;
-		*strchr(bstart, '\"') = '\0';
-		bline = atoi(bstart);
-		
-		file_quoted = g_strdup_printf("\\\"%s\\\"", file);
-		break_found = !strcmp(fname, file_quoted) && bline == line;
-		g_free(file_quoted);
+		if (! number || ! location)
+			continue;
 
+		colon = strrchr(location, ':');
+		if (colon && atoi(colon + 1) == line)
+		{
+			gchar *fname;
+
+			/* quotes around filename (location not found or something?) */
+			if (*location == '"' && colon - location > 2)
+				fname = g_strndup(location + 1, colon - location - 2);
+			else
+				fname = g_strndup(location, colon - location);
+			break_found = strcmp(fname, file) == 0;
+			g_free(fname);
+		}
 		if (break_found)
 		{
-			return num;
+			break_number = atoi(number);
+			break;
 		}
-		
-		bstart += strlen(bstart) + 1;
-	} 
-	
-	free(record);
-	
-	return -1;
+	}
+
+	gdb_mi_record_free(record);
+
+	return break_number;
 }
 
 /*
@@ -1003,48 +1003,53 @@ static gboolean set_break(breakpoint* bp, break_set_activity bsa)
 	if (BSA_NEW_BREAK == bsa)
 	{
 		/* new breakpoint */
-
-		char *pos;
-		int number;
-		gchar *record = NULL;
+		struct gdb_mi_record *record;
+		const struct gdb_mi_result *bkpt;
+		const gchar *number;
+		gchar *escaped;
+		int num = 0;
 
 		/* 1. insert breakpoint */
-		sprintf (command, "-break-insert \"\\\"%s\\\":%i\"", bp->file, bp->line);
-		if (RC_DONE != exec_sync_command(command, TRUE, &record))
+		escaped = escape_string(bp->file);
+		g_snprintf(command, sizeof command, "-break-insert \"\\\"%s\\\":%i\"", escaped, bp->line);
+		if (RC_DONE != exec_sync_command(command, TRUE, &record) || !record)
 		{
-			g_free(record);
-			sprintf (command, "-break-insert -f \"\\\"%s\\\":%i\"", bp->file, bp->line);
-			if (RC_DONE != exec_sync_command(command, TRUE, &record))
+			gdb_mi_record_free(record);
+			record = NULL;
+			g_snprintf(command, sizeof command, "-break-insert -f \"\\\"%s\\\":%i\"", escaped, bp->line);
+			if (RC_DONE != exec_sync_command(command, TRUE, &record) || !record)
 			{
-				g_free(record);
+				gdb_mi_record_free(record);
+				g_free(escaped);
 				return FALSE;
 			}
 		}
 		/* lookup break-number */
-		pos = strstr(record, "number=\"") + strlen("number=\"");
-		*strchr(pos, '\"') = '\0';
-		number = atoi(pos);
-		g_free(record);
+		bkpt = gdb_mi_result_var(record->first, "bkpt", GDB_MI_VAL_LIST);
+		if ((number = gdb_mi_result_var(bkpt, "number", GDB_MI_VAL_STRING)))
+			num = atoi(number);
+		gdb_mi_record_free(record);
+		g_free(escaped);
 		/* 2. set hits count if differs from 0 */
 		if (bp->hitscount)
 		{
-			sprintf (command, "-break-after %i %i", number, bp->hitscount);
+			g_snprintf(command, sizeof command, "-break-after %i %i", num, bp->hitscount);
 			exec_sync_command(command, TRUE, NULL);
 		}
 		/* 3. set condition if exists */
 		if (strlen(bp->condition))
 		{
-			sprintf (command, "-break-condition %i %s", number, bp->condition);
+			g_snprintf(command, sizeof command, "-break-condition %i %s", num, bp->condition);
 			if (RC_DONE != exec_sync_command(command, TRUE, NULL))
 				return FALSE;
 		}
 		/* 4. disable if disabled */
 		if (!bp->enabled)
 		{
-			sprintf (command, "-break-disable %i", number);
+			g_snprintf(command, sizeof command, "-break-disable %i", num);
 			exec_sync_command(command, TRUE, NULL);
 		}
-		
+
 		return TRUE;
 	}
 	else
@@ -1055,15 +1060,15 @@ static gboolean set_break(breakpoint* bp, break_set_activity bsa)
 			return FALSE;
 
 		if (BSA_UPDATE_ENABLE == bsa)
-			sprintf (command, bp->enabled ? "-break-enable %i" : "-break-disable %i", bnumber);
+			g_snprintf(command, sizeof command, bp->enabled ? "-break-enable %i" : "-break-disable %i", bnumber);
 		else if (BSA_UPDATE_HITS_COUNT == bsa)
-			sprintf (command, "-break-after %i %i", bnumber, bp->hitscount);
+			g_snprintf(command, sizeof command, "-break-after %i %i", bnumber, bp->hitscount);
 		else if (BSA_UPDATE_CONDITION == bsa)
-			sprintf (command, "-break-condition %i %s", bnumber, bp->condition);
+			g_snprintf(command, sizeof command, "-break-condition %i %s", bnumber, bp->condition);
 
 		return RC_DONE == exec_sync_command(command, TRUE, NULL);
 	}
-	
+
 	return FALSE;
 }
 
@@ -1079,9 +1084,9 @@ static gboolean remove_break(breakpoint* bp)
 		result_class rc;
 		gchar command[100];
 
-		sprintf(command, "-break-delete %i", number);
+		g_snprintf(command, sizeof command, "-break-delete %i", number);
 		rc = exec_sync_command(command, TRUE, NULL);
-		
+
 		return RC_DONE == rc;
 	}
 	return FALSE;
@@ -1110,301 +1115,143 @@ static void set_active_frame(int frame_number)
 	g_free(command);
 }
 
+static int get_active_thread(void)
+{
+	struct gdb_mi_record *record = NULL;
+	int current_thread = 0;
+
+	if (RC_DONE == exec_sync_command("-thread-info", TRUE, &record))
+	{
+		const gchar *id = gdb_mi_result_var(record->first, "current-thread-id", GDB_MI_VAL_STRING);
+		current_thread = id ? atoi(id) : 0;
+	}
+	gdb_mi_record_free(record);
+
+	return current_thread;
+}
+
+static gboolean set_active_thread(int thread_id)
+{
+	gchar *command = g_strdup_printf("-thread-select %i", thread_id);
+	gboolean success = (RC_DONE == exec_sync_command(command, TRUE, NULL));
+
+	if (success)
+		set_active_frame(0);
+
+	g_free(command);
+
+	return success;
+}
+
 /*
  * gets stack
  */
 static GList* get_stack(void)
 {
-	gchar* record = NULL;
+	struct gdb_mi_record *record = NULL;
+	const struct gdb_mi_result *stack_node, *frame_node;
 	GList *stack = NULL;
-	gchar **frames, **next;
-	result_class rc;
 
-	rc = exec_sync_command("-stack-list-frames", TRUE, &record);
-	if (RC_DONE != rc)
-		return NULL;
-
-	frames = g_strsplit(record, "frame=", 0);
-	next = frames + 1;
-	while (*next)
+	if (RC_DONE != exec_sync_command("-stack-list-frames", TRUE, &record) || ! record)
 	{
-		frame *f = frame_new();
-		int line;
-		gchar *pos, *fullname, *file, *from;
-		
-		/* adresss */
-		pos = strstr(*next, "addr=\"") + strlen("addr=\"");
-		*strchr(pos, '\"') = '\0';
-		f->address = g_strdup(pos);
-		pos += strlen(pos) + 1;
+		gdb_mi_record_free(record);
+		return NULL;
+	}
 
-		/* function */
-		pos = strstr(pos, "func=\"") + strlen("func=\"");
-		*strchr(pos, '\"') = '\0';
-		f->function = g_strdup(pos);
-		pos += strlen(pos) + 1;
+	stack_node = gdb_mi_result_var(record->first, "stack", GDB_MI_VAL_LIST);
+	gdb_mi_result_foreach_matched (frame_node, stack_node, "frame", GDB_MI_VAL_LIST)
+	{
+		const gchar *addr = gdb_mi_result_var(frame_node->val->v.list, "addr", GDB_MI_VAL_STRING);
+		const gchar *func = gdb_mi_result_var(frame_node->val->v.list, "func", GDB_MI_VAL_STRING);
+		const gchar *line = gdb_mi_result_var(frame_node->val->v.list, "line", GDB_MI_VAL_STRING);
+		const gchar *file, *fullname;
+		frame *f = frame_new();
+
+		f->address = g_strdup(addr);
+		f->function = g_strdup(func);
 
 		/* file: fullname | file | from */
-		fullname = strstr(pos, "fullname=\"");
-		file = strstr(pos, "file=\"");
-		from = strstr(pos, "from=\"");
-		
-		if (fullname)
+		if ((fullname = file = gdb_mi_result_var(frame_node->val->v.list, "fullname", GDB_MI_VAL_STRING)) ||
+			(file = gdb_mi_result_var(frame_node->val->v.list, "file", GDB_MI_VAL_STRING)) ||
+			(file = gdb_mi_result_var(frame_node->val->v.list, "from", GDB_MI_VAL_STRING)))
 		{
-			fullname += strlen("fullname=\"");
-			pos = fullname;
-			*strchr(pos, '\"') = '\0';
-			f->file = g_strdup(pos);
-			pos += strlen(pos) + 1;
-		}
-		else if (file)
-		{
-			file += strlen("file=\"");
-			pos = file;
-			*strchr(pos, '\"') = '\0';
-			f->file = g_strdup(pos);
-			pos += strlen(pos) + 1;
-		}
-		else if (from)
-		{
-			from += strlen("from=\"");
-			pos = from;
-			*strchr(pos, '\"') = '\0';
-			f->file = g_strdup(pos);
-			pos += strlen(pos) + 1;
+			f->file = g_strdup(file);
 		}
 		else
 		{
 			f->file = g_strdup("");
 		}
-		
+
 		/* whether source is available */
 		f->have_source = fullname ? TRUE : FALSE;
 
 		/* line */
-		line = 0;
-		pos = strstr(pos, "line=\"");
-		if (pos)
-		{
-			pos += strlen("line=\"");
-			*strchr(pos, '\"') = '\0';
-			line = atoi(pos);
-			pos += strlen(pos) + 1;
-		}
-		f->line = line;
+		f->line = line ? atoi(line) : 0;
 
-		stack = g_list_append(stack, f);
-
-		next++;
+		stack = g_list_prepend(stack, f);
 	}
-	g_strfreev(frames);	
-	
-	free(record);
-	
-	return stack;
+	gdb_mi_record_free(record);
+
+	return g_list_reverse(stack);
 }
 
 /*
- * unescapes hex values (\0xXXX) to readable chars
- * converting it from wide character value to char
- */
-static gchar* unescape_hex_values(gchar *src)
-{
-	GString *dest = g_string_new("");
-	
-	gchar *slash;
-	while ( (slash = strstr(src, "\\x")) )
-	{
-		char hex[4] = { 0, 0, 0, '\0' };
-		wchar_t wc;
-
-		/* append what has been missed
-		unescaping it in advance */
-		if (slash - src)
-		{
-			gchar *missed = g_strndup(src, slash - src);
-			gchar *unescaped = g_strcompress(missed);
-			g_string_append(dest, unescaped);
-			g_free(missed);
-			g_free(unescaped);
-		}
-
-		strncpy(hex, slash + 2, 3);
-		wc = (wchar_t)strtol(hex, NULL, 16);
-
-		if (iswalpha(wc))
-		{
-			gchar mb[5];
-			int len = wctomb(mb, wc);
-			mb[len] = '\0';
-			g_string_append(dest, mb);
-		}
-		else
-			g_string_append_len(dest, slash, 5);
-		
-		src = slash + 5;
-	}
-	
-	if (strlen(src))
-	{
-		gchar *unescaped = g_strcompress(src);
-		g_string_append(dest, unescaped);
-		g_free(unescaped);
-	}
-
-	return g_string_free(dest, FALSE);
-}
-
-/*
- * checks if pc pointer points to the 
- * valid printable charater
- */
-static gboolean isvalidcharacter(gchar *pc, gboolean utf8)
-{
-	if (utf8)
-		return -1 != g_utf8_get_char_validated(pc, -1);
-	else
-		return isprint(*pc);
-}
-
-/*
- * unescapes string, handles octal characters representations
- */
-static gchar* unescape_octal_values(gchar *text)
-{
-	GString *value = g_string_new("");
-	
-	gboolean utf8 = g_str_has_suffix(getenv("LANG"), "UTF-8");
-
-	gchar *tmp = g_strdup(text);
-	gchar *unescaped = g_strcompress(tmp);
-
-	gchar *pos = unescaped;
-	while (*pos)
-	{
-		if (isvalidcharacter(pos, utf8))
-		{
-			if (utf8)
-			{
-				/* valid utf8 character, copy to output
-				 and move to the next character */
-				gchar *next = g_utf8_next_char(pos);
-				g_string_append_len(value, pos, next - pos);
-				pos = next;
-			}
-			else
-			{
-				g_string_append_len(value, pos++, 1);
-			}
-		}
-		else
-		{
-			/* not a valid character, convert it to its octal representation
-			 and append to the result string */
-			gchar *invalid = g_strndup(pos, 1);
-			gchar *escaped = g_strescape(invalid, NULL);
-
-			g_string_append(value, escaped);
-
-			g_free(escaped);
-			g_free(invalid);
-
-			pos += 1;
-		}
-	}
-
-	g_free(tmp);
-
-	return g_string_free (value, FALSE);
-}
-
-/*
- * unescapes value string, handles hexidecimal and octal characters representations
- */
-static gchar *unescape(gchar *text)
-{
-	gchar *retval = NULL;
-
-	/* create string copy */
-	gchar *value = g_strdup(text);
-
-	/* make first unescaping */
-	gchar *tmp = g_strcompress(value);
-
-	/* make first unescaping */
-	if (strstr(tmp, "\\x"))
-		retval = unescape_hex_values(tmp);
-	else
-		retval = unescape_octal_values(tmp);
-
-	g_free(tmp);
-	g_free(value);
-
-	return retval;
-}
-
-/*
- * updates variables from vars list 
+ * updates variables from vars list
  */
 static void get_variables (GList *vars)
 {
 	while (vars)
 	{
 		gchar command[1000];
-		
+
 		variable *var = (variable*)vars->data;
 
 		gchar *varname = var->internal->str;
-		gchar *record = NULL;
-		gchar *pos;
-		gchar *expression;
-		int numchild;
-		gchar *value;
+		struct gdb_mi_record *record = NULL;
+		const gchar *expression = NULL;
+		const gchar *numchild = NULL;
+		const gchar *value = NULL;
+		const gchar *type = NULL;
 
 		/* path expression */
-		sprintf(command, "-var-info-path-expression \"%s\"", varname);
+		g_snprintf(command, sizeof command, "-var-info-path-expression \"%s\"", varname);
 		exec_sync_command(command, TRUE, &record);
-		pos = strstr(record, "path_expr=\"") + strlen("path_expr=\"");
-		*(strrchr(pos, '\"')) = '\0';
-		expression = unescape(pos);
-		g_string_assign(var->expression, expression);
-		g_free(expression);
-		g_free(record);
-		
+		if (record)
+			expression = gdb_mi_result_var(record->first, "path_expr", GDB_MI_VAL_STRING);
+		g_string_assign(var->expression, expression ? expression : "");
+		gdb_mi_record_free(record);
+
 		/* children number */
-		sprintf(command, "-var-info-num-children \"%s\"", varname);
+		g_snprintf(command, sizeof command, "-var-info-num-children \"%s\"", varname);
 		exec_sync_command(command, TRUE, &record);
-		pos = strstr(record, "numchild=\"") + strlen("numchild=\"");
-		*(strchr(pos, '\"')) = '\0';
-		numchild = atoi(pos);
-		var->has_children = numchild > 0;
-		g_free(record);
+		if (record)
+			numchild = gdb_mi_result_var(record->first, "numchild", GDB_MI_VAL_STRING);
+		var->has_children = numchild && atoi(numchild) > 0;
+		gdb_mi_record_free(record);
 
 		/* value */
-		sprintf(command, "-data-evaluate-expression \"%s\"", var->expression->str);
+		g_snprintf(command, sizeof command, "-data-evaluate-expression \"%s\"", var->expression->str);
 		exec_sync_command(command, TRUE, &record);
-		pos = strstr(record, "value=\"");
-		if (!pos)
+		if (record)
+			value = gdb_mi_result_var(record->first, "value", GDB_MI_VAL_STRING);
+		if (!value)
 		{
-			g_free(record);
-			sprintf(command, "-var-evaluate-expression \"%s\"", varname);
+			gdb_mi_record_free(record);
+			g_snprintf(command, sizeof command, "-var-evaluate-expression \"%s\"", varname);
 			exec_sync_command(command, TRUE, &record);
-			pos = strstr(record, "value=\"");
+			if (record)
+				value = gdb_mi_result_var(record->first, "value", GDB_MI_VAL_STRING);
 		}
-		pos +=  + strlen("value=\"");
-		*(strrchr(pos, '\"')) = '\0';
-		value = unescape(pos);
-		g_string_assign(var->value, value);
-		g_free(value);
-		g_free(record);
+		g_string_assign(var->value, value ? value : "");
+		gdb_mi_record_free(record);
 
 		/* type */
-		sprintf(command, "-var-info-type \"%s\"", varname);
+		g_snprintf(command, sizeof command, "-var-info-type \"%s\"", varname);
 		exec_sync_command(command, TRUE, &record);
-		pos = strstr(record, "type=\"") + strlen("type=\"");
-		*(strchr(pos, '\"')) = '\0';
-		g_string_assign(var->type, pos);
-		g_free(record);
+		if (record)
+			type = gdb_mi_result_var(record->first, "type", GDB_MI_VAL_STRING);
+		g_string_assign(var->type, type ? type : "");
+		gdb_mi_record_free(record);
 
 		vars = vars->next;
 	}
@@ -1415,9 +1262,9 @@ static void get_variables (GList *vars)
  */
 static void update_files(void)
 {
-	GHashTable *ht = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, NULL);
-	gchar *record = NULL;
-	gchar *pos;
+	GHashTable *ht;
+	struct gdb_mi_record *record = NULL;
+	const struct gdb_mi_result *files_node;
 
 	if (files)
 	{
@@ -1428,26 +1275,29 @@ static void update_files(void)
 	}
 
 	exec_sync_command("-file-list-exec-source-files", TRUE, &record);
-	pos = record;
-	while ( (pos = strstr(pos, "fullname=\"")) )
+	if (! record)
+		return;
+
+	ht = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, NULL);
+
+	files_node = gdb_mi_result_var(record->first, "files", GDB_MI_VAL_LIST);
+	gdb_mi_result_foreach_matched (files_node, files_node, NULL, GDB_MI_VAL_LIST)
 	{
-		pos += strlen("fullname=\"");
-		*(strchr(pos, '\"')) = '\0';
-		if (!g_hash_table_lookup(ht, pos))
+		const gchar *fullname = gdb_mi_result_var(files_node->val->v.list, "fullname", GDB_MI_VAL_STRING);
+
+		if (fullname && !g_hash_table_lookup(ht, fullname))
 		{
-			g_hash_table_insert(ht, (gpointer)pos, (gpointer)1);
-			files = g_list_append(files, g_strdup(pos));
+			g_hash_table_insert(ht, (gpointer)fullname, (gpointer)1);
+			files = g_list_append(files, g_strdup(fullname));
 		}
-			
-		pos += strlen(pos) + 1;
 	}
 
 	g_hash_table_destroy(ht);
-	g_free(record);
+	gdb_mi_record_free(record);
 }
 
 /*
- * updates watches list 
+ * updates watches list
  */
 static void update_watches(void)
 {
@@ -1459,53 +1309,53 @@ static void update_watches(void)
 	for (iter = watches; iter; iter = iter->next)
 	{
 		variable *var = (variable*)iter->data;
-		
+
 		if (var->internal->len)
 		{
-			sprintf(command, "-var-delete %s", var->internal->str);
+			g_snprintf(command, sizeof command, "-var-delete %s", var->internal->str);
 			exec_sync_command(command, TRUE, NULL);
 		}
-		
+
 		/* reset all variables fields */
 		variable_reset(var);
 	}
-	
+
 	/* create GDB variables, adding successfully created
 	variables to the list then passed for updatind */
 	for (iter = watches; iter; iter = iter->next)
 	{
 		variable *var = (variable*)iter->data;
-		gchar *record = NULL;
-		gchar *pos;
+		struct gdb_mi_record *record = NULL;
+		const gchar *name;
 		gchar *escaped;
 
 		/* try to create variable */
-		escaped = g_strescape(var->name->str, NULL);
-		sprintf(command, "-var-create - * \"%s\"", escaped);
+		escaped = escape_string(var->name->str);
+		g_snprintf(command, sizeof command, "-var-create - * \"%s\"", escaped);
 		g_free(escaped);
 
-		if (RC_DONE != exec_sync_command(command, TRUE, &record))
+		if (RC_DONE != exec_sync_command(command, TRUE, &record) || !record)
 		{
 			/* do not include to updating list, move to next watch */
 			var->evaluated = FALSE;
 			g_string_assign(var->internal, "");
-			g_free(record);
-			
+			gdb_mi_record_free(record);
+
 			continue;
 		}
-		
+
 		/* find and assign internal name */
-		pos = strstr(record, "name=\"") + strlen("name=\"");
-		*strchr(pos, '\"') = '\0'; 
-		g_string_assign(var->internal, pos);
-		g_free(record);			
-		
-		var->evaluated = TRUE;
+		name = gdb_mi_result_var(record->first, "name", GDB_MI_VAL_STRING);
+		g_string_assign(var->internal, name ? name : "");
+		gdb_mi_record_free(record);
+
+		var->evaluated = name != NULL;
 
 		/* add to updating list */
-		updating = g_list_append(updating, var);
+		updating = g_list_prepend(updating, var);
 	}
-	
+	updating = g_list_reverse(updating);
+
 	/* update watches */
 	get_variables(updating);
 
@@ -1514,89 +1364,99 @@ static void update_watches(void)
 }
 
 /*
- * updates autos list 
+ * updates autos list
  */
 static void update_autos(void)
 {
 	gchar command[1000];
-	GList *unevaluated = NULL, *iter;
-	const char *gdb_commands[2];
-	int i;
+	GList *unevaluated = NULL, *vars = NULL, *iter;
 
 	/* remove all previous GDB variables for autos */
 	for (iter = autos; iter; iter = iter->next)
 	{
 		variable *var = (variable*)iter->data;
-		
-		sprintf(command, "-var-delete %s", var->internal->str);
+
+		g_snprintf(command, sizeof command, "-var-delete %s", var->internal->str);
 		exec_sync_command(command, TRUE, NULL);
 	}
 
 	g_list_foreach(autos, (GFunc)variable_free, NULL);
 	g_list_free(autos);
 	autos = NULL;
-	
+
 	/* add current autos to the list */
-	
-	gdb_commands[0] = g_strdup_printf("-stack-list-arguments 0 %i %i", active_frame, active_frame);
-	gdb_commands[1] = "-stack-list-locals 0";
-	for (i = 0; i < sizeof (gdb_commands) / sizeof(*gdb_commands); i++)
+
+	struct gdb_mi_record *record = NULL;
+
+	g_snprintf(command, sizeof command, "-stack-list-arguments 0 %i %i", active_frame, active_frame);
+	if (RC_DONE == exec_sync_command(command, TRUE, &record) && record)
 	{
-		gchar *record = NULL, *pos;
+		const struct gdb_mi_result *stack_args = gdb_mi_result_var(record->first, "stack-args", GDB_MI_VAL_LIST);
 
-		result_class rc = exec_sync_command(gdb_commands[i], TRUE, &record);
-		if (RC_DONE != rc)
-			break;
-
-		pos = record;
-		while ((pos = strstr(pos, "name=\"")))
+		gdb_mi_result_foreach_matched (stack_args, stack_args, "frame", GDB_MI_VAL_LIST)
 		{
-			variable *var;
-			gchar *create_record = NULL, *escaped;
+			const struct gdb_mi_result *args = gdb_mi_result_var(stack_args->val->v.list, "args", GDB_MI_VAL_LIST);
 
-			pos += strlen("name=\"");
-			*(strchr(pos, '\"')) = '\0';
-
-			var = variable_new(pos, i ? VT_LOCAL : VT_ARGUMENT);
-
-			/* create new gdb variable */
-			escaped = g_strescape(pos, NULL);
-			sprintf(command, "-var-create - * \"%s\"", escaped);
-			g_free(escaped);
-
-			/* form new variable */
-			if (RC_DONE == exec_sync_command(command, TRUE, &create_record))
+			gdb_mi_result_foreach_matched (args, args, "name", GDB_MI_VAL_STRING)
 			{
-				gchar *intname = strstr(create_record, "name=\"") + strlen ("name=\"");
-				*strchr(intname, '\"') = '\0';
-				var->evaluated = TRUE;
-				g_string_assign(var->internal, intname);
-				autos = g_list_append(autos, var);
-
-				g_free(create_record);
+				variable *var = variable_new(args->val->v.string, VT_ARGUMENT);
+				vars = g_list_append(vars, var);
 			}
-			else
-			{
-				var->evaluated = FALSE;
-				g_string_assign(var->internal, "");
-				unevaluated = g_list_append(unevaluated, var);
-			}
-			
-			pos += strlen(pos) + 1;
 		}
-		g_free(record);
 	}
-	g_free((void*)gdb_commands[0]);
-	
+	gdb_mi_record_free(record);
+
+	if (RC_DONE == exec_sync_command("-stack-list-locals 0", TRUE, &record) && record)
+	{
+		const struct gdb_mi_result *locals = gdb_mi_result_var(record->first, "locals", GDB_MI_VAL_LIST);
+
+		gdb_mi_result_foreach_matched (locals, locals, "name", GDB_MI_VAL_STRING)
+		{
+			variable *var = variable_new(locals->val->v.string, VT_LOCAL);
+			vars = g_list_append(vars, var);
+		}
+	}
+	gdb_mi_record_free(record);
+
+	for (iter = vars; iter; iter = iter->next)
+	{
+		variable *var = iter->data;
+		struct gdb_mi_record *create_record = NULL;
+		gchar *escaped;
+		const gchar *intname;
+
+		/* create new gdb variable */
+		escaped = escape_string(var->name->str);
+		g_snprintf(command, sizeof command, "-var-create - * \"%s\"", escaped);
+		g_free(escaped);
+
+		/* form new variable */
+		if (RC_DONE == exec_sync_command(command, TRUE, &create_record) && create_record &&
+			(intname = gdb_mi_result_var(create_record->first, "name", GDB_MI_VAL_STRING)))
+		{
+			var->evaluated = TRUE;
+			g_string_assign(var->internal, intname);
+			autos = g_list_append(autos, var);
+		}
+		else
+		{
+			var->evaluated = FALSE;
+			g_string_assign(var->internal, "");
+			unevaluated = g_list_append(unevaluated, var);
+		}
+		gdb_mi_record_free(create_record);
+	}
+	g_list_free(vars);
+
 	/* get values for the autos (without incorrect variables) */
 	get_variables(autos);
-	
+
 	/* add incorrect variables */
 	autos = g_list_concat(autos, unevaluated);
 }
 
 /*
- * get autos list 
+ * get autos list
  */
 static GList* get_autos (void)
 {
@@ -1604,7 +1464,7 @@ static GList* get_autos (void)
 }
 
 /*
- * get watches list 
+ * get watches list
  */
 static GList* get_watches (void)
 {
@@ -1612,7 +1472,7 @@ static GList* get_watches (void)
 }
 
 /*
- * get files list 
+ * get files list
  */
 static GList* get_files (void)
 {
@@ -1620,109 +1480,102 @@ static GList* get_files (void)
 }
 
 /*
- * get list of children 
+ * get list of children
  */
 static GList* get_children (gchar* path)
 {
 	GList *children = NULL;
-	
+
 	gchar command[1000];
 	result_class rc;
-	gchar *record = NULL;
-	gchar *pos = NULL;
-	int numchild;
+	struct gdb_mi_record *record = NULL;
+	const gchar *numchild;
+	int n;
 
 	/* children number */
-	sprintf(command, "-var-info-num-children \"%s\"", path);
+	g_snprintf(command, sizeof command, "-var-info-num-children \"%s\"", path);
 	rc = exec_sync_command(command, TRUE, &record);
-	if (RC_DONE != rc)
-		return NULL;
-	pos = strstr(record, "numchild=\"") + strlen("numchild=\"");
-	*(strchr(pos, '\"')) = '\0';
-	numchild = atoi(pos);
-	g_free(record);
-	if (!numchild)
-		return NULL;
-	
-	/* recursive get children and put into list */
-	sprintf(command, "-var-list-children \"%s\"", path);
-	rc = exec_sync_command(command, TRUE, &record);
-	if (RC_DONE == rc)
+	if (RC_DONE != rc || ! record)
 	{
-		pos = record;
-		while ( (pos = strstr(pos, "child={")) )
-		{
-			gchar *name, *internal;
-			variable *var;
-			
-			/* name */
-			pos = strstr(pos, "name=\"") + strlen("name=\"");
-			*(strstr(pos, "\",exp=\"")) = '\0';
-			internal = pos;
-			pos += strlen(pos) + 1;
+		gdb_mi_record_free(record);
+		return NULL;
+	}
+	numchild = gdb_mi_result_var(record->first, "numchild", GDB_MI_VAL_STRING);
+	n = numchild ? atoi(numchild) : 0;
+	gdb_mi_record_free(record);
+	if (!n)
+		return NULL;
 
-			/* exp */
-			pos = strstr(pos, "exp=\"") + strlen("exp=\"");
-			*(strstr(pos, "\",numchild=\"")) = '\0';
-			
-			name = g_strcompress(pos);
-			
+	/* recursive get children and put into list */
+	g_snprintf(command, sizeof command, "-var-list-children \"%s\"", path);
+	rc = exec_sync_command(command, TRUE, &record);
+	if (RC_DONE == rc && record)
+	{
+		const struct gdb_mi_result *child_node = gdb_mi_result_var(record->first, "children", GDB_MI_VAL_LIST);
+
+		gdb_mi_result_foreach_matched (child_node, child_node, "child", GDB_MI_VAL_LIST)
+		{
+			const gchar *internal = gdb_mi_result_var(child_node->val->v.list, "name", GDB_MI_VAL_STRING);
+			const gchar *name = gdb_mi_result_var(child_node->val->v.list, "exp", GDB_MI_VAL_STRING);
+			variable *var;
+
+			if (! name || ! internal)
+				continue;
+
 			var = variable_new2(name, internal, VT_CHILD);
 			var->evaluated = TRUE;
-			
-			pos += strlen(pos) + 1;
 
-			children = g_list_append(children, var);
-		
-			g_free(name);
+			children = g_list_prepend(children, var);
 		}
 	}
-	g_free(record);
-	
+	gdb_mi_record_free(record);
+
+	children = g_list_reverse(children);
 	get_variables(children);
 
 	return children;
 }
 
 /*
- * add new watch 
+ * add new watch
  */
 static variable* add_watch(gchar* expression)
 {
 	gchar command[1000];
-	gchar *record = NULL, *escaped, *pos;
+	gchar *escaped;
+	struct gdb_mi_record *record = NULL;
+	const gchar *name;
 	GList *vars = NULL;
 	variable *var = variable_new(expression, VT_WATCH);
 
 	watches = g_list_append(watches, var);
 
 	/* try to create a variable */
-	escaped = g_strescape(expression, NULL);
-	sprintf(command, "-var-create - * \"%s\"", escaped);
+	escaped = escape_string(var->name->str);
+	g_snprintf(command, sizeof command, "-var-create - * \"%s\"", escaped);
 	g_free(escaped);
 
-	if (RC_DONE != exec_sync_command(command, TRUE, &record))
+	if (RC_DONE != exec_sync_command(command, TRUE, &record) || !record)
 	{
-		g_free(record);
+		gdb_mi_record_free(record);
 		return var;
 	}
-	
-	pos = strstr(record, "name=\"") + strlen("name=\"");
-	*strchr(pos, '\"') = '\0'; 
-	g_string_assign(var->internal, pos);
-	var->evaluated = TRUE;
+
+	name = gdb_mi_result_var(record->first, "name", GDB_MI_VAL_STRING);
+	g_string_assign(var->internal, name ? name : "");
+	var->evaluated = name != NULL;
 
 	vars = g_list_append(NULL, var);
 	get_variables(vars);
 
-	g_free(record);
+	gdb_mi_record_free(record);
 	g_list_free(vars);
 
-	return var;	
+	return var;
 }
 
 /*
- * remove watch 
+ * remove watch
  */
 static void remove_watch(gchar* internal)
 {
@@ -1733,7 +1586,7 @@ static void remove_watch(gchar* internal)
 		if (!strcmp(var->internal->str, internal))
 		{
 			gchar command[1000];
-			sprintf(command, "-var-delete %s", internal);
+			g_snprintf(command, sizeof command, "-var-delete %s", internal);
 			exec_sync_command(command, TRUE, NULL);
 			variable_free(var);
 			watches = g_list_delete_link(watches, iter);
@@ -1747,36 +1600,34 @@ static void remove_watch(gchar* internal)
  */
 static gchar *evaluate_expression(gchar *expression)
 {
-	gchar *record = NULL, *pos;
+	struct gdb_mi_record *record = NULL;
+	gchar *value;
 	char command[1000];
-	result_class rc;
 
-	sprintf (command, "-data-evaluate-expression \"%s\"", expression);
-	rc = exec_sync_command(command, TRUE, &record);
-	
-	if (RC_DONE != rc)
+	g_snprintf(command, sizeof command, "-data-evaluate-expression \"%s\"", expression);
+	if (RC_DONE != exec_sync_command(command, TRUE, &record) || ! record)
 	{
-		g_free(record);
+		gdb_mi_record_free(record);
 		return NULL;
 	}
 
-	pos = strstr(record, "value=\"") + strlen("value=\"");
-	*(strrchr(pos, '\"')) = '\0';
+	value = g_strdup(gdb_mi_result_var(record->first, "value", GDB_MI_VAL_STRING));
+	gdb_mi_record_free(record);
 
-	return unescape(pos);
+	return value;
 }
 
 /*
- * request GDB interrupt 
+ * request GDB interrupt
  */
 static gboolean request_interrupt(void)
 {
 #ifdef DEBUG_OUTPUT
 	char msg[1000];
-	sprintf(msg, "interrupting pid=%i", target_pid);
+	g_snprintf(msg, sizeof msg, "interrupting pid=%i", target_pid);
 	dbg_cbs->send_message(msg, "red");
 #endif
-	
+
 	requested_interrupt = TRUE;
 	kill(target_pid, SIGINT);
 
@@ -1784,7 +1635,7 @@ static gboolean request_interrupt(void)
 }
 
 /*
- * get GDB error messages 
+ * get GDB error messages
  */
 static gchar* error_message(void)
 {
@@ -1792,7 +1643,7 @@ static gchar* error_message(void)
 }
 
 /*
- * define GDB debug module 
+ * define GDB debug module
  */
 DBG_MODULE_DEFINE(gdb);
 

@@ -34,7 +34,7 @@
 
 /* Check that the running Geany supports the plugin API used below, and check
  * for binary compatibility. */
-PLUGIN_VERSION_CHECK(200)
+PLUGIN_VERSION_CHECK(224)
 
 /* All plugins must set name, description, version and author. */
 PLUGIN_SET_TRANSLATABLE_INFO(
@@ -43,10 +43,6 @@ PLUGIN_SET_TRANSLATABLE_INFO(
 	_("Code navigation"),
 	_(	"This plugin adds features to facilitate navigation between source files."), 
 	CODE_NAVIGATION_VERSION, "Lionel Fuentes, Federico Reghenzani")
-
-/* Declare "GeanyKeyGroupInfo plugin_key_group_info[1]" and "GeanyKeyGroup *plugin_key_group",
- * for Geany to find the keybindings */
-PLUGIN_KEY_GROUP(code_navigation, NB_KEY_IDS)
 
 
 /********************* Data types for the feature *********************/
@@ -63,7 +59,8 @@ typedef enum
 /* These items are set by Geany before plugin_init() is called. */
 GeanyPlugin		*geany_plugin;
 GeanyData		*geany_data;
-GeanyFunctions	*geany_functions;
+
+GeanyKeyGroup *plugin_key_group;
 
 static GtkListStore *list_store;	/* for settings dialog */
 
@@ -100,6 +97,8 @@ on_configure_response(GtkDialog *dialog, gint response, gpointer user_data);
 void plugin_init(GeanyData *data)
 {
 	log_func();
+
+	plugin_key_group = plugin_set_key_group(geany_plugin, "code_navigation", NB_KEY_IDS, NULL);
 
 	/* Load configuration */
 	load_configuration();

@@ -19,16 +19,9 @@ static gint glspi_text(lua_State* L)
 
 	if (!doc) { return 0; }
 	if (0 == lua_gettop(L)) { /* Called with no args, GET the current text */
-		gint len = sci_get_length(doc->editor->sci);
-		gchar *txt = NULL;
-		if (len>0) {
-			txt = g_malloc0((guint)len+2);
-			sci_get_text(doc->editor->sci, len+1, txt);
-			lua_pushstring(L, (const gchar *) txt);
-			g_free(txt);
-		} else {
-			lua_pushstring(L, "");
-		}
+		gchar *txt = sci_get_contents(doc->editor->sci, -1);
+		lua_pushstring(L, txt ? txt : "");
+		g_free(txt);
 		return 1;
 	} else { /* Called with one arg, SET the current text */
 		const gchar*txt;
@@ -48,16 +41,9 @@ static gint glspi_selection(lua_State* L)
 
 	DOC_REQUIRED
 	if (0 == lua_gettop(L)) { /* Called with no args, GET the selection */
-		gint len = sci_get_selected_text_length(doc->editor->sci);
-		gchar *txt = NULL;
-		if (len>0) {
-			txt = g_malloc0((guint)(len+1));
-			sci_get_selected_text(doc->editor->sci, txt);
-			lua_pushstring(L, (const gchar *) txt);
-			g_free(txt);
-		} else {
-			lua_pushstring(L, "");
-		}
+		gchar *txt = sci_get_selection_contents(doc->editor->sci);
+		lua_pushstring(L, txt ? txt : "");
+		g_free(txt);
 		return 1;
 	} else { /* Called with one arg, SET the selection */
 		const gchar*txt=NULL;
@@ -753,7 +739,7 @@ static gint glspi_scintilla(lua_State* L)
 
 static gint glspi_find(lua_State* L)
 {
-	struct TextToFind ttf;
+	struct Sci_TextToFind ttf;
 
 	gint flags=0;
 	gint i,n;
@@ -834,7 +820,7 @@ struct CharacterRange {
 */
 
 /*
-struct TextToFind {
+struct Sci_TextToFind {
 		struct CharacterRange chrg;     // range to search
 		char *lpstrText;                // the search pattern (zero terminated)
 		struct CharacterRange chrgText; // returned as position of matching text

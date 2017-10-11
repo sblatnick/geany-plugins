@@ -40,9 +40,12 @@ typedef struct _AoMarkWord				AoMarkWord;
 typedef struct _AoMarkWordClass			AoMarkWordClass;
 
 GType			ao_mark_word_get_type		(void);
-AoMarkWord*		ao_mark_word_new			(gboolean enable);
-void			ao_mark_word_check			(AoMarkWord *bm, GeanyEditor *editor,
-											 SCNotification *nt);
+AoMarkWord*		ao_mark_word_new			(gboolean enable, gboolean single_click_deselect);
+void			ao_mark_document_new		(AoMarkWord *mw, GeanyDocument *document);
+void			ao_mark_document_open		(AoMarkWord *mw, GeanyDocument *document);
+void			ao_mark_document_close		(AoMarkWord *mw, GeanyDocument *document);
+void 			ao_mark_editor_notify		(AoMarkWord *mw, GeanyEditor *editor,
+												SCNotification *nt);
 
 G_END_DECLS
 
