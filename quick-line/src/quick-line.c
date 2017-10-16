@@ -4,7 +4,6 @@
 
 GeanyPlugin *geany_plugin;
 GeanyData *geany_data;
-GeanyFunctions *geany_functions;
 
 static GtkWidget *dialog, *entry;
 static gulong handler;
@@ -77,7 +76,8 @@ static gboolean on_key(GtkWidget *widget, GdkEventKey *event, gpointer user_data
 
 void plugin_init(GeanyData *data)
 {
-	dialog = gtk_window_new(GTK_WINDOW_POPUP);
+	dialog = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+	gtk_window_set_decorated(GTK_WINDOW(dialog), FALSE);
 	g_signal_connect(G_OBJECT(dialog), "show", G_CALLBACK(on_in), NULL);
 	gtk_window_set_transient_for(GTK_WINDOW(dialog), GTK_WINDOW(geany->main_widgets->window));
 
